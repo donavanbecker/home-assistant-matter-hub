@@ -17,15 +17,17 @@ import RunningMode = Thermostat.ThermostatRunningMode;
 import type { ActionContext } from "@matter/main";
 import { transactionIsOffline } from "../../utils/transaction-is-offline.js";
 
-// For dual-mode thermostats (heating + cooling), AutoMode feature IS included because
-// it's required for the minSetpointDeadBand attribute. For single-mode thermostats
-// (heating-only or cooling-only), only the relevant feature is enabled.
-// This ensures controllers like Alexa correctly identify thermostat capabilities.
+// For dual-mode thermostats (heating + cooling), we intentionally do NOT enable AutoMode.
+// AutoMode adds the thermostatRunningMode attribute, which Matter.js's internal
+// #handleSystemModeChange reactor overrides to match systemMode for non-Auto modes
+// (Heat→Heat, Cool→Cool, never Off). This prevents controllers like Apple Home from
+// distinguishing active heating/cooling ("Heating to 26") from idle ("Heat to 26").
 //
-// Matter.js issue #3105: internal #handleSystemModeChange reactor tries to write
-// thermostatRunningMode in post-commit without proper permissions.
-// WORKAROUND: We set thermostatRunningMode ourselves in initialize() and update(), so the
-// internal reactor either sees the correct value already set or the error is harmless.
+// Without AutoMode:
+// - thermostatRunningMode is not exposed → Apple Home relies on thermostatRunningState
+// - Deadband is effectively 0 (Matter.js returns 0 for non-AutoMode devices)
+// - SystemMode.Auto still works (validated by controlSequenceOfOperation, not feature flag)
+// - Matter.js issue #3105 is avoided entirely (no reactor writing without permissions)
 // See: https://github.com/matter-js/matter.js/issues/3105
 
 // Default state values for each feature combination.
@@ -65,13 +67,11 @@ const coolingOnlyDefaults = {
   thermostatRunningState: runningStateAllOff,
 };
 
-// Full defaults include both heating and cooling, plus AutoMode's minSetpointDeadBand.
-// AutoMode is required to expose minSetpointDeadBand attribute, which we set to 0
-// to allow heat_cool thermostats with a single temperature setpoint.
+// Full defaults include both heating and cooling.
+// No AutoMode → no minSetpointDeadBand attribute needed (Matter.js uses 0 internally).
 const fullDefaults = {
   ...heatingOnlyDefaults,
   ...coolingOnlyDefaults,
-  minSetpointDeadBand: 0,
 };
 
 // Feature-specific bases for different thermostat types.
@@ -81,9 +81,7 @@ const fullDefaults = {
 // See: https://github.com/RiDDiX/home-assistant-matter-hub/issues/136
 const HeatingOnlyFeaturedBase = Base.with("Heating").set(heatingOnlyDefaults);
 const CoolingOnlyFeaturedBase = Base.with("Cooling").set(coolingOnlyDefaults);
-const FullFeaturedBase = Base.with("Heating", "Cooling", "AutoMode").set(
-  fullDefaults,
-);
+const FullFeaturedBase = Base.with("Heating", "Cooling").set(fullDefaults);
 
 export interface ThermostatRunningState {
   heat: boolean;
@@ -115,11 +113,6 @@ export interface ThermostatServerConfig {
   }>;
 }
 
-/** Check if AutoMode feature is enabled (false in heating-only/cooling-only variants) */
-function hasAutoMode(self: { features: Record<string, boolean> }): boolean {
-  return !!self.features.autoMode;
-}
-
 /**
  * Pre-super initialization: force-set feature-appropriate attribute values.
  * Must run BEFORE super.initialize() because Matter.js validates setpoints during super.
@@ -131,7 +124,7 @@ function thermostatPreInitialize(self: any): void {
   const currentLocal = self.state.localTemperature;
 
   logger.debug(
-    `initialize: features - heating=${self.features.heating}, cooling=${self.features.cooling}, autoMode=${hasAutoMode(self)}`,
+    `initialize: features - heating=${self.features.heating}, cooling=${self.features.cooling}`,
   );
 
   // Force-set local temperature (always available)
@@ -186,21 +179,7 @@ function thermostatPreInitialize(self: any): void {
   // Initialize thermostatRunningState (optional attribute) so controllers
   // subscribe to it from the start. This is the bitmap that indicates active
   // heating/cooling — used by Apple Home for "Heating to" vs "Heat to" display.
-  // NOTE: thermostatRunningMode is also available for AutoMode devices, but
-  // Matter.js's internal #handleSystemModeChange reactor overrides it for
-  // non-Auto modes to match systemMode, so we cannot use it for active/idle
-  // indication. thermostatRunningState is fully in our control.
   self.state.thermostatRunningState = runningStateAllOff;
-
-  // Initialize thermostatRunningMode (required by AutoMode feature only).
-  // Setting this ourselves prevents Matter.js issue #3105 where the internal
-  // #handleSystemModeChange reactor tries to write thermostatRunningMode
-  // without proper permissions in post-commit.
-  // NOTE: For non-Auto modes (Heat, Cool, Off), the internal reactor always
-  // overrides this to match systemMode. Only for Auto mode is our value preserved.
-  if (hasAutoMode(self)) {
-    self.state.thermostatRunningMode = Thermostat.ThermostatRunningMode.Off;
-  }
 
   // Set initial controlSequenceOfOperation based on enabled features.
   // Will be updated from HA entity's actual hvac_modes in update().
@@ -355,8 +334,6 @@ export class ThermostatServerBase extends FullFeaturedBase {
     // Property order matters: applyPatchState sets properties sequentially, so if one
     // property write triggers an error, subsequent properties won't be set.
     // Limits are set FIRST to ensure they're applied even if mode changes trigger errors.
-    // thermostatRunningMode is set BEFORE systemMode to prevent Matter.js issue #3105
-    // (internal reactor tries to write thermostatRunningMode when systemMode changes).
     applyPatchState(this.state, {
       ...(this.features.heating
         ? {
@@ -379,7 +356,6 @@ export class ThermostatServerBase extends FullFeaturedBase {
         entity.state,
         this.agent,
       ),
-      ...(hasAutoMode(this) ? { thermostatRunningMode: runningMode } : {}),
       thermostatRunningState: this.getRunningState(systemMode, runningMode),
       systemMode: systemMode,
       ...(this.features.heating
@@ -553,7 +529,6 @@ export class ThermostatServerBase extends FullFeaturedBase {
     });
   }
 
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: Called via setpointRaiseLower + prototype copy
   private setTemperature(
     low: Temperature,
     high: Temperature,
@@ -594,17 +569,12 @@ export class ThermostatServerBase extends FullFeaturedBase {
     });
   }
 
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: Called via update + prototype copy
   private getSystemMode(entity: HomeAssistantEntityInformation) {
-    // NOTE: We intentionally allow SystemMode.Auto to be displayed without the AutoMode feature.
-    // The AutoMode feature only adds thermostatRunningMode attribute and its internal reactor.
-    // The systemMode attribute itself (including Auto value) is part of the base Thermostat cluster.
-    // Controllers should be able to display Auto mode without the AutoMode feature enabled.
-    // See: https://github.com/matter-js/matter.js/issues/3105 for why we don't enable AutoMode.
+    // SystemMode.Auto works without the AutoMode feature — Matter.js validates it
+    // only against controlSequenceOfOperation, not feature flags. See file header comment.
     return this.state.config.getSystemMode(entity.state, this.agent);
   }
 
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: Called via update + prototype copy
   private getRunningState(
     systemMode: SystemMode,
     runningMode: RunningMode,
@@ -646,7 +616,6 @@ export class ThermostatServerBase extends FullFeaturedBase {
     }
   }
 
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: Called via update + prototype copy
   private clampSetpoint(
     value: number | undefined,
     min: number | undefined,
