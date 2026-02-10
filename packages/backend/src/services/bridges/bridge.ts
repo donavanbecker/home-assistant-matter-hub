@@ -258,13 +258,18 @@ export class Bridge {
           if (count >= DEAD_SESSION_THRESHOLD) {
             this.log.warn(
               `Subscription health: Session ${sessionId} (peer ${session.peerNodeId}) has had no subscriptions for ${count} consecutive checks. ` +
-                `Closing session to force controller reconnection.`,
+                `Force-closing session to allow controller reconnection.`,
             );
             try {
-              await session.initiateClose();
+              // Use initiateForceClose instead of initiateClose.
+              // initiateClose attempts a graceful close that waits for a peer response -
+              // when the peer is unreachable (e.g. Alexa went offline), the session stays
+              // as a zombie. initiateForceClose marks the peer as lost and immediately
+              // removes the session, forcing the controller to do a full CASE re-establishment.
+              await session.initiateForceClose();
             } catch (e) {
               this.log.debug(
-                `Subscription health: Failed to close session ${sessionId}:`,
+                `Subscription health: Failed to force-close session ${sessionId}:`,
                 e,
               );
             }
