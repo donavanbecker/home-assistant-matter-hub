@@ -85,21 +85,30 @@ export function createLegacyEndpointType(
 /**
  * Add FixedLabel cluster with room name to an endpoint type.
  * Google Home uses { label: "room", value: "<name>" } for automatic room assignment.
+ *
+ * Uses MutableEndpoint.with() to properly extend behaviors instead of manual
+ * object spreading, which can lose MutableEndpoint metadata and cause
+ * "Behaviors have errors" during endpoint initialization.
  */
 function addFixedLabel(type: EndpointType, areaName: string): EndpointType {
   // Matter spec: LabelStruct label and value fields are max 16 bytes each.
-  // Truncate area name to prevent "Behaviors have errors" validation failures.
+  // Truncate area name to prevent validation failures.
   const truncatedName =
     areaName.length > 16 ? areaName.substring(0, 16) : areaName;
-  const fixedLabelWithDefaults = FixedLabelServer.set({
+  const fixedLabel = FixedLabelServer.set({
     labelList: [{ label: "room", value: truncatedName }],
   });
+  // All factory functions return MutableEndpoint which has .with()
+  const mutable = type as EndpointType & {
+    with(...behaviors: unknown[]): EndpointType;
+  };
+  if (typeof mutable.with === "function") {
+    return mutable.with(fixedLabel);
+  }
+  // Fallback for non-mutable types (shouldn't happen in practice)
   return {
     ...type,
-    behaviors: {
-      ...type.behaviors,
-      fixedLabel: fixedLabelWithDefaults,
-    },
+    behaviors: { ...type.behaviors, fixedLabel },
   } as EndpointType;
 }
 
