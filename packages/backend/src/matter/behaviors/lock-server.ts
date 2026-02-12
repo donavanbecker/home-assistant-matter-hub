@@ -42,6 +42,41 @@ function verifyStoredPinHelper(
   }
 }
 
+function buildGetUserResponse(
+  env: { get: (type: typeof LockCredentialStorage) => LockCredentialStorage },
+  entityId: string,
+  userIndex: number,
+): DoorLock.GetUserResponse {
+  if (userIndex !== 1 || !hasStoredCredentialHelper(env, entityId)) {
+    return {
+      userIndex,
+      userName: null,
+      userUniqueId: null,
+      userStatus: DoorLock.UserStatus.Available,
+      userType: null,
+      credentialRule: null,
+      credentials: null,
+      creatorFabricIndex: null,
+      lastModifiedFabricIndex: null,
+      nextUserIndex: null,
+    };
+  }
+  return {
+    userIndex: 1,
+    userName: "PIN User",
+    userUniqueId: 1,
+    userStatus: DoorLock.UserStatus.OccupiedEnabled,
+    userType: DoorLock.UserType.UnrestrictedUser,
+    credentialRule: DoorLock.CredentialRule.Single,
+    credentials: [
+      { credentialType: DoorLock.CredentialType.Pin, credentialIndex: 1 },
+    ],
+    creatorFabricIndex: null,
+    lastModifiedFabricIndex: null,
+    nextUserIndex: null,
+  };
+}
+
 /**
  * Base DoorLock server - used when no PIN is configured for the entity.
  * This provides basic lock/unlock functionality without PIN requirements.
@@ -105,12 +140,15 @@ namespace LockServerBase {
  * a Google policy, not a Matter limitation).
  */
 const PinCredentialBase = Base.with(
+  "User",
   "PinCredential",
   "CredentialOverTheAirAccess",
 ).set({
-  // Required defaults for PinCredential feature
   wrongCodeEntryLimit: 3,
-  userCodeTemporaryDisableTime: 10, // seconds
+  userCodeTemporaryDisableTime: 10,
+  numberOfTotalUsersSupported: 1,
+  numberOfCredentialsSupportedPerUser: 1,
+  credentialRulesSupport: { single: true, dual: false, tri: false },
 });
 
 // biome-ignore lint/correctness/noUnusedVariables: Biome thinks this is unused, but it's used by the function below
@@ -129,11 +167,14 @@ class LockServerWithPinBase extends PinCredentialBase {
     if (this.state.minPinCodeLength === undefined) {
       this.state.minPinCodeLength = 4;
     }
-    if (this.state.sendPinOverTheAir === undefined) {
-      this.state.sendPinOverTheAir = true;
-    }
     if (this.state.requirePinForRemoteOperation === undefined) {
       this.state.requirePinForRemoteOperation = false;
+    }
+    if (this.state.numberOfTotalUsersSupported === undefined) {
+      this.state.numberOfTotalUsersSupported = 1;
+    }
+    if (this.state.numberOfCredentialsSupportedPerUser === undefined) {
+      this.state.numberOfCredentialsSupportedPerUser = 1;
     }
 
     await super.initialize();
@@ -147,8 +188,6 @@ class LockServerWithPinBase extends PinCredentialBase {
       return;
     }
 
-    // Check if a PIN credential is configured for this entity
-    // Also check if PIN is disabled via entity mapping
     const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
     const isPinDisabledByMapping =
       homeAssistant.state.mapping?.disableLockPin === true;
@@ -168,14 +207,12 @@ class LockServerWithPinBase extends PinCredentialBase {
         privacy: false,
         vacation: false,
       },
-      // PIN credential configuration
       numberOfPinUsersSupported: 1,
+      numberOfTotalUsersSupported: 1,
+      numberOfCredentialsSupportedPerUser: 1,
       maxPinCodeLength: 8,
       minPinCodeLength: 4,
-      // Only require PIN for remote operation if a PIN is actually configured
-      // This tells Google Home to prompt for PIN in the app before unlocking
       requirePinForRemoteOperation: hasPinConfigured,
-      sendPinOverTheAir: true,
     });
   }
 
@@ -246,75 +283,91 @@ class LockServerWithPinBase extends PinCredentialBase {
     return verifyStoredPinHelper(this.env, entityId, pin);
   }
 
-  /**
-   * Set a PIN code for a user slot.
-   * The PIN will be hashed before storage.
-   */
-  override async setPinCode(
-    request: DoorLock.SetPinCodeRequest,
-  ): Promise<void> {
+  override getUser(request: DoorLock.GetUserRequest): DoorLock.GetUserResponse {
     const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
-    const storage = this.env.get(LockCredentialStorage);
-
-    const pinCode = new TextDecoder().decode(request.pin);
-
-    await storage.setCredential({
-      entityId: homeAssistant.entityId,
-      pinCode,
-      name: `User ${request.userId}`,
-      enabled: request.userStatus === DoorLock.UserStatus.OccupiedEnabled,
-    });
+    return buildGetUserResponse(
+      this.env,
+      homeAssistant.entityId,
+      request.userIndex,
+    );
   }
 
-  /**
-   * Get a PIN code for a user slot.
-   * Note: We cannot return the actual PIN since it's hashed.
-   * We return a placeholder to indicate a PIN exists.
-   */
-  override getPinCode(
-    request: DoorLock.GetPinCodeRequest,
-  ): DoorLock.GetPinCodeResponse {
-    const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
-    const hasCredential = this.hasStoredCredential(homeAssistant.entityId);
-
-    if (!hasCredential || request.userId !== 1) {
-      return {
-        userId: request.userId,
-        userStatus: DoorLock.UserStatus.Available,
-        userType: null,
-        pinCode: null,
-      };
-    }
-
-    // Cannot return actual PIN since it's hashed - return empty to indicate PIN exists
-    return {
-      userId: request.userId,
-      userStatus: DoorLock.UserStatus.OccupiedEnabled,
-      userType: DoorLock.UserType.UnrestrictedUser,
-      pinCode: null, // PIN is hashed, cannot be retrieved
-    };
+  override async setUser(): Promise<void> {
+    // Users are managed via the entity mapping UI, not via Matter commands
   }
 
-  /**
-   * Clear a specific PIN code.
-   */
-  override async clearPinCode(
-    request: DoorLock.ClearPinCodeRequest,
-  ): Promise<void> {
-    if (request.pinSlotIndex === 1) {
+  override async clearUser(request: DoorLock.ClearUserRequest): Promise<void> {
+    if (request.userIndex === 1 || request.userIndex === 0xfffe) {
       const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
       const storage = this.env.get(LockCredentialStorage);
       await storage.deleteCredential(homeAssistant.entityId);
     }
   }
 
-  /**
-   * Clear all PIN codes.
-   */
-  override async clearAllPinCodes(): Promise<void> {
+  override async setCredential(
+    request: DoorLock.SetCredentialRequest,
+  ): Promise<DoorLock.SetCredentialResponse> {
     const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
-    const storage = this.env.get(LockCredentialStorage);
-    await storage.deleteCredential(homeAssistant.entityId);
+    if (
+      request.credential.credentialType !== DoorLock.CredentialType.Pin ||
+      request.credential.credentialIndex !== 1
+    ) {
+      return {
+        status: 0x01 as never,
+        userIndex: null,
+        nextCredentialIndex: null,
+      };
+    }
+    if (request.credentialData) {
+      const pinCode = new TextDecoder().decode(request.credentialData);
+      const storage = this.env.get(LockCredentialStorage);
+      await storage.setCredential({
+        entityId: homeAssistant.entityId,
+        pinCode,
+        name: "User 1",
+        enabled: true,
+      });
+    }
+    return { status: 0x00 as never, userIndex: 1, nextCredentialIndex: null };
+  }
+
+  override getCredentialStatus(
+    request: DoorLock.GetCredentialStatusRequest,
+  ): DoorLock.GetCredentialStatusResponse {
+    const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
+    if (
+      request.credential.credentialType !== DoorLock.CredentialType.Pin ||
+      request.credential.credentialIndex !== 1
+    ) {
+      return {
+        credentialExists: false,
+        userIndex: null,
+        creatorFabricIndex: null,
+        lastModifiedFabricIndex: null,
+        nextCredentialIndex: null,
+      };
+    }
+    const exists = hasStoredCredentialHelper(this.env, homeAssistant.entityId);
+    return {
+      credentialExists: exists,
+      userIndex: exists ? 1 : null,
+      creatorFabricIndex: null,
+      lastModifiedFabricIndex: null,
+      nextCredentialIndex: null,
+    };
+  }
+
+  override async clearCredential(
+    request: DoorLock.ClearCredentialRequest,
+  ): Promise<void> {
+    if (
+      request.credential === null ||
+      request.credential.credentialType === DoorLock.CredentialType.Pin
+    ) {
+      const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
+      const storage = this.env.get(LockCredentialStorage);
+      await storage.deleteCredential(homeAssistant.entityId);
+    }
   }
 }
 
@@ -352,12 +405,16 @@ export function LockServerWithPin(config: LockServerConfig) {
  * Apple Home shows an "Unlatch" button when this feature is present.
  */
 const PinCredentialUnboltBase = Base.with(
+  "User",
   "PinCredential",
   "CredentialOverTheAirAccess",
   "Unbolting",
 ).set({
   wrongCodeEntryLimit: 3,
   userCodeTemporaryDisableTime: 10,
+  numberOfTotalUsersSupported: 1,
+  numberOfCredentialsSupportedPerUser: 1,
+  credentialRulesSupport: { single: true, dual: false, tri: false },
 });
 
 // biome-ignore lint/correctness/noUnusedVariables: Used by the factory function below
@@ -374,11 +431,14 @@ class LockServerWithPinAndUnboltBase extends PinCredentialUnboltBase {
     if (this.state.minPinCodeLength === undefined) {
       this.state.minPinCodeLength = 4;
     }
-    if (this.state.sendPinOverTheAir === undefined) {
-      this.state.sendPinOverTheAir = true;
-    }
     if (this.state.requirePinForRemoteOperation === undefined) {
       this.state.requirePinForRemoteOperation = false;
+    }
+    if (this.state.numberOfTotalUsersSupported === undefined) {
+      this.state.numberOfTotalUsersSupported = 1;
+    }
+    if (this.state.numberOfCredentialsSupportedPerUser === undefined) {
+      this.state.numberOfCredentialsSupportedPerUser = 1;
     }
 
     await super.initialize();
@@ -411,10 +471,11 @@ class LockServerWithPinAndUnboltBase extends PinCredentialUnboltBase {
         vacation: false,
       },
       numberOfPinUsersSupported: 1,
+      numberOfTotalUsersSupported: 1,
+      numberOfCredentialsSupportedPerUser: 1,
       maxPinCodeLength: 8,
       minPinCodeLength: 4,
       requirePinForRemoteOperation: hasPinConfigured,
-      sendPinOverTheAir: true,
     });
   }
 
@@ -495,58 +556,91 @@ class LockServerWithPinAndUnboltBase extends PinCredentialUnboltBase {
     homeAssistant.callAction(action);
   }
 
-  override async setPinCode(
-    request: DoorLock.SetPinCodeRequest,
-  ): Promise<void> {
+  override getUser(request: DoorLock.GetUserRequest): DoorLock.GetUserResponse {
     const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
-    const storage = this.env.get(LockCredentialStorage);
-    const pinCode = new TextDecoder().decode(request.pin);
-    await storage.setCredential({
-      entityId: homeAssistant.entityId,
-      pinCode,
-      name: `User ${request.userId}`,
-      enabled: request.userStatus === DoorLock.UserStatus.OccupiedEnabled,
-    });
-  }
-
-  override getPinCode(
-    request: DoorLock.GetPinCodeRequest,
-  ): DoorLock.GetPinCodeResponse {
-    const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
-    const hasCredential = hasStoredCredentialHelper(
+    return buildGetUserResponse(
       this.env,
       homeAssistant.entityId,
+      request.userIndex,
     );
-    if (!hasCredential || request.userId !== 1) {
-      return {
-        userId: request.userId,
-        userStatus: DoorLock.UserStatus.Available,
-        userType: null,
-        pinCode: null,
-      };
-    }
-    return {
-      userId: request.userId,
-      userStatus: DoorLock.UserStatus.OccupiedEnabled,
-      userType: DoorLock.UserType.UnrestrictedUser,
-      pinCode: null,
-    };
   }
 
-  override async clearPinCode(
-    request: DoorLock.ClearPinCodeRequest,
-  ): Promise<void> {
-    if (request.pinSlotIndex === 1) {
+  override async setUser(): Promise<void> {
+    // Users are managed via the entity mapping UI, not via Matter commands
+  }
+
+  override async clearUser(request: DoorLock.ClearUserRequest): Promise<void> {
+    if (request.userIndex === 1 || request.userIndex === 0xfffe) {
       const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
       const storage = this.env.get(LockCredentialStorage);
       await storage.deleteCredential(homeAssistant.entityId);
     }
   }
 
-  override async clearAllPinCodes(): Promise<void> {
+  override async setCredential(
+    request: DoorLock.SetCredentialRequest,
+  ): Promise<DoorLock.SetCredentialResponse> {
     const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
-    const storage = this.env.get(LockCredentialStorage);
-    await storage.deleteCredential(homeAssistant.entityId);
+    if (
+      request.credential.credentialType !== DoorLock.CredentialType.Pin ||
+      request.credential.credentialIndex !== 1
+    ) {
+      return {
+        status: 0x01 as never,
+        userIndex: null,
+        nextCredentialIndex: null,
+      };
+    }
+    if (request.credentialData) {
+      const pinCode = new TextDecoder().decode(request.credentialData);
+      const storage = this.env.get(LockCredentialStorage);
+      await storage.setCredential({
+        entityId: homeAssistant.entityId,
+        pinCode,
+        name: "User 1",
+        enabled: true,
+      });
+    }
+    return { status: 0x00 as never, userIndex: 1, nextCredentialIndex: null };
+  }
+
+  override getCredentialStatus(
+    request: DoorLock.GetCredentialStatusRequest,
+  ): DoorLock.GetCredentialStatusResponse {
+    const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
+    if (
+      request.credential.credentialType !== DoorLock.CredentialType.Pin ||
+      request.credential.credentialIndex !== 1
+    ) {
+      return {
+        credentialExists: false,
+        userIndex: null,
+        creatorFabricIndex: null,
+        lastModifiedFabricIndex: null,
+        nextCredentialIndex: null,
+      };
+    }
+    const exists = hasStoredCredentialHelper(this.env, homeAssistant.entityId);
+    return {
+      credentialExists: exists,
+      userIndex: exists ? 1 : null,
+      creatorFabricIndex: null,
+      lastModifiedFabricIndex: null,
+      nextCredentialIndex: null,
+    };
+  }
+
+  override async clearCredential(
+    request: DoorLock.ClearCredentialRequest,
+  ): Promise<void> {
+    if (
+      request.credential === null ||
+      request.credential.credentialType === DoorLock.CredentialType.Pin
+    ) {
+      const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
+      const storage = this.env.get(LockCredentialStorage);
+      await storage.deleteCredential(homeAssistant.entityId);
+    }
   }
 }
 
