@@ -37,7 +37,7 @@ of port forwarding etc.
 
 | Channel | Branch | Current Version | Description |
 |---------|--------|-----------------|-------------|
-| **Stable** | `main` | v2.0.x | Production-ready, recommended for most users |
+| **Stable** | `main` | v2.0.17 | Production-ready, recommended for most users |
 | **Alpha** | `alpha` | v2.1.0-alpha.x | Pre-release with new features, for early adopters |
 | **Testing** | `testing` | v4.1.0-testing.x | ⚠️ **Highly unstable!** Experimental features, may break |
 
@@ -52,42 +52,17 @@ of port forwarding etc.
 ## 🎉 What's New
 
 <details>
-<summary><strong>📦 Stable Features (v2.0.x)</strong> - Click to expand</summary>
-
-| Feature | Description |
-|---------|-------------|
-| **🌬️ Fan Oscillation** | Rocking/oscillation via Matter ([#108](https://github.com/RiDDiX/home-assistant-matter-hub/discussions/108)) |
-| **🌬️ Wind Modes** | Natural Wind, Sleep Wind preset modes |
-| **🔋 PowerSource** | Battery support for Climate, Fan, Temperature sensors |
-| **🔒 Lock PIN** | PBKDF2 hashed PINs, lock without PIN, per-lock disable option ([#95](https://github.com/RiDDiX/home-assistant-matter-hub/issues/95)) |
-| **🚪 Cover/Blinds** | `coverSwapOpenClose` flag for Alexa ([#117](https://github.com/RiDDiX/home-assistant-matter-hub/issues/117)) |
-| **🔋 Battery Entity** | `batteryEntity` mapping for Roomba/Deebot/Climate/Fan ([#112](https://github.com/RiDDiX/home-assistant-matter-hub/issues/112)) |
-| **🤖 Vacuum Rooms** | Ecovacs Deebot, Roborock, Dreame room support ([#118](https://github.com/RiDDiX/home-assistant-matter-hub/pull/118), [#106](https://github.com/RiDDiX/home-assistant-matter-hub/issues/106)) |
-| **🤖 Vacuum Cleaning Modes** | Dreame cleaning mode entity mapping ([#110](https://github.com/RiDDiX/home-assistant-matter-hub/issues/110)) |
-| **� Force Sync** | Push device states to controllers, auto-sync every 5min |
-| **�🔋 Auto Entity Grouping** | Auto Battery/Humidity mapping feature flags |
-| **🏷️ Labels API** | `/api/matter/labels` for label-based filtering |
-| **🌡️ Thermostat** | Heat/Cool mode fix, AutoMode support |
-| **💡 Lights** | ColorTemp + HueSat fix, boundary order fix |
-| **🌡️ Sensors** | PM2.5/PM10/CO2/TVOC fixes, Apple Home defaults |
-| **🌬️ Air Purifier** | HEPA Filter Life Monitoring |
-| **📋 Copy to Clipboard** | Copy endpoint data button in UI ([#121](https://github.com/RiDDiX/home-assistant-matter-hub/pull/121)) |
-| **🐛 Bug Fixes** | Lock initialization fix ([#122](https://github.com/RiDDiX/home-assistant-matter-hub/issues/122)), vacuum log spam fix ([#123](https://github.com/RiDDiX/home-assistant-matter-hub/issues/123)) |
-
-</details>
-
-<details>
-<summary><strong>🧪 Alpha Features (v2.1.0-alpha.x)</strong> - Click to expand</summary>
-
-> [!NOTE]
-> These features are available in the Alpha channel and will be included in the next stable release once testing is complete.
+<summary><strong>📦 Stable Features (v2.0.17)</strong> - Click to expand</summary>
 
 | Feature | Description |
 |---------|-------------|
 | **🏷️ Automatic Room Assignment** | Entities are automatically assigned to rooms in Matter controllers (Google Home, Apple Home) based on HA area assignments using the FixedLabel cluster ([#77](https://github.com/RiDDiX/home-assistant-matter-hub/discussions/77)) |
 | **🏷️ Device-Level Label Filter** | Label filter now also matches device-level labels, not just entity labels |
-| **🌡️ Thermostat Overhaul** | Major thermostat improvements: negative temperature support, proper Auto mode, hvac_action-based running state, Alexa-compatible feature variants, NaN guards, per-property error handling ([#52](https://github.com/RiDDiX/home-assistant-matter-hub/issues/52), [#136](https://github.com/RiDDiX/home-assistant-matter-hub/issues/136), [#137](https://github.com/RiDDiX/home-assistant-matter-hub/issues/137), [#143](https://github.com/RiDDiX/home-assistant-matter-hub/issues/143), [#146](https://github.com/RiDDiX/home-assistant-matter-hub/issues/146)) |
-| **🌡️ localTemperature null** | Set localTemperature to null when HA reports current_temperature unavailable — fixes Apple Home display ([#146](https://github.com/RiDDiX/home-assistant-matter-hub/issues/146)) |
+| **🌡️ Thermostat Overhaul** | Major thermostat improvements: negative temperature support, proper Auto mode, hvac_action-based running state, Alexa-compatible feature variants, localTemperature setpoint fallback, NaN guards, per-property error handling ([#52](https://github.com/RiDDiX/home-assistant-matter-hub/issues/52), [#136](https://github.com/RiDDiX/home-assistant-matter-hub/issues/136), [#137](https://github.com/RiDDiX/home-assistant-matter-hub/issues/137), [#143](https://github.com/RiDDiX/home-assistant-matter-hub/issues/143), [#146](https://github.com/RiDDiX/home-assistant-matter-hub/issues/146)) |
+| **🔒 Lock Unlatch/Unbolt** | Locks with HA OPEN support now expose the Matter Unbolting feature — Apple Home shows an Unlatch button ([#153](https://github.com/RiDDiX/home-assistant-matter-hub/issues/153)) |
+| **🔒 Lock User Feature** | DoorLock now includes User feature for Apple Home commissioning compatibility |
+| **🔘 Binary Sensor Fix** | Binary sensors with device_class running/plug/power now map to OnOffSensor (On/Off) instead of ContactSensor (Open/Closed) ([#154](https://github.com/RiDDiX/home-assistant-matter-hub/issues/154)) |
+| **🌡️ Auto Pressure Mapping** | Pressure sensors on the same device as temperature sensors are automatically combined into a single endpoint with PressureMeasurement cluster (e.g. Aqara WSDCGQ11LM) |
 | **🚿 Water Heater Limits** | Pass min/max limits at endpoint level to prevent 50°C cap regression ([#145](https://github.com/RiDDiX/home-assistant-matter-hub/issues/145)) |
 | **🤖 Vacuum Fixes** | Remove OnOff from bridged vacuum to fix Apple Home "Updating" status, GoHome command, OperationCompletion event, state deduplication & debouncing ([#103](https://github.com/RiDDiX/home-assistant-matter-hub/issues/103)) |
 | **🚪 Cover Fix** | Fix coverSwapOpenClose not affecting position display ([#148](https://github.com/RiDDiX/home-assistant-matter-hub/issues/148)) |
@@ -106,6 +81,14 @@ of port forwarding etc.
 | **📋 Page Size Selector** | Configurable page size selector on All Devices page |
 | **📖 Labels & Areas Page** | New Labels & Areas reference page in the frontend UI |
 | **🐛 Behavior Error Logging** | Enhanced diagnostic logging for "Behaviors have errors" — extracts per-behavior error details |
+
+</details>
+
+<details>
+<summary><strong>🧪 Alpha Features (v2.1.0-alpha.x)</strong> - Click to expand</summary>
+
+> [!NOTE]
+> Alpha and Stable are currently in sync. No additional alpha-only features at this time.
 
 </details>
 
@@ -131,8 +114,8 @@ of port forwarding etc.
 <details>
 <summary><strong>📜 Previous Stable Versions</strong> - Click to expand</summary>
 
-### v2.0.x
-Force Sync, Lock PIN, Cover/Blinds improvements, Roborock Rooms, Auto Entity Grouping, Water Heater, Vacuum Server Mode
+### v2.0.16
+Force Sync, Lock PIN, Cover/Blinds improvements, Roborock Rooms, Auto Entity Grouping, Water Heater, Vacuum Server Mode, OOM fix
 
 ### v1.10.4
 Climate/Thermostat fixes, Cover position fix, Vacuum battery, Humidifier improvements, Entity Mapping, Alexa brightness preserve
@@ -159,12 +142,12 @@ Matter Bridge, Multi-Fabric support, Health Monitoring, Bridge Wizard, AirQualit
 |-----------------------|-------------------|---------------|
 | `light` | On/Off, Dimmable, Color Temp, Extended Color | |
 | `switch`, `input_boolean` | On/Off Plug-in Unit | |
-| `lock` | Door Lock | PIN Credentials |
+| `lock` | Door Lock | PIN Credentials, Unlatch/Unbolt |
 | `cover` | Window Covering | `coverSwapOpenClose` |
 | `climate` | Thermostat | Battery via `batteryEntity` |
 | `fan` | Fan, Air Purifier | Oscillation, Wind Modes |
-| `binary_sensor` | Contact, Occupancy, Smoke/CO, Water Leak | |
-| `sensor` | Temperature, Humidity, Pressure, Flow, Light, AirQuality | `batteryEntity`, `humidityEntity` |
+| `binary_sensor` | Contact, OnOff, Occupancy, Smoke/CO, Water Leak | |
+| `sensor` | Temperature, Humidity, Pressure, Flow, Light, AirQuality | `batteryEntity`, `humidityEntity`, `pressureEntity` |
 | `button`, `input_button` | Generic Switch | |
 | `media_player` | Speaker, Basic Video Player (TV) | |
 | `valve` | Water Valve, Pump | |
