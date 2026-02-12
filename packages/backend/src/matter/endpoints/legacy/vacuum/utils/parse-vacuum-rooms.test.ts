@@ -53,9 +53,39 @@ describe("parseVacuumRooms", () => {
     };
     const result = parseVacuumRooms(attributes);
     expect(result).toEqual([
-      { id: 1, name: "Kitchen", icon: undefined },
-      { id: 2, name: "Living Room", icon: undefined },
+      { id: 1, name: "Kitchen", icon: undefined, originalId: 1 },
+      { id: 2, name: "Living Room", icon: undefined, originalId: 2 },
     ]);
+  });
+
+  it("should deduplicate room IDs across floors in Dreame format", () => {
+    const attributes: VacuumDeviceAttributes = {
+      rooms: {
+        Upstairs: [
+          { id: 1, name: "Bedroom" },
+          { id: 2, name: "Bathroom" },
+        ],
+        Downstairs: [
+          { id: 1, name: "Kitchen" },
+          { id: 2, name: "Living Room" },
+        ],
+      },
+    };
+    const result = parseVacuumRooms(attributes);
+    expect(result).toHaveLength(4);
+    // All IDs must be unique
+    const ids = result.map((r) => r.id);
+    expect(new Set(ids).size).toBe(4);
+    // originalId preserves per-floor IDs
+    expect(result[0]).toMatchObject({ name: "Bedroom", originalId: 1 });
+    expect(result[1]).toMatchObject({ name: "Bathroom", originalId: 2 });
+    expect(result[2]).toMatchObject({ name: "Kitchen", originalId: 1 });
+    expect(result[3]).toMatchObject({ name: "Living Room", originalId: 2 });
+    // Floor 0 IDs unchanged, Floor 1 IDs offset by 10000
+    expect(result[0].id).toBe(1);
+    expect(result[1].id).toBe(2);
+    expect(result[2].id).toBe(10001);
+    expect(result[3].id).toBe(10002);
   });
 
   it("should filter out unnamed rooms by default", () => {
