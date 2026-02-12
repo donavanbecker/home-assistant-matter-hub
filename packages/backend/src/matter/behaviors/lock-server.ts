@@ -495,10 +495,15 @@ class LockServerWithPinAndUnboltBase extends PinCredentialUnboltBase {
 
   override unlockDoor(request: DoorLock.UnlockDoorRequest) {
     const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
-    const action = this.state.config.unlock(void 0, this.agent);
+    // Use unlatch action if available (lock.open = unlock + unlatch on most locks)
+    // This ensures Apple Home's unlock also unlatches, matching Google Home behavior
+    const unlatchConfig = this.state.config.unlatch;
+    const action = unlatchConfig
+      ? unlatchConfig(void 0, this.agent)
+      : this.state.config.unlock(void 0, this.agent);
     const hasPinProvided = !!request.pinCode;
     console.log(
-      `[LockServer] unlockDoor called for ${homeAssistant.entityId}, PIN provided: ${hasPinProvided}, requirePin: ${this.state.requirePinForRemoteOperation}`,
+      `[LockServer] unlockDoor called for ${homeAssistant.entityId}, PIN provided: ${hasPinProvided}, requirePin: ${this.state.requirePinForRemoteOperation}, usingUnlatch: ${!!unlatchConfig}`,
     );
     if (this.state.requirePinForRemoteOperation) {
       if (!request.pinCode) {
