@@ -1,11 +1,17 @@
 import type { EndpointData } from "@home-assistant-matter-hub/common";
+import BatteryAlertIcon from "@mui/icons-material/BatteryAlert";
+import BatteryChargingFullIcon from "@mui/icons-material/BatteryChargingFull";
+import BatteryFullIcon from "@mui/icons-material/BatteryFull";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import EditIcon from "@mui/icons-material/Edit";
 import ErrorIcon from "@mui/icons-material/Error";
+import LinkIcon from "@mui/icons-material/Link";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
+import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
@@ -107,7 +113,20 @@ const getDeviceColor = (deviceType: string): string => {
 interface HomeAssistantEntityState {
   entity?: {
     entity_id?: string;
+    state?: {
+      state?: string;
+    };
   };
+  mapping?: {
+    batteryEntity?: string;
+    humidityEntity?: string;
+    pressureEntity?: string;
+  };
+}
+
+interface PowerSourceState {
+  batPercentRemaining?: number | null;
+  batChargeState?: number;
 }
 
 export interface EndpointCardProps {
@@ -137,12 +156,45 @@ export const EndpointCard = ({
 
   const isReachable = basicInfo?.reachable ?? true;
 
-  const entityId = useMemo(() => {
+  const haEntity = useMemo(() => {
     const state = endpoint.state as {
       homeAssistantEntity?: HomeAssistantEntityState;
     };
-    return state.homeAssistantEntity?.entity?.entity_id;
+    return state.homeAssistantEntity;
   }, [endpoint.state]);
+
+  const entityId = haEntity?.entity?.entity_id;
+  const haState = haEntity?.entity?.state?.state;
+  const isUnavailable = haState === "unavailable" || haState === "unknown";
+
+  const mapping = haEntity?.mapping;
+  const autoMappings = useMemo(() => {
+    const mappings: { label: string; entity: string }[] = [];
+    if (mapping?.batteryEntity) {
+      mappings.push({ label: "Battery", entity: mapping.batteryEntity });
+    }
+    if (mapping?.humidityEntity) {
+      mappings.push({ label: "Humidity", entity: mapping.humidityEntity });
+    }
+    if (mapping?.pressureEntity) {
+      mappings.push({ label: "Pressure", entity: mapping.pressureEntity });
+    }
+    return mappings;
+  }, [mapping]);
+
+  const powerSource = useMemo(() => {
+    const state = endpoint.state as { powerSource?: PowerSourceState };
+    return state.powerSource;
+  }, [endpoint.state]);
+
+  const batteryPercent = useMemo(() => {
+    if (powerSource?.batPercentRemaining == null) return null;
+    return Math.round(powerSource.batPercentRemaining / 2);
+  }, [powerSource]);
+
+  // batChargeState: 0=Unknown, 1=IsCharging, 2=IsAtFullCharge, 3=IsNotCharging
+  const isCharging =
+    powerSource?.batChargeState === 1 || powerSource?.batChargeState === 2;
 
   const clusters = useMemo(() => {
     return Object.keys(endpoint.state).filter(
@@ -349,14 +401,30 @@ export const EndpointCard = ({
                   </IconButton>
                 </Tooltip>
               )}
-              <Tooltip title={isReachable ? "Online" : "Offline"}>
-                {isReachable ? (
-                  <CheckCircleIcon color="success" fontSize="small" />
-                ) : (
-                  <ErrorIcon color="error" fontSize="small" />
-                )}
-              </Tooltip>
+              {isUnavailable ? (
+                <Tooltip title={`HA State: ${haState}`}>
+                  <WarningAmberIcon color="warning" fontSize="small" />
+                </Tooltip>
+              ) : (
+                <Tooltip title={isReachable ? "Online" : "Offline"}>
+                  {isReachable ? (
+                    <CheckCircleIcon color="success" fontSize="small" />
+                  ) : (
+                    <ErrorIcon color="error" fontSize="small" />
+                  )}
+                </Tooltip>
+              )}
             </Box>
+            {entityId && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                fontFamily="monospace"
+                noWrap
+              >
+                {entityId}
+              </Typography>
+            )}
             {bridgeName && (
               <Typography variant="body2" color="text.secondary" noWrap>
                 {bridgeName}
@@ -389,13 +457,64 @@ export const EndpointCard = ({
           </Box>
         </Box>
 
+        {/* Battery & Auto-Mappings */}
+        {(batteryPercent != null || autoMappings.length > 0) && (
+          <>
+            <Divider sx={{ my: 1 }} />
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ flexWrap: "wrap", gap: 0.5, mb: 1 }}
+            >
+              {batteryPercent != null && (
+                <Chip
+                  icon={
+                    isCharging ? (
+                      <BatteryChargingFullIcon />
+                    ) : batteryPercent <= 20 ? (
+                      <BatteryAlertIcon />
+                    ) : (
+                      <BatteryFullIcon />
+                    )
+                  }
+                  label={`${batteryPercent}%`}
+                  size="small"
+                  color={
+                    isCharging
+                      ? "info"
+                      : batteryPercent <= 10
+                        ? "error"
+                        : batteryPercent <= 20
+                          ? "warning"
+                          : "success"
+                  }
+                  variant="outlined"
+                />
+              )}
+              {autoMappings.map((m) => (
+                <Tooltip key={m.label} title={m.entity}>
+                  <Chip
+                    icon={<LinkIcon />}
+                    label={m.label}
+                    size="small"
+                    variant="outlined"
+                    sx={{ fontSize: "0.7rem", height: 22 }}
+                  />
+                </Tooltip>
+              ))}
+            </Stack>
+          </>
+        )}
+
+        {/* Clusters */}
         <Box>
           <Typography
             variant="caption"
             color="text.secondary"
             sx={{ display: "block", mb: 0.5 }}
           >
-            Available Clusters ({clusters.length})
+            Clusters ({clusters.length})
           </Typography>
           <Stack
             direction="row"

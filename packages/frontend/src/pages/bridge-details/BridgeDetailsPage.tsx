@@ -16,6 +16,7 @@ import { Breadcrumbs } from "../../components/breadcrumbs/Breadcrumbs.tsx";
 import { BridgeDetails } from "../../components/bridge/BridgeDetails.tsx";
 import { BridgeStatusHint } from "../../components/bridge/BridgeStatusHint.tsx";
 import { BridgeStatusIcon } from "../../components/bridge/BridgeStatusIcon.tsx";
+import { DiagnosticsCard } from "../../components/bridge/DiagnosticsCard.tsx";
 import { EndpointList } from "../../components/endpoints/EndpointList.tsx";
 import { EntityMappingSection } from "../../components/entity-mapping/EntityMappingSection.js";
 import { useNotifications } from "../../components/notifications/use-notifications.ts";
@@ -145,6 +146,8 @@ export const BridgeDetailsPage = () => {
       )}
 
       <MemoizedBridgeDetails bridge={bridge} />
+
+      {devices && <DiagnosticsCard devices={devices} />}
 
       <EntityMappingSection bridgeId={bridgeId} key={mappingRefreshKey} />
 
