@@ -14,6 +14,7 @@ import { BinarySensorDevice } from "./binary-sensor/index.js";
 import { ButtonDevice } from "./button/index.js";
 import { ClimateDevice } from "./climate/index.js";
 import { CoverDevice } from "./cover/index.js";
+import { EventDevice } from "./event/index.js";
 import { FanDevice } from "./fan/index.js";
 import { HumidifierDevice } from "./humidifier/index.js";
 import { InputButtonDevice } from "./input-button/index.js";
@@ -144,6 +145,7 @@ const deviceCtrs: Partial<
   alarm_control_panel: AlarmControlPanelDevice,
   remote: RemoteDevice,
   water_heater: WaterHeaterDevice,
+  event: EventDevice,
 };
 
 const matterDeviceTypeFactories: Partial<
@@ -216,4 +218,5 @@ const matterDeviceTypeFactories: Partial<
   water_valve: ValveDevice,
   pump: PumpEndpoint,
   water_heater: WaterHeaterDevice,
+  generic_switch: EventDevice,
 };

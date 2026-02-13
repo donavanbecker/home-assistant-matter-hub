@@ -167,6 +167,7 @@ export const domainToDefaultMatterTypes: Partial<
   button: ["generic_switch"],
   climate: ["thermostat"],
   cover: ["window_covering"],
+  event: ["generic_switch"],
   fan: ["air_purifier", "fan"],
   humidifier: ["humidifier_dehumidifier"],
   input_boolean: ["on_off_plugin_unit", "on_off_switch"],

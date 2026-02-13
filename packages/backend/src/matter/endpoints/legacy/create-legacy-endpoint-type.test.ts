@@ -158,6 +158,13 @@ const testEntities: Record<
       current_humidity: 45,
     }),
   ],
+  [HomeAssistantDomain.event]: [
+    createEntity("event.doorbell_press", "2024-01-01T00:00:00", {
+      device_class: "doorbell",
+      event_types: ["press", "double_press"],
+      event_type: "press",
+    }),
+  ],
   [HomeAssistantDomain.valve]: [createEntity("valve.v1", "open")],
   [HomeAssistantDomain.alarm_control_panel]: [
     createEntity("alarm_control_panel.a1", "armed_away"),

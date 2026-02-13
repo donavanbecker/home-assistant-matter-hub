@@ -5,6 +5,7 @@ export enum HomeAssistantDomain {
   binary_sensor = "binary_sensor",
   climate = "climate",
   cover = "cover",
+  event = "event",
   fan = "fan",
   humidifier = "humidifier",
   input_boolean = "input_boolean",
