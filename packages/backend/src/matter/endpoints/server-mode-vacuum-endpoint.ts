@@ -38,6 +38,27 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
       return undefined;
     }
 
+    // Auto-assign battery entity if not manually set
+    let effectiveMapping = mapping;
+    if (entity.device_id) {
+      if (registry.isAutoBatteryMappingEnabled() && !mapping?.batteryEntity) {
+        const batteryEntityId = registry.findBatteryEntityForDevice(
+          entity.device_id,
+        );
+        if (batteryEntityId && batteryEntityId !== entityId) {
+          effectiveMapping = {
+            ...effectiveMapping,
+            entityId: effectiveMapping?.entityId ?? entityId,
+            batteryEntity: batteryEntityId,
+          };
+          registry.markBatteryEntityUsed(batteryEntityId);
+          logger.debug(
+            `Auto-assigned battery ${batteryEntityId} to ${entityId}`,
+          );
+        }
+      }
+    }
+
     const payload = {
       entity_id: entityId,
       state,
@@ -45,11 +66,11 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
       deviceRegistry,
     };
 
-    const customName = mapping?.customName;
+    const customName = effectiveMapping?.customName;
     const endpointType = ServerModeVacuumDevice({
       entity: payload,
       customName,
-      mapping,
+      mapping: effectiveMapping,
     });
 
     if (!endpointType) {

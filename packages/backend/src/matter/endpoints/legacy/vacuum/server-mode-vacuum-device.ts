@@ -68,20 +68,31 @@ export function ServerModeVacuumDevice(
   // Start/stop is handled via RvcRunMode.changeToMode(Cleaning/Idle).
 
   // Add PowerSource if BATTERY feature is set OR if battery attribute exists
+  // OR if a battery entity is mapped (for Roomba, Deebot, etc.)
   const batteryValue = attributes.battery_level ?? attributes.battery;
   const hasBattery = batteryValue != null && typeof batteryValue === "number";
-  if (testBit(supportedFeatures, VacuumDeviceFeature.BATTERY) || hasBattery) {
+  const hasBatteryEntity = !!homeAssistantEntity.mapping?.batteryEntity;
+  if (
+    testBit(supportedFeatures, VacuumDeviceFeature.BATTERY) ||
+    hasBattery ||
+    hasBatteryEntity
+  ) {
     device = device.with(VacuumPowerSourceServer);
   }
 
   // ServiceArea cluster for native room selection
+  const roomEntities = homeAssistantEntity.mapping?.roomEntities;
   const rooms = parseVacuumRooms(attributes);
-  if (rooms.length > 0) {
-    device = device.with(createVacuumServiceAreaServer(attributes));
+  if (rooms.length > 0 || (roomEntities && roomEntities.length > 0)) {
+    device = device.with(
+      createVacuumServiceAreaServer(attributes, roomEntities),
+    );
   }
 
-  // RvcCleanMode for Dreame vacuum cleaning modes
-  if (supportsCleaningModes(attributes)) {
+  // RvcCleanMode for cleaning modes (Dreame, or mapped entity)
+  const hasCleaningModeEntity =
+    !!homeAssistantEntity.mapping?.cleaningModeEntity;
+  if (supportsCleaningModes(attributes) || hasCleaningModeEntity) {
     device = device.with(createVacuumRvcCleanModeServer(attributes));
   }
 
