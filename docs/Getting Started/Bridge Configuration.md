@@ -63,10 +63,12 @@ A include- or exclude-item is an object having a `type` and a `value` property.
 | `regex` | Regular expression matching entity IDs. Full regex support. | `^light\.(kitchen\|bedroom)_.*` |
 | `domain` | Match entities by their domain (the part before the dot). | `light`, `switch`, `sensor` |
 | `platform` | Match entities by their integration/platform. | `hue`, `zwave`, `mqtt` |
-| `label` | Match entities by their label slug. | `voice_control` |
+| `label` | Match entities or devices by their label slug. Also matches if the parent device carries the label. | `voice_control` |
 | `area` | Match entities by their area slug. | `living_room` |
 | `entity_category` | Match entities by their category. | `config`, `diagnostic` |
 | `device_name` | Match entities by their device name (case-insensitive, supports wildcards). | `Living Room*` |
+| `product_name` | Match entities by their device model/product name (case-insensitive, supports wildcards). | `Hue Color Bulb` |
+| `device_class` | Match entities by their device class attribute (e.g. temperature, motion, door). | `temperature` |
 
 ### Pattern vs Regex
 
@@ -88,12 +90,27 @@ The `device_name` filter matches against the device's name (not the entity ID):
 - Matches against: user-defined name → device name → default name
 - Example: `*Philips*` matches all devices with "Philips" in their name
 
+### Product Name Filter
+
+The `product_name` filter matches against the device's model or product name:
+- Case-insensitive matching
+- Supports `*` wildcard for pattern matching
+- Matches against: model → default model
+- Example: `Hue*Bulb` matches all devices with a model name containing "Hue" and "Bulb"
+
+### Device Class Filter
+
+The `device_class` filter matches against the entity's `device_class` attribute:
+- Exact match (case-sensitive)
+- Common device classes: `temperature`, `humidity`, `motion`, `door`, `window`, `battery`, `power`, `energy`, `illuminance`, `pressure`
+- Example: `temperature` matches all entities with `device_class: temperature`
+
 The `value` property is a string containing the corresponding value. You can add multiple include or exclude rules which
 are then combined.
 All entities which match one of the include-rules will be included, but all entities which match one of the exclude
 rules will be excluded.
 
-Labels have to be applied at an entity level, not under device.
+Labels can be applied at the entity level or at the device level. When a label is applied to a device, all entities belonging to that device will match the label filter.
 
 > [!WARNING]
 > When performing changes on entities, like adding or removing a label, you need to refresh the matter-hub application
