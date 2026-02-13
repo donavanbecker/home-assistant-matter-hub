@@ -2,6 +2,8 @@ import type { EndpointType } from "@matter/main";
 import { OnOffPlugInUnitDevice } from "@matter/main/devices";
 import { EntityStateProvider } from "../../../../services/bridges/entity-state-provider.js";
 import { BasicInformationServer } from "../../../behaviors/basic-information-server.js";
+import { HaElectricalEnergyMeasurementServer } from "../../../behaviors/electrical-energy-measurement-server.js";
+import { HaElectricalPowerMeasurementServer } from "../../../behaviors/electrical-power-measurement-server.js";
 import { HomeAssistantEntityBehavior } from "../../../behaviors/home-assistant-entity-behavior.js";
 import { IdentifyServer } from "../../../behaviors/identify-server.js";
 import { OnOffServer } from "../../../behaviors/on-off-server.js";
@@ -57,9 +59,20 @@ export function SwitchDevice(
   };
   const hasBatteryAttr = attrs.battery_level != null || attrs.battery != null;
   const hasBatteryEntity = !!homeAssistantEntity.mapping?.batteryEntity;
+  const hasPowerEntity = !!homeAssistantEntity.mapping?.powerEntity;
+  const hasEnergyEntity = !!homeAssistantEntity.mapping?.energyEntity;
 
-  if (hasBatteryAttr || hasBatteryEntity) {
-    return SwitchWithBatteryEndpointType.set({ homeAssistantEntity });
+  let device =
+    hasBatteryAttr || hasBatteryEntity
+      ? SwitchWithBatteryEndpointType
+      : SwitchEndpointType;
+
+  if (hasPowerEntity) {
+    device = device.with(HaElectricalPowerMeasurementServer);
   }
-  return SwitchEndpointType.set({ homeAssistantEntity });
+  if (hasEnergyEntity) {
+    device = device.with(HaElectricalEnergyMeasurementServer);
+  }
+
+  return device.set({ homeAssistantEntity });
 }

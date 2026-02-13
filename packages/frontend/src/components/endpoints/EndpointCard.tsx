@@ -121,6 +121,8 @@ interface HomeAssistantEntityState {
     batteryEntity?: string;
     humidityEntity?: string;
     pressureEntity?: string;
+    powerEntity?: string;
+    energyEntity?: string;
   };
 }
 
@@ -178,6 +180,12 @@ export const EndpointCard = ({
     }
     if (mapping?.pressureEntity) {
       mappings.push({ label: "Pressure", entity: mapping.pressureEntity });
+    }
+    if (mapping?.powerEntity) {
+      mappings.push({ label: "Power", entity: mapping.powerEntity });
+    }
+    if (mapping?.energyEntity) {
+      mappings.push({ label: "Energy", entity: mapping.energyEntity });
     }
     return mappings;
   }, [mapping]);

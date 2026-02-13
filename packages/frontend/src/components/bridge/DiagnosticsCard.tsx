@@ -31,6 +31,8 @@ interface HaEntityState {
     batteryEntity?: string;
     humidityEntity?: string;
     pressureEntity?: string;
+    powerEntity?: string;
+    energyEntity?: string;
   };
 }
 
@@ -98,6 +100,12 @@ const extractDiagnostics = (
   }
   if (ha?.mapping?.pressureEntity) {
     autoMappings.push({ label: "Pressure", entity: ha.mapping.pressureEntity });
+  }
+  if (ha?.mapping?.powerEntity) {
+    autoMappings.push({ label: "Power", entity: ha.mapping.powerEntity });
+  }
+  if (ha?.mapping?.energyEntity) {
+    autoMappings.push({ label: "Energy", entity: ha.mapping.energyEntity });
   }
 
   return {

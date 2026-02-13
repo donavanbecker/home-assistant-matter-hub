@@ -86,6 +86,18 @@ export interface EntityMappingConfig {
    * Default: false (PIN is required if configured)
    */
   readonly disableLockPin?: boolean;
+  /**
+   * Optional: Entity ID of a power sensor (device_class: power, unit: W).
+   * Adds ElectricalPowerMeasurement cluster to show real-time power consumption.
+   * Example: "sensor.smart_plug_power"
+   */
+  readonly powerEntity?: string;
+  /**
+   * Optional: Entity ID of an energy sensor (device_class: energy, unit: kWh).
+   * Adds ElectricalEnergyMeasurement cluster to show cumulative energy consumption.
+   * Example: "sensor.smart_plug_energy"
+   */
+  readonly energyEntity?: string;
 }
 
 export interface EntityMappingRequest {
@@ -101,6 +113,8 @@ export interface EntityMappingRequest {
   readonly batteryEntity?: string;
   readonly roomEntities?: string[];
   readonly disableLockPin?: boolean;
+  readonly powerEntity?: string;
+  readonly energyEntity?: string;
 }
 
 export interface EntityMappingResponse {

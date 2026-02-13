@@ -141,6 +141,46 @@ export class LegacyEndpoint extends EntityEndpoint {
           );
         }
       }
+
+      // 4. Auto-assign power entity to switch/plug entities
+      if (!mapping?.powerEntity) {
+        const domain = entityId.split(".")[0];
+        if (domain === "switch" || domain === "light") {
+          const powerEntityId = registry.findPowerEntityForDevice(
+            entity.device_id,
+          );
+          if (powerEntityId && powerEntityId !== entityId) {
+            effectiveMapping = {
+              ...effectiveMapping,
+              entityId: effectiveMapping?.entityId ?? entityId,
+              powerEntity: powerEntityId,
+            };
+            registry.markPowerEntityUsed(powerEntityId);
+            logger.debug(`Auto-assigned power ${powerEntityId} to ${entityId}`);
+          }
+        }
+      }
+
+      // 5. Auto-assign energy entity to switch/plug entities
+      if (!mapping?.energyEntity) {
+        const domain = entityId.split(".")[0];
+        if (domain === "switch" || domain === "light") {
+          const energyEntityId = registry.findEnergyEntityForDevice(
+            entity.device_id,
+          );
+          if (energyEntityId && energyEntityId !== entityId) {
+            effectiveMapping = {
+              ...effectiveMapping,
+              entityId: effectiveMapping?.entityId ?? entityId,
+              energyEntity: energyEntityId,
+            };
+            registry.markEnergyEntityUsed(energyEntityId);
+            logger.debug(
+              `Auto-assigned energy ${energyEntityId} to ${entityId}`,
+            );
+          }
+        }
+      }
     }
 
     const payload = {

@@ -1,0 +1,75 @@
+import { Logger } from "@matter/general";
+import { ElectricalEnergyMeasurementServer as Base } from "@matter/main/behaviors";
+import { ElectricalPowerMeasurement } from "@matter/main/clusters";
+import { EntityStateProvider } from "../../services/bridges/entity-state-provider.js";
+import { applyPatchState } from "../../utils/apply-patch-state.js";
+import { HomeAssistantEntityBehavior } from "./home-assistant-entity-behavior.js";
+
+const logger = Logger.get("ElectricalEnergyMeasurementServer");
+
+const FeaturedBase = Base.with("CumulativeEnergy", "ImportedEnergy");
+
+// biome-ignore lint/correctness/noUnusedVariables: Used by the function below
+class ElectricalEnergyMeasurementServerBase extends FeaturedBase {
+  declare state: ElectricalEnergyMeasurementServerBase.State;
+
+  override async initialize() {
+    await super.initialize();
+
+    const homeAssistant = await this.agent.load(HomeAssistantEntityBehavior);
+    const entityId = homeAssistant.entityId;
+    const energyEntity = homeAssistant.state.mapping?.energyEntity;
+
+    if (energyEntity) {
+      logger.debug(
+        `[${entityId}] ElectricalEnergyMeasurement using mapped energy entity: ${energyEntity}`,
+      );
+    }
+
+    this.update();
+    this.reactTo(homeAssistant.onChange, this.update);
+  }
+
+  private update() {
+    const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
+    const energyEntity = homeAssistant.state.mapping?.energyEntity;
+
+    if (!energyEntity) return;
+
+    const stateProvider = this.agent.env.get(EntityStateProvider);
+    const energyKwh = stateProvider.getNumericState(energyEntity);
+
+    if (energyKwh == null) return;
+
+    // Matter uses milliwatt-hours (mWh)
+    const energyMwh = Math.round(energyKwh * 1_000_000);
+
+    applyPatchState(this.state, {
+      cumulativeEnergyImported: {
+        energy: energyMwh,
+      },
+    });
+  }
+}
+
+namespace ElectricalEnergyMeasurementServerBase {
+  export class State extends FeaturedBase.State {}
+}
+
+export const HaElectricalEnergyMeasurementServer =
+  ElectricalEnergyMeasurementServerBase.set({
+    accuracy: {
+      measurementType:
+        ElectricalPowerMeasurement.MeasurementType.ElectricalEnergy,
+      measured: true,
+      minMeasuredValue: 0,
+      maxMeasuredValue: 100_000_000_000, // 100MWh in mWh
+      accuracyRanges: [
+        {
+          rangeMin: 0,
+          rangeMax: 100_000_000_000,
+          fixedMax: 1000, // 1Wh accuracy
+        },
+      ],
+    },
+  });
