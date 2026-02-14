@@ -224,6 +224,31 @@ export function getRoomIdFromMode(mode: number): number {
 }
 
 /**
+ * Detect if the vacuum uses Xiaomi Miot Auto or xiaomi_miio integration format.
+ * These vacuums store rooms as a flat array of { id, name } objects and are the
+ * only ones supporting the `app_segment_clean` command via `vacuum.send_command`.
+ *
+ * This distinguishes them from Ecovacs (dict format), Dreame (nested dict), etc.
+ */
+export function isXiaomiMiotVacuum(
+  attributes: VacuumDeviceAttributes,
+): boolean {
+  const sources = [attributes.rooms, attributes.segments, attributes.room_list];
+  for (const source of sources) {
+    if (
+      Array.isArray(source) &&
+      source.length > 0 &&
+      typeof source[0] === "object" &&
+      source[0] !== null &&
+      "id" in source[0]
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Detect if the vacuum uses Dreame integration format.
  * Dreame vacuums have rooms nested under a map name key: { "Map Name": [rooms...] }
  * This is different from Roborock/Xiaomi which use flat arrays or simple objects.

@@ -17,6 +17,7 @@ import {
   getRoomIdFromMode,
   getRoomModeValue,
   isDreameVacuum,
+  isXiaomiMiotVacuum,
   parseVacuumRooms,
 } from "../utils/parse-vacuum-rooms.js";
 import { toAreaId } from "./vacuum-service-area-server.js";
@@ -152,14 +153,23 @@ const vacuumRvcRunModeConfig = {
             };
           }
 
-          // Roborock/Xiaomi vacuums use vacuum.send_command
-          return {
-            action: "vacuum.send_command",
-            data: {
-              command: "app_segment_clean",
-              params: roomIds,
-            },
-          };
+          // Roborock/Xiaomi Miot vacuums use vacuum.send_command with app_segment_clean
+          if (isXiaomiMiotVacuum(attributes)) {
+            return {
+              action: "vacuum.send_command",
+              data: {
+                command: "app_segment_clean",
+                params: roomIds,
+              },
+            };
+          }
+
+          // Unknown vacuum type - fall back to regular start.
+          // app_segment_clean is Roborock-specific and will fail on other
+          // integrations (e.g. Ecovacs/Deebot rejects list params).
+          logger.warn(
+            `Room cleaning via send_command not supported for this vacuum type. Rooms: ${roomIds.join(", ")}. Falling back to vacuum.start`,
+          );
         }
       }
     } catch {
@@ -232,17 +242,24 @@ const vacuumRvcRunModeConfig = {
         };
       }
 
-      // Roborock/Xiaomi vacuums use vacuum.send_command with app_segment_clean
-      logger.debug(
-        `Using vacuum.send_command with app_segment_clean for room ${room.name} (commandId: ${commandId}, id: ${room.id})`,
+      // Roborock/Xiaomi Miot vacuums use vacuum.send_command with app_segment_clean
+      if (isXiaomiMiotVacuum(attributes)) {
+        logger.debug(
+          `Using vacuum.send_command with app_segment_clean for room ${room.name} (commandId: ${commandId}, id: ${room.id})`,
+        );
+        return {
+          action: "vacuum.send_command",
+          data: {
+            command: "app_segment_clean",
+            params: [commandId],
+          },
+        };
+      }
+
+      // Unknown vacuum type - fall back to regular start
+      logger.warn(
+        `Room cleaning via send_command not supported for this vacuum type. Room: ${room.name} (id=${commandId}). Falling back to vacuum.start`,
       );
-      return {
-        action: "vacuum.send_command",
-        data: {
-          command: "app_segment_clean",
-          params: [commandId],
-        },
-      };
     }
     return { action: "vacuum.start" };
   },
