@@ -22,10 +22,10 @@ The storage format is fully compatible between both versions. Your Matter fabric
    ```bash
    # Find the correct folder name first
    ls /addon_configs/
-   # Look for a folder ending with _hamh (e.g., a]c_hamh or similar)
+   # Look for the folder ending with _hamh (e.g., a0d7b954_hamh)
+   # Note the EXACT folder name — do NOT use wildcards like *_hamh
    
-   # Then copy it (replace *_hamh with the actual folder name if needed)
-   cp -r /addon_configs/*_hamh /config/hamh-backup
+   cp -r /addon_configs/<OLD_FOLDER> /config/hamh-backup
    ```
 
 #### Step 2: Uninstall Old Add-on
@@ -45,14 +45,18 @@ The storage format is fully compatible between both versions. Your Matter fabric
 
 1. Find **Home-Assistant-Matter-Hub** in the store (by RiDDiX)
 2. Click **Install**
-3. **Before starting**, restore the backup:
+3. **Start the add-on once** to create the new data folder, then **stop it**
+4. Restore the backup:
    ```bash
    # Find the new add-on folder name
    ls /addon_configs/
-   # Look for the new _hamh folder
+   # Note the NEW folder ending with _hamh (it will have a different prefix)
    
-   # Then restore (replace *_hamh with the actual folder name if needed)
-   cp -r /config/hamh-backup/* /addon_configs/*_hamh/
+   # Delete the new folder's contents first to avoid conflicts
+   rm -rf /addon_configs/<NEW_FOLDER>/*
+   
+   # Then restore your backup
+   cp -r /config/hamh-backup/* /addon_configs/<NEW_FOLDER>/
    ```
 
 #### Step 5: Configure and Start
