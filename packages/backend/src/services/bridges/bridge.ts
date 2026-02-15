@@ -15,11 +15,13 @@ import type {
 } from "./bridge-data-provider.js";
 import type { BridgeEndpointManager } from "./bridge-endpoint-manager.js";
 
-// Auto Force Sync interval in milliseconds (5 minutes).
-// A longer interval reduces MRP traffic and gives controllers more time
-// to recover from brief network interruptions before a report triggers
-// an MRP retransmission failure → session loss.
-const AUTO_FORCE_SYNC_INTERVAL_MS = 300_000;
+// Auto Force Sync interval in milliseconds (90 seconds).
+// Must be shorter than the subscription maxInterval (~185s) to ensure
+// subscription reports are sent before the controller times out.
+// When devices are idle, no cluster attributes change, so matter.js
+// only sends empty keepalive reports which controllers may ignore.
+// This interval triggers a forced keepalive with real attribute data.
+const AUTO_FORCE_SYNC_INTERVAL_MS = 90_000;
 
 // Subscription health check interval in milliseconds (60 seconds).
 // Runs independently of force sync (no MRP traffic — only reads session state)
@@ -304,12 +306,48 @@ export class Bridge {
         `Force sync: Pushed ${syncedCount} changed device(s), skipped ${skippedCount} unchanged`,
       );
     } else {
-      this.log.debug(
-        `Force sync: No changes detected (${skippedCount} devices unchanged)`,
-      );
+      // No state changes — send a keepalive to prevent controllers showing
+      // "Updating" or "Offline". matter.js sends empty keepalive reports
+      // automatically, but Apple Home, Google Home, and Alexa may ignore them.
+      // Force-writing attributes generates real subscription reports.
+      await this.sendSubscriptionKeepalive();
     }
 
     return syncedCount;
+  }
+
+  /**
+   * Send subscription keepalive by force-writing attributes on bridged endpoints.
+   * When no device states have changed, matter.js only sends empty keepalive
+   * reports which controllers may ignore. Force-writing the reachable attribute
+   * on each endpoint generates real subscription reports with actual data,
+   * preventing Apple Home, Google Home, and Alexa from showing devices as
+   * "Updating" or "Offline".
+   */
+  private async sendSubscriptionKeepalive(): Promise<void> {
+    const { EntityEndpoint } = await import(
+      "../../matter/endpoints/entity-endpoint.js"
+    );
+
+    const endpoints = this.aggregator.parts;
+    let keepaliveCount = 0;
+
+    for (const endpoint of endpoints) {
+      try {
+        if (endpoint instanceof EntityEndpoint) {
+          await endpoint.forceKeepalive();
+          keepaliveCount++;
+        }
+      } catch (e) {
+        this.log.debug("Subscription keepalive failed for endpoint:", e);
+      }
+    }
+
+    if (keepaliveCount > 0) {
+      this.log.debug(
+        `Subscription keepalive sent for ${keepaliveCount} device(s)`,
+      );
+    }
   }
 
   private async checkSubscriptionHealth(): Promise<void> {

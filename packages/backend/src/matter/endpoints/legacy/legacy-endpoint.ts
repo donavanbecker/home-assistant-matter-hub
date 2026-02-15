@@ -10,9 +10,11 @@ import {
   TransactionDestroyedError,
 } from "@matter/general";
 import type { EndpointType } from "@matter/main";
+import { BridgedDeviceBasicInformationServer } from "@matter/main/behaviors";
 import debounce from "debounce";
 import type { BridgeRegistry } from "../../../services/bridges/bridge-registry.js";
 import type { HomeAssistantStates } from "../../../services/home-assistant/home-assistant-registry.js";
+import { applyPatchState } from "../../../utils/apply-patch-state.js";
 import { HomeAssistantEntityBehavior } from "../../behaviors/home-assistant-entity-behavior.js";
 import { EntityEndpoint } from "../../endpoints/entity-endpoint.js";
 import { createLegacyEndpointType } from "./create-legacy-endpoint-type.js";
@@ -220,6 +222,36 @@ export class LegacyEndpoint extends EntityEndpoint {
     // Clear any pending debounce timers to prevent callbacks firing after deletion
     this.flushUpdate.clear();
     await super.delete();
+  }
+
+  /**
+   * Force a subscription keepalive by re-writing the reachable attribute.
+   * When device state is unchanged, matter.js only sends empty keepalive
+   * reports. Apple Home, Google Home, and Alexa may ignore these, causing
+   * devices to show "Updating" or "Offline". Force-writing reachable
+   * generates a real subscription report with actual data.
+   */
+  override async forceKeepalive(): Promise<void> {
+    try {
+      await this.construction.ready;
+    } catch {
+      return;
+    }
+
+    try {
+      if (this.behaviors.has(BridgedDeviceBasicInformationServer)) {
+        const state = this.stateOf(BridgedDeviceBasicInformationServer);
+        applyPatchState(state, { reachable: state.reachable }, { force: true });
+      }
+    } catch (error) {
+      if (
+        error instanceof TransactionDestroyedError ||
+        error instanceof DestroyedDependencyError
+      ) {
+        return;
+      }
+      logger.debug("Force keepalive failed:", error);
+    }
   }
 
   async updateStates(states: HomeAssistantStates) {
