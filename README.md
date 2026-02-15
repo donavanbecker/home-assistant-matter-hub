@@ -336,27 +336,26 @@ Migrating from the original `t0bst4r/home-assistant-matter-hub` is straightforwa
 
 1. **Backup your data:**
    ```bash
-   # SSH into Home Assistant and find your add-on folder
-   ls /addon_configs/
-   # Look for folder ending with _hamh (e.g., a0c_hamh)
-   
    cp -r /addon_configs/*_hamh /config/hamh-backup
+   # Verify the backup was copied correctly
+   ls /config/hamh-backup
    ```
 
-2. **Uninstall the old add-on** (Settings → Add-ons → Uninstall)
+2. **Uninstall the old add-on** (Settings → Add-ons → Uninstall) and make sure the old folder is removed:
+   ```bash
+   rm -rf /addon_configs/*_hamh
+   ```
 
 3. **Add the new repository:**
    ```
    https://github.com/RiDDiX/home-assistant-addons
    ```
 
-4. **Install and start the new add-on**, then check the new _hamh folder:
-   ```bash
-   ls /addon_configs/
-   ```
+4. **Install and start the new add-on once** (creates the data folder), then **stop it**
 
-5. **Stop the add-on** and restore your backup:
+5. **Clear the new folder and restore your backup:**
    ```bash
+   rm -rf /addon_configs/*_hamh/*
    cp -r /config/hamh-backup/* /addon_configs/*_hamh/
    ```
 
