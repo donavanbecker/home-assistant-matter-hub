@@ -20,19 +20,19 @@ The storage format is fully compatible between both versions. Your Matter fabric
 1. Access your Home Assistant via SSH or Terminal
 2. Copy the storage directory:
    ```bash
-   # Find the correct folder name first
-   ls /addon_configs/
-   # Look for a folder ending with _hamh (e.g., a]c_hamh or similar)
-   
-   # Then copy it (replace *_hamh with the actual folder name if needed)
    cp -r /addon_configs/*_hamh /config/hamh-backup
+   # Verify the backup was copied correctly
+   ls /config/hamh-backup
    ```
 
 #### Step 2: Uninstall Old Add-on
 
 1. Go to **Settings → Add-ons → Home Assistant Matter Hub**
 2. Click **Uninstall**
-3. **Important:** Do NOT remove the backup yet
+3. Make sure the old folder is removed:
+   ```bash
+   rm -rf /addon_configs/*_hamh
+   ```
 
 #### Step 3: Add RiDDiX Repository
 
@@ -45,13 +45,10 @@ The storage format is fully compatible between both versions. Your Matter fabric
 
 1. Find **Home-Assistant-Matter-Hub** in the store (by RiDDiX)
 2. Click **Install**
-3. **Before starting**, restore the backup:
+3. **Start the add-on once** to create the new data folder, then **stop it**
+4. Clear the new folder and restore the backup:
    ```bash
-   # Find the new add-on folder name
-   ls /addon_configs/
-   # Look for the new _hamh folder
-   
-   # Then restore (replace *_hamh with the actual folder name if needed)
+   rm -rf /addon_configs/*_hamh/*
    cp -r /config/hamh-backup/* /addon_configs/*_hamh/
    ```
 
