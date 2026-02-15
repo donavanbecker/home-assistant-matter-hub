@@ -267,3 +267,29 @@ export function isDreameVacuum(attributes: VacuumDeviceAttributes): boolean {
   }
   return false;
 }
+
+/**
+ * Detect if the vacuum uses the Ecovacs/Deebot integration format.
+ * Ecovacs vacuums store rooms as a flat dict of { room_name: numeric_id }:
+ *   { flur: 0, wohnzimmer: 8, esszimmer: 9, kuche: 1, ... }
+ *
+ * Room cleaning uses `vacuum.send_command` with `spot_area` command:
+ *   { command: "spot_area", params: { mapID: 0, cleanings: 1, rooms: "8,1,6" } }
+ *
+ * This is distinct from Dreame (nested arrays) and Xiaomi Miot (flat array of {id,name}).
+ */
+export function isEcovacsVacuum(attributes: VacuumDeviceAttributes): boolean {
+  const roomsData = attributes.rooms;
+  if (!roomsData || typeof roomsData !== "object" || Array.isArray(roomsData)) {
+    return false;
+  }
+
+  // Ecovacs format: all values are plain numbers (room IDs), keys are room names
+  // This excludes Dreame (values are arrays) and simple id:name objects (keys are numeric)
+  const entries = Object.entries(roomsData);
+  if (entries.length === 0) return false;
+
+  return entries.every(
+    ([key, value]) => typeof value === "number" && !/^\d+$/.test(key),
+  );
+}

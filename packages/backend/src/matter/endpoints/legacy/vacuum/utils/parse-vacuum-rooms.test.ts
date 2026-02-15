@@ -7,6 +7,7 @@ import {
   getRoomIdFromMode,
   getRoomModeValue,
   isDreameVacuum,
+  isEcovacsVacuum,
   isRoomMode,
   isUnnamedRoom,
   parseVacuumRooms,
@@ -386,5 +387,82 @@ describe("isDreameVacuum", () => {
       rooms: null,
     };
     expect(isDreameVacuum(attributes)).toBe(false);
+  });
+});
+
+describe("isEcovacsVacuum", () => {
+  it("should detect Ecovacs T20 Omni format (room_name: numeric_id)", () => {
+    const attributes: VacuumDeviceAttributes = {
+      rooms: {
+        flur: 0,
+        wohnzimmer: 8,
+        esszimmer: 9,
+        buro: 4,
+        schlafzimmer: 6,
+        kuche: 1,
+        badezimmer: 7,
+      },
+    };
+    expect(isEcovacsVacuum(attributes)).toBe(true);
+  });
+
+  it("should not detect array format as Ecovacs", () => {
+    const attributes: VacuumDeviceAttributes = {
+      rooms: [
+        { id: 1, name: "Kitchen" },
+        { id: 2, name: "Living Room" },
+      ],
+    };
+    expect(isEcovacsVacuum(attributes)).toBe(false);
+  });
+
+  it("should not detect Dreame nested format as Ecovacs", () => {
+    const attributes: VacuumDeviceAttributes = {
+      rooms: {
+        "Ground Floor": [
+          { id: 1, name: "Kitchen" },
+          { id: 2, name: "Living Room" },
+        ],
+      },
+    };
+    expect(isEcovacsVacuum(attributes)).toBe(false);
+  });
+
+  it("should not detect simple id:name object as Ecovacs", () => {
+    const attributes: VacuumDeviceAttributes = {
+      rooms: {
+        "1": "Kitchen",
+        "2": "Living Room",
+      },
+    };
+    expect(isEcovacsVacuum(attributes)).toBe(false);
+  });
+
+  it("should return false when no rooms attribute", () => {
+    const attributes: VacuumDeviceAttributes = {};
+    expect(isEcovacsVacuum(attributes)).toBe(false);
+  });
+
+  it("should return false when rooms is null", () => {
+    const attributes: VacuumDeviceAttributes = {
+      rooms: null,
+    };
+    expect(isEcovacsVacuum(attributes)).toBe(false);
+  });
+
+  it("should parse Ecovacs rooms correctly", () => {
+    const attributes: VacuumDeviceAttributes = {
+      rooms: {
+        flur: 0,
+        wohnzimmer: 8,
+        kuche: 1,
+      },
+    };
+    const rooms = parseVacuumRooms(attributes);
+    expect(rooms).toEqual([
+      { id: 0, name: "Flur" },
+      { id: 8, name: "Wohnzimmer" },
+      { id: 1, name: "Kuche" },
+    ]);
   });
 });
