@@ -115,7 +115,10 @@ export class BridgeRegistry {
    * Check if auto battery mapping is enabled for this bridge.
    */
   isAutoBatteryMappingEnabled(): boolean {
-    return this.dataProvider.featureFlags?.autoBatteryMapping === true;
+    return (
+      this.dataProvider.featureFlags?.autoBatteryMapping === true ||
+      this.dataProvider.featureFlags?.autoComposedDevices === true
+    );
   }
 
   /**
@@ -128,7 +131,10 @@ export class BridgeRegistry {
    * See: https://github.com/RiDDiX/home-assistant-matter-hub/issues/133
    */
   isAutoHumidityMappingEnabled(): boolean {
-    return this.dataProvider.featureFlags?.autoHumidityMapping === true;
+    return (
+      this.dataProvider.featureFlags?.autoHumidityMapping === true ||
+      this.dataProvider.featureFlags?.autoComposedDevices === true
+    );
   }
 
   /**
@@ -175,7 +181,10 @@ export class BridgeRegistry {
    * are combined into a single endpoint with PressureMeasurement cluster.
    */
   isAutoPressureMappingEnabled(): boolean {
-    return this.dataProvider.featureFlags?.autoPressureMapping !== false;
+    return (
+      this.dataProvider.featureFlags?.autoPressureMapping !== false ||
+      this.dataProvider.featureFlags?.autoComposedDevices === true
+    );
   }
 
   /**

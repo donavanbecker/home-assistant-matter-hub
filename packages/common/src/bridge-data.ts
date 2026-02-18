@@ -36,6 +36,14 @@ interface AllBridgeFeatureFlags {
    */
   readonly autoPressureMapping: boolean;
   /**
+   * Auto Composed Devices: Master toggle that enables all auto-mapping features at once.
+   * When enabled, related entities from the same Home Assistant device are automatically
+   * combined into single Matter endpoints (battery, humidity, pressure, power, energy).
+   * This provides a cleaner device experience in Matter controllers.
+   * Default: false (disabled)
+   */
+  readonly autoComposedDevices: boolean;
+  /**
    * Auto Force Sync: Periodically push all device states to connected controllers.
    * This is a workaround for Google Home and Alexa which sometimes lose subscriptions
    * and show devices as offline/unresponsive after a few hours.
