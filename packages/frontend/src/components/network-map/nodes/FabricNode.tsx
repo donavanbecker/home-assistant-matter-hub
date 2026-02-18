@@ -10,10 +10,11 @@ export interface FabricNodeData {
 }
 
 const vendorNames: Record<number, string> = {
-  24582: "Apple Home",
-  65521: "Apple Home",
-  4996: "Google Home",
-  4937: "Amazon Alexa",
+  4937: "Apple Home",
+  4996: "Apple Home",
+  24582: "Google Home",
+  4631: "Amazon Alexa",
+  4448: "Amazon Alexa",
   4362: "Samsung SmartThings",
 };
 

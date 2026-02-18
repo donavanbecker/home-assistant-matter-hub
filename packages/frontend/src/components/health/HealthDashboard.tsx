@@ -92,14 +92,15 @@ const formatUptime = (seconds: number): string => {
 
 const getVendorName = (vendorId: number): string => {
   const vendors: Record<number, string> = {
+    4362: "Samsung SmartThings",
     4417: "Tuya",
     4442: "LG ThinQ",
     4447: "Aqara",
-    4448: "Amazon",
+    4448: "Amazon Alexa",
+    4631: "Amazon Alexa",
     4937: "Apple Home",
-    4939: "Samsung SmartThings",
     4996: "Apple (iCloud Keychain)",
-    6006: "Google",
+    24582: "Google Home",
   };
   return vendors[vendorId] ?? `Vendor ${vendorId}`;
 };

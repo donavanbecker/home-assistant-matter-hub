@@ -474,10 +474,10 @@ export class ThermostatServerBase extends FullFeaturedBase {
         const isHeatingMode =
           currentMode === Thermostat.SystemMode.Heat ||
           currentMode === Thermostat.SystemMode.EmergencyHeat;
-
         // In Auto mode: heating setpoint updates temperature (cooling setpoint is ignored)
         // In Heat mode: heating setpoint updates temperature
         // In Cool mode: let coolingSetpointChanging handle this
+        // When Off: skip — temperature changes while off are not forwarded to HA
         if (!isAutoMode && !isHeatingMode) {
           logger.debug(
             `heatingSetpointChanging: skipping - not in heating/auto mode (mode=${currentMode}, haMode=${haHvacMode})`,
@@ -539,10 +539,10 @@ export class ThermostatServerBase extends FullFeaturedBase {
         const isCoolingMode =
           currentMode === Thermostat.SystemMode.Cool ||
           currentMode === Thermostat.SystemMode.Precooling;
-
         // In Auto mode: BOTH heating and cooling setpoint should update temperature (#71)
         // In Cool mode: cooling setpoint updates temperature
         // In Heat mode: let heatingSetpointChanging handle this
+        // When Off: skip — temperature changes while off are not forwarded to HA
         if (!isAutoMode && !isCoolingMode) {
           logger.debug(
             `coolingSetpointChanging: skipping - not in cooling/auto mode (mode=${currentMode}, haMode=${haHvacMode})`,
