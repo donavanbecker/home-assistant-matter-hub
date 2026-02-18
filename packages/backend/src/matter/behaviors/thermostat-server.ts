@@ -476,9 +476,13 @@ export class ThermostatServerBase extends FullFeaturedBase {
           currentMode === Thermostat.SystemMode.EmergencyHeat;
         const isOff = currentMode === Thermostat.SystemMode.Off;
 
-        if (isOff) {
+        if (isOff && this.features.heating) {
           // Auto-resume: setting a temperature while off should turn on the device (#176).
           // Controllers like Google Home expect "set to 20°C" to work even when off.
+          // Only resume from this handler if heating is allowed by controlSequenceOfOperation.
+          // For cooling-only devices, coolingSetpointChanging handles auto-resume instead.
+          // For dual-mode (CoolingAndHeating) devices, only THIS handler resumes to prevent
+          // dual-fire when matter.js deadband adjusts both setpoints simultaneously.
           logger.info(
             "heatingSetpointChanging: device is off, auto-switching to Heat mode",
           );
@@ -553,11 +557,14 @@ export class ThermostatServerBase extends FullFeaturedBase {
           currentMode === Thermostat.SystemMode.Precooling;
         const isOff = currentMode === Thermostat.SystemMode.Off;
 
-        if (isOff) {
-          // Auto-resume: setting a temperature while off should turn on the device (#176).
-          // Controllers like Google Home expect "set to 20°C" to work even when off.
+        if (isOff && !this.features.heating && this.features.cooling) {
+          // Auto-resume for COOLING-ONLY devices (#176).
+          // For dual-mode devices (heating + cooling), heatingSetpointChanging handles
+          // auto-resume exclusively to prevent dual-fire: when matter.js enforces deadband
+          // (AutoMode), both setpoint handlers fire simultaneously — if both send mode
+          // changes, HA receives heat+cool in quick succession causing mode cycling.
           logger.info(
-            "coolingSetpointChanging: device is off, auto-switching to Cool mode",
+            "coolingSetpointChanging: cooling-only device is off, auto-switching to Cool mode",
           );
           const modeAction = this.state.config.setSystemMode(
             Thermostat.SystemMode.Cool,
