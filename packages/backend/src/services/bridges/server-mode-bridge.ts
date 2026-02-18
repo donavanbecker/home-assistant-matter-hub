@@ -6,6 +6,7 @@ import type { Logger } from "@matter/general";
 import { SessionManager } from "@matter/main/protocol";
 import type { LoggerService } from "../../core/app/logger.js";
 import type { ServerModeServerNode } from "../../matter/endpoints/server-mode-server-node.js";
+import { diagnosticEventBus } from "../diagnostics/diagnostic-event-bus.js";
 import type {
   BridgeDataProvider,
   BridgeServerStatus,
@@ -36,6 +37,7 @@ export class ServerModeBridge {
   public onStatusChange?: () => void;
 
   private autoForceSyncTimer: ReturnType<typeof setInterval> | null = null;
+  private warmStartTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Tracks the last synced state JSON per entity to avoid pushing unchanged states.
   private lastSyncedState: string | undefined;
@@ -131,7 +133,12 @@ export class ServerModeBridge {
       await this.server.start();
       this.setStatus({ code: BridgeStatus.Running });
       this.startAutoForceSyncIfEnabled();
+      this.scheduleWarmStart();
       this.log.info("Server mode bridge started successfully");
+      diagnosticEventBus.emit("bridge_started", "Server mode bridge started", {
+        bridgeId: this.id,
+        bridgeName: this.dataProvider.name,
+      });
     } catch (e) {
       const reason = "Failed to start server mode bridge due to error:";
       this.log.error(reason, e);
@@ -143,6 +150,7 @@ export class ServerModeBridge {
     code: BridgeStatus = BridgeStatus.Stopped,
     reason = "Manually stopped",
   ): Promise<void> {
+    this.cancelWarmStart();
     this.stopAutoForceSync();
     this.endpointManager.stopObserving();
     try {
@@ -154,6 +162,14 @@ export class ServerModeBridge {
       }
     }
     this.setStatus({ code, reason });
+    diagnosticEventBus.emit(
+      "bridge_stopped",
+      `Server mode bridge stopped: ${reason}`,
+      {
+        bridgeId: this.id,
+        bridgeName: this.dataProvider.name,
+      },
+    );
   }
 
   async update(update: UpdateBridgeRequest): Promise<void> {
@@ -206,6 +222,63 @@ export class ServerModeBridge {
     if (this.autoForceSyncTimer) {
       clearInterval(this.autoForceSyncTimer);
       this.autoForceSyncTimer = null;
+    }
+  }
+
+  /**
+   * Schedule a one-time state push shortly after bridge start.
+   * This refreshes internal attribute versions so that controllers
+   * reading attributes after session establishment get current data.
+   */
+  private scheduleWarmStart() {
+    this.cancelWarmStart();
+    this.warmStartTimer = setTimeout(() => {
+      this.warmStartTimer = null;
+      this.pushCurrentState().catch((e) => {
+        this.log.debug("Warm-start state push failed:", e);
+      });
+    }, 15_000);
+  }
+
+  private cancelWarmStart() {
+    if (this.warmStartTimer) {
+      clearTimeout(this.warmStartTimer);
+      this.warmStartTimer = null;
+    }
+  }
+
+  /**
+   * Push the current device state unconditionally.
+   * Unlike forceSync, this ignores the autoForceSync flag and always pushes.
+   */
+  private async pushCurrentState(): Promise<void> {
+    if (this.status.code !== BridgeStatus.Running) {
+      return;
+    }
+    const device = this.endpointManager.device;
+    if (!device) {
+      return;
+    }
+    try {
+      const { HomeAssistantEntityBehavior } = await import(
+        "../../matter/behaviors/home-assistant-entity-behavior.js"
+      );
+      if (!device.behaviors.has(HomeAssistantEntityBehavior)) {
+        return;
+      }
+      const behavior = device.stateOf(HomeAssistantEntityBehavior);
+      const currentEntity = behavior.entity;
+      if (currentEntity?.state) {
+        await device.setStateOf(HomeAssistantEntityBehavior, {
+          entity: {
+            ...currentEntity,
+            state: { ...currentEntity.state },
+          },
+        });
+        this.log.info("Warm-start: Pushed initial device state");
+      }
+    } catch (e) {
+      this.log.debug("Warm-start: Failed to push state:", e);
     }
   }
 
