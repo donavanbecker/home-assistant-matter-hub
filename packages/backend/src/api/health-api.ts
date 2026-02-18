@@ -25,8 +25,6 @@ export interface BridgeHealthInfo {
   connectivity: {
     totalSessions: number;
     totalSubscriptions: number;
-    orphanChecks: number;
-    hadActiveSession: boolean;
     sessions: SessionInfo[];
   };
 }
@@ -130,8 +128,6 @@ export function healthApi(
         connectivity: {
           totalSessions: sessionInfo.totalSessions,
           totalSubscriptions: sessionInfo.totalSubscriptions,
-          orphanChecks: sessionInfo.orphanChecks,
-          hadActiveSession: sessionInfo.hadActiveSession,
           sessions: sessionInfo.sessions,
         },
       };

@@ -49,8 +49,6 @@ interface BridgeHealthInfo {
   connectivity?: {
     totalSessions: number;
     totalSubscriptions: number;
-    orphanChecks: number;
-    hadActiveSession: boolean;
     sessions: Array<{
       id: number;
       peerNodeId: string;
@@ -407,14 +405,6 @@ export function HealthDashboard() {
                       <Typography variant="caption" color="text.secondary">
                         Sessions: {bridge.connectivity.totalSessions} |
                         Subscriptions: {bridge.connectivity.totalSubscriptions}
-                        {bridge.connectivity.orphanChecks > 0 && (
-                          <Chip
-                            label={`Orphan ${bridge.connectivity.orphanChecks}`}
-                            color="warning"
-                            size="small"
-                            sx={{ ml: 1 }}
-                          />
-                        )}
                       </Typography>
                     </Box>
                   )}

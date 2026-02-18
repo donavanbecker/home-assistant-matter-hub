@@ -38,8 +38,5 @@ export function createBridgeServerConfig(
       softwareVersion: data.basicInformation.softwareVersion,
       ...(data.countryCode ? { location: data.countryCode } : {}),
     },
-    subscriptions: {
-      persistenceEnabled: false,
-    },
   };
 }
