@@ -122,6 +122,18 @@ export class BridgeRegistry {
   }
 
   /**
+   * Check if auto composed devices mode is enabled.
+   * When enabled, temperature sensors with auto-mapped humidity/pressure/battery
+   * create real Matter Composed Devices (BridgedNodeEndpoint with sub-endpoints)
+   * instead of adding extra clusters to a flat TemperatureSensor endpoint.
+   * This ensures Apple Home, Google Home, and Alexa properly display
+   * humidity and pressure readings using their correct device types.
+   */
+  isAutoComposedDevicesEnabled(): boolean {
+    return this.dataProvider.featureFlags?.autoComposedDevices === true;
+  }
+
+  /**
    * Check if auto humidity mapping is enabled for this bridge.
    * Default: false (disabled by default, user must explicitly enable).
    * When enabled, humidity sensors on the same device as a temperature sensor

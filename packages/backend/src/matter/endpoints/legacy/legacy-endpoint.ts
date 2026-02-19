@@ -15,6 +15,7 @@ import type { BridgeRegistry } from "../../../services/bridges/bridge-registry.j
 import type { HomeAssistantStates } from "../../../services/home-assistant/home-assistant-registry.js";
 import { HomeAssistantEntityBehavior } from "../../behaviors/home-assistant-entity-behavior.js";
 import { EntityEndpoint } from "../../endpoints/entity-endpoint.js";
+import { ComposedSensorEndpoint } from "../composed/composed-sensor-endpoint.js";
 import { createLegacyEndpointType } from "./create-legacy-endpoint-type.js";
 
 const logger = Logger.get("LegacyEndpoint");
@@ -180,6 +181,33 @@ export class LegacyEndpoint extends EntityEndpoint {
             );
           }
         }
+      }
+    }
+
+    // When autoComposedDevices is enabled and this is a temperature sensor
+    // with auto-mapped humidity/pressure, create a real Matter Composed Device
+    // instead of a flat endpoint with extra clusters.
+    // This ensures Apple Home, Google Home, and Alexa properly display
+    // humidity and pressure using their correct device types.
+    if (registry.isAutoComposedDevicesEnabled()) {
+      const attrs = state.attributes as SensorDeviceAttributes;
+      if (
+        entityId.startsWith("sensor.") &&
+        attrs.device_class === SensorDeviceClass.temperature &&
+        (effectiveMapping?.humidityEntity || effectiveMapping?.pressureEntity)
+      ) {
+        const areaName = registry.getAreaName(entityId);
+        const composed = await ComposedSensorEndpoint.create({
+          registry,
+          primaryEntityId: entityId,
+          humidityEntityId: effectiveMapping?.humidityEntity,
+          pressureEntityId: effectiveMapping?.pressureEntity,
+          batteryEntityId: effectiveMapping?.batteryEntity,
+          customName: effectiveMapping?.customName,
+          areaName,
+        });
+        // Return as LegacyEndpoint-compatible (duck typed: entityId + updateStates)
+        return composed as unknown as LegacyEndpoint;
       }
     }
 
