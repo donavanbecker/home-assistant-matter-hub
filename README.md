@@ -112,7 +112,12 @@ of port forwarding etc.
 <details>
 <summary><strong>🧪 Alpha Features (v2.1.0-alpha.x)</strong> - Click to expand</summary>
 
-**Alpha and Stable are currently in sync (v2.0.21).** All previously alpha-only features have been promoted to the stable release. New experimental features will appear here before being promoted.
+**New in Alpha (since v2.0.21):**
+
+| Feature | Description |
+|---------|-------------|
+| **🧊 Water Freeze Detector** | `binary_sensor` with device class `cold` now maps to Matter WaterFreezeDetector (0x0041) instead of ContactSensor |
+| **🔧 Device Type Overrides** | SmokeCO Alarm, Water Leak Detector, and Water Freeze Detector can now be selected as manual device type overrides via Entity Mapping |
 
 </details>
 
@@ -176,7 +181,7 @@ Matter Bridge, Multi-Fabric support, Health Monitoring, Bridge Wizard, AirQualit
 | `cover` | Window Covering | `coverSwapOpenClose` |
 | `climate` | Thermostat | Battery via `batteryEntity` |
 | `fan` | Fan, Air Purifier | Oscillation, Wind Modes |
-| `binary_sensor` | Contact, OnOff, Occupancy, Smoke/CO, Water Leak | |
+| `binary_sensor` | Contact, OnOff, Occupancy, Smoke/CO, Water Leak, Water Freeze | |
 | `sensor` | Temperature, Humidity, Pressure, Flow, Light, AirQuality | `batteryEntity`, `humidityEntity`, `pressureEntity` |
 | `event` | Generic Switch (Doorbell, Button Events) | |
 | `button`, `input_button` | Generic Switch | |
