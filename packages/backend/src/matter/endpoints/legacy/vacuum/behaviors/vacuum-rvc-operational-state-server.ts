@@ -14,7 +14,6 @@ export const VacuumRvcOperationalStateServer = RvcOperationalStateServer({
   getOperationalState(entity): RvcOperationalState.OperationalState {
     const state = entity.state as VacuumState | "unavailable";
 
-    // All cleaning-related states should map to Running
     const cleaningStates: string[] = [
       VacuumState.cleaning,
       VacuumState.segment_cleaning,
@@ -31,8 +30,22 @@ export const VacuumRvcOperationalStateServer = RvcOperationalStateServer({
       operationalState = RvcOperationalState.OperationalState.SeekingCharger;
     } else if (cleaningStates.includes(state)) {
       operationalState = RvcOperationalState.OperationalState.Running;
-    } else if (state === VacuumState.paused || state === VacuumState.idle) {
+    } else if (state === VacuumState.paused) {
       operationalState = RvcOperationalState.OperationalState.Paused;
+    } else if (state === VacuumState.idle) {
+      // Idle could mean docked/charging or just idle - check if charging
+      const attributes = entity.attributes as {
+        battery_icon?: string;
+        is_charging?: boolean;
+        charging?: boolean;
+      };
+      const batteryIcon = attributes.battery_icon;
+      const isCharging = attributes.is_charging ?? attributes.charging;
+      if (batteryIcon?.includes("charging") || isCharging === true) {
+        operationalState = RvcOperationalState.OperationalState.Docked;
+      } else {
+        operationalState = RvcOperationalState.OperationalState.Paused;
+      }
     } else if (state === VacuumState.error || state === "unavailable") {
       operationalState = RvcOperationalState.OperationalState.Error;
     } else {
