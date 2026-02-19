@@ -109,8 +109,8 @@ The dashboard fetches data from `/api/health/detailed` and refreshes every 15 se
 
 The Bridge Wizard now has a 5-step flow: **Template → Bridge Info → Entity Filter → Feature Flags → Review & Create**. The new Feature Flags step lets you enable common flags directly during bridge creation:
 
-- **Auto Compose Devices** (`autoComposedDevices`) — Combine related entities from the same HA device into single Matter endpoints
-- **Auto Force Sync** (`autoForceSync`) — Periodically push state to controllers (recommended for Google Home / Alexa)
+- **Auto Composed Devices** (`autoComposedDevices`) — Combine related entities into single Matter endpoints (recommended for Google Home / Alexa)
+- **Auto Force Sync** (`autoForceSync`) — Periodically push all states to controllers (recommended for Google Home)
 - **Invert Cover Direction** (`coverSwapOpenClose`) — Swap open/close direction for covers
 - **Include Hidden Entities** (`includeHiddenEntities`) — Also expose hidden HA entities
 
@@ -143,6 +143,16 @@ Matter controllers can send transition times with light commands (brightness cha
 **Backward compatible:** Transition times of 0 or null are not forwarded, preserving current behavior (instant changes). Only non-zero transition times are included in the HA service call.
 
 ### Auto Composed Devices (Master Toggle)
+
+> [!WARNING]
+> **BREAKING CHANGE**: Enabling `autoComposedDevices` changes the Matter endpoint structure for temperature sensors with humidity/pressure. Controllers (Alexa, Google Home, Apple Home) will see these as **new devices** and you'll need to:
+> - Re-assign them to rooms
+> - Re-add them to routines/automations
+> - Reconfigure any voice assistant aliases
+>
+> This only affects temperature sensors with auto-mapped humidity or pressure. The endpoint changes from a flat structure to a composed device with sub-endpoints.
+>
+> **Recommendation**: Only enable this for new bridges, or be prepared to reconfigure your controllers.
 
 **Feature Flag:** `autoComposedDevices` (default: `false`)
 

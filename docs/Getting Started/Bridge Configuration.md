@@ -264,9 +264,12 @@ This configuration:
 
 Feature flags control advanced behavior of the bridge. Configure them in the **Bridge Settings → Feature Flags** section of the web UI.
 
+> [!WARNING]
+> **autoComposedDevices is a BREAKING CHANGE**: Enabling this flag changes the Matter endpoint structure for temperature sensors with auto-mapped humidity/pressure. Controllers will see these as **new devices** and you'll need to re-assign rooms, routines, and voice aliases. Only enable for new bridges or be prepared to reconfigure.
+
 | Feature Flag | Description | Default |
 |--------------|-------------|---------|
-| `autoComposedDevices` | Master toggle: combines related entities (battery, humidity, pressure, power, energy) into single Matter endpoints. Enables all auto-mapping features at once. | `false` |
+| `autoComposedDevices` | Master toggle: combines related entities (battery, humidity, pressure, power, energy) into single Matter endpoints. **WARNING: Breaking change - see above.** | `false` |
 | `autoBatteryMapping` | Automatically combines battery sensors with their parent device | `false` |
 | `autoHumidityMapping` | Automatically combines humidity sensors with temperature sensors | `true` |
 | `autoPressureMapping` | Automatically combines pressure sensors with temperature sensors | `true` |
