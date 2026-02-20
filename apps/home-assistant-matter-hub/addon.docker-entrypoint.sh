@@ -1,10 +1,12 @@
 #!/usr/bin/with-contenv bashio
 
-# Limit Node.js heap to 512MB to prevent OOM kills on resource-constrained
+# Limit Node.js heap to 768MB to prevent OOM kills on resource-constrained
 # devices like HA Yellow (4GB shared) and RPi (1GB). Without this, V8 tries
 # to grow the heap to ~4GB on 64-bit systems, which triggers the Linux OOM
 # killer when other HA services are already using most of the available RAM.
-export NODE_OPTIONS="--max-old-space-size=512"
+# 768MB provides enough headroom for medium-to-large setups where matter.js
+# endpoints consume ~1-3MB each (behaviors, TLV schemas, scenes, etc.).
+export NODE_OPTIONS="--max-old-space-size=768"
 
 exec home-assistant-matter-hub start \
   --log-level=$(bashio::config 'app_log_level') \

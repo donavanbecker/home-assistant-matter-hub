@@ -8,6 +8,7 @@ import { Logger } from "@matter/general";
 import { getStates } from "home-assistant-js-websocket";
 import { fromPairs, keyBy, keys, uniq, values } from "lodash-es";
 import { Service } from "../../core/ioc/service.js";
+import { logMemoryUsage } from "../../utils/log-memory.js";
 import { withRetry } from "../../utils/retry.js";
 import {
   getAreaRegistry,
@@ -137,6 +138,11 @@ export class HomeAssistantRegistry extends Service {
     // that don't have entity registry entries but still need to be filterable
     this._entities = allEntities;
     this._states = states;
+
+    logger.info(
+      `Loaded HA registry: ${keys(allEntities).length} entities, ${keys(realDevices).length} devices, ${keys(states).length} states`,
+    );
+    logMemoryUsage(logger, "after HA registry load");
 
     // Fetch labels registry for UI autocomplete
     try {

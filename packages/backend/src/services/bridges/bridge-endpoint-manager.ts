@@ -8,6 +8,7 @@ import { Service } from "../../core/ioc/service.js";
 import { AggregatorEndpoint } from "../../matter/endpoints/aggregator-endpoint.js";
 import type { EntityEndpoint } from "../../matter/endpoints/entity-endpoint.js";
 import { LegacyEndpoint } from "../../matter/endpoints/legacy/legacy-endpoint.js";
+import { isHeapUnderPressure } from "../../utils/log-memory.js";
 import { subscribeEntities } from "../home-assistant/api/subscribe-entities.js";
 import type { HomeAssistantClient } from "../home-assistant/home-assistant-client.js";
 import type { HomeAssistantStates } from "../home-assistant/home-assistant-registry.js";
@@ -127,7 +128,32 @@ export class BridgeEndpointManager extends Service {
       }
     }
 
+    let memoryLimitReached = false;
+
     for (const entityId of this.entityIds) {
+      // Check heap pressure before creating a new endpoint.
+      // matter.js endpoints are memory-heavy (~1-3 MB each), so we stop
+      // loading more entities when the heap approaches its limit to
+      // prevent OOM crashes. Already-loaded endpoints keep working.
+      if (!memoryLimitReached && isHeapUnderPressure()) {
+        memoryLimitReached = true;
+        this.log.error(
+          "Memory pressure detected — skipping remaining entities to prevent OOM crash. " +
+            "Reduce the number of entities in this bridge or increase the Node.js heap size (NODE_OPTIONS=--max-old-space-size=1024).",
+        );
+      }
+      if (memoryLimitReached) {
+        // Skip existing endpoints that are already loaded
+        if (!existingEndpoints.some((e) => e.entityId === entityId)) {
+          this._failedEntities.push({
+            entityId,
+            reason:
+              "Skipped due to memory pressure — reduce entities or increase heap size",
+          });
+        }
+        continue;
+      }
+
       const mapping = this.getEntityMapping(entityId);
 
       if (mapping?.disabled) {

@@ -6,6 +6,7 @@ import type { Logger } from "@matter/general";
 import { SessionManager } from "@matter/main/protocol";
 import type { LoggerService } from "../../core/app/logger.js";
 import type { ServerModeServerNode } from "../../matter/endpoints/server-mode-server-node.js";
+import { logMemoryUsage } from "../../utils/log-memory.js";
 import { diagnosticEventBus } from "../diagnostics/diagnostic-event-bus.js";
 import type {
   BridgeDataProvider,
@@ -129,11 +130,13 @@ export class ServerModeBridge {
         reason: "The server mode bridge is starting... Please wait.",
       });
       await this.refreshDevices();
+      logMemoryUsage(this.log, "after refreshDevices (server mode)");
       this.endpointManager.startObserving();
       await this.server.start();
       this.setStatus({ code: BridgeStatus.Running });
       this.startAutoForceSyncIfEnabled();
       this.scheduleWarmStart();
+      logMemoryUsage(this.log, "server mode bridge running");
       this.log.info("Server mode bridge started successfully");
       diagnosticEventBus.emit("bridge_started", "Server mode bridge started", {
         bridgeId: this.id,

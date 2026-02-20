@@ -10,6 +10,7 @@ import type { EntityEndpoint } from "../../matter/endpoints/entity-endpoint.js";
 import { LegacyEndpoint } from "../../matter/endpoints/legacy/legacy-endpoint.js";
 import type { ServerModeServerNode } from "../../matter/endpoints/server-mode-server-node.js";
 import { ServerModeVacuumEndpoint } from "../../matter/endpoints/server-mode-vacuum-endpoint.js";
+import { isHeapUnderPressure } from "../../utils/log-memory.js";
 import { subscribeEntities } from "../home-assistant/api/subscribe-entities.js";
 import type { HomeAssistantClient } from "../home-assistant/home-assistant-client.js";
 import type { HomeAssistantStates } from "../home-assistant/home-assistant-registry.js";
@@ -128,6 +129,19 @@ export class ServerModeEndpointManager extends Service {
     // If we already have a device endpoint, update its state instead of recreating
     if (this.deviceEndpoint) {
       this.log.debug(`Device endpoint already exists for ${entityId}`);
+      return;
+    }
+
+    if (isHeapUnderPressure()) {
+      this.log.error(
+        "Memory pressure detected — cannot create device endpoint. " +
+          "Reduce entities on other bridges or increase the Node.js heap size (NODE_OPTIONS=--max-old-space-size=1024).",
+      );
+      this._failedEntities.push({
+        entityId,
+        reason:
+          "Skipped due to memory pressure — reduce entities or increase heap size",
+      });
       return;
     }
 
