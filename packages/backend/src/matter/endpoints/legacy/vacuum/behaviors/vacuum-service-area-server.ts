@@ -163,6 +163,31 @@ export function createVacuumServiceAreaServer(
 }
 
 /**
+ * Create a default ServiceAreaServer with a single "Home" area.
+ * Used when no rooms are available from vacuum attributes or entity mapping.
+ */
+export function createDefaultServiceAreaServer() {
+  return ServiceAreaServer({
+    supportedAreas: [
+      {
+        areaId: 1,
+        mapId: null,
+        areaInfo: {
+          locationInfo: {
+            locationName: "Home",
+            floorNumber: null,
+            areaType: null,
+          },
+          landmarkInfo: null,
+        },
+      },
+    ],
+    selectedAreas: [],
+    currentArea: null,
+  });
+}
+
+/**
  * Export toAreaId for use by RvcRunModeServer to convert area IDs back to room IDs
  */
 export { toAreaId };

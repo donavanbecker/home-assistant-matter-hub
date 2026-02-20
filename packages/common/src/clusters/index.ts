@@ -46,5 +46,6 @@ export enum ClusterId {
   rvcCleanMode = "rvcCleanMode",
   rvcRunMode = "rvcRunMode",
   rvcOperationalState = "rvcOperationalState",
+  serviceArea = "serviceArea",
   switch = "switch",
 }

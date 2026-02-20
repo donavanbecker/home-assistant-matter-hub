@@ -1,14 +1,10 @@
-import {
-  type VacuumDeviceAttributes,
-  VacuumDeviceFeature,
-} from "@home-assistant-matter-hub/common";
+import type { VacuumDeviceAttributes } from "@home-assistant-matter-hub/common";
 import { Logger } from "@matter/general";
 import type { EndpointType } from "@matter/main";
 import { RoboticVacuumCleanerDevice } from "@matter/main/devices";
 
 const logger = Logger.get("VacuumDevice");
 
-import { testBit } from "../../../../utils/test-bit.js";
 import { BasicInformationServer } from "../../../behaviors/basic-information-server.js";
 import { HomeAssistantEntityBehavior } from "../../../behaviors/home-assistant-entity-behavior.js";
 import { IdentifyServer } from "../../../behaviors/identify-server.js";
@@ -20,7 +16,10 @@ import {
 } from "./behaviors/vacuum-rvc-clean-mode-server.js";
 import { VacuumRvcOperationalStateServer } from "./behaviors/vacuum-rvc-operational-state-server.js";
 import { createVacuumRvcRunModeServer } from "./behaviors/vacuum-rvc-run-mode-server.js";
-import { createVacuumServiceAreaServer } from "./behaviors/vacuum-service-area-server.js";
+import {
+  createDefaultServiceAreaServer,
+  createVacuumServiceAreaServer,
+} from "./behaviors/vacuum-service-area-server.js";
 import { parseVacuumRooms } from "./utils/parse-vacuum-rooms.js";
 
 const VacuumEndpointType = RoboticVacuumCleanerDevice.with(
@@ -40,8 +39,6 @@ export function VacuumDevice(
   const entityId = homeAssistantEntity.entity.entity_id;
   const attributes = homeAssistantEntity.entity.state
     .attributes as VacuumDeviceAttributes;
-  const supportedFeatures = attributes.supported_features ?? 0;
-
   // Debug: Log mapping info
   logger.info(
     `Creating vacuum endpoint for ${entityId}, mapping: ${JSON.stringify(homeAssistantEntity.mapping ?? "none")}`,
@@ -59,37 +56,25 @@ export function VacuumDevice(
   // "Updating" instead of using RvcOperationalState for the actual status.
   // Start/stop is handled via RvcRunMode.changeToMode(Cleaning/Idle).
 
-  // Add PowerSource if BATTERY feature is set OR if battery attribute exists
-  // OR if a battery entity is mapped (for Roomba, Deebot, etc.)
-  // Some vacuums use 'battery_level', others use 'battery' (e.g. Dreame)
-  const batteryValue = attributes.battery_level ?? attributes.battery;
-  const hasBatteryAttr =
-    batteryValue != null && typeof batteryValue === "number";
-  const hasBatteryEntity = !!homeAssistantEntity.mapping?.batteryEntity;
-  if (
-    testBit(supportedFeatures, VacuumDeviceFeature.BATTERY) ||
-    hasBatteryAttr ||
-    hasBatteryEntity
-  ) {
-    device = device.with(VacuumPowerSourceServer);
-  }
+  // PowerSource — always included.
+  // Controllers (Alexa, Apple Home) expect battery info on vacuum endpoints.
+  device = device.with(VacuumPowerSourceServer);
 
-  // ServiceArea cluster for native room selection in Apple Home
-  // All state is set at creation time (no custom initialize())
-  // Support both: 1) rooms from vacuum attributes (Dreame, Xiaomi Miot)
-  //               2) button entities from mapping (Roborock official integration)
+  // ServiceArea — always included.
+  // Controllers expect this cluster on vacuum endpoints.
   const roomEntities = homeAssistantEntity.mapping?.roomEntities;
   const rooms = parseVacuumRooms(attributes);
   logger.info(
     `${entityId}: roomEntities=${JSON.stringify(roomEntities ?? [])}, parsedRooms=${rooms.length}`,
   );
   if (rooms.length > 0 || (roomEntities && roomEntities.length > 0)) {
-    logger.info(`${entityId}: Adding ServiceArea cluster with rooms`);
+    logger.info(`${entityId}: Adding ServiceArea (${rooms.length} rooms)`);
     device = device.with(
       createVacuumServiceAreaServer(attributes, roomEntities),
     );
   } else {
-    logger.info(`${entityId}: No rooms found, skipping ServiceArea cluster`);
+    logger.info(`${entityId}: Adding ServiceArea (default single-area)`);
+    device = device.with(createDefaultServiceAreaServer());
   }
 
   // RvcCleanMode — always included.
