@@ -60,6 +60,7 @@ enum CleanType {
 function buildSupportedModes(
   fanSpeedList?: string[],
   mopIntensityList?: string[],
+  includeCleanTypes = true,
 ): RvcCleanMode.ModeOption[] {
   const modes: RvcCleanMode.ModeOption[] = [
     {
@@ -67,20 +68,28 @@ function buildSupportedModes(
       mode: MODE_VACUUM,
       modeTags: [{ value: RvcCleanMode.ModeTag.Vacuum }],
     },
-    {
-      label: "Vacuum & Mop",
-      mode: MODE_VACUUM_AND_MOP,
-      modeTags: [
-        { value: RvcCleanMode.ModeTag.Vacuum },
-        { value: RvcCleanMode.ModeTag.Mop },
-      ],
-    },
-    {
-      label: "Mop",
-      mode: MODE_MOP,
-      modeTags: [{ value: RvcCleanMode.ModeTag.Mop }],
-    },
   ];
+
+  // Cleaning type modes require a cleaningModeEntity or native support
+  // (Dreame/Ecovacs). Without them, only the Vacuum base + fan speeds
+  // are exposed (e.g. Roborock via Roborock integration).
+  if (includeCleanTypes) {
+    modes.push(
+      {
+        label: "Vacuum & Mop",
+        mode: MODE_VACUUM_AND_MOP,
+        modeTags: [
+          { value: RvcCleanMode.ModeTag.Vacuum },
+          { value: RvcCleanMode.ModeTag.Mop },
+        ],
+      },
+      {
+        label: "Mop",
+        mode: MODE_MOP,
+        modeTags: [{ value: RvcCleanMode.ModeTag.Mop }],
+      },
+    );
+  }
 
   // Fan-speed modes are generated dynamically from fan_speed_list.
   // Apple Home shows them as "extra features" when the Vacuum cleaning
@@ -89,22 +98,24 @@ function buildSupportedModes(
     modes.push(...buildFanSpeedModes(fanSpeedList));
   }
 
-  // Mop-intensity modes are generated dynamically from the mopIntensityEntity options.
-  // Apple Home shows them as "extra features" when the Mop cleaning type is active.
-  if (mopIntensityList && mopIntensityList.length > 0) {
+  // Mop-intensity modes require cleaning type modes (Mop base mode)
+  // so Apple Home can show them as extra features when mopping.
+  if (includeCleanTypes && mopIntensityList && mopIntensityList.length > 0) {
     modes.push(...buildMopIntensityModes(mopIntensityList));
   }
 
-  // VacuumThenMop always last — uses DeepClean + Vacuum + Mop tags
-  modes.push({
-    label: "Vacuum Then Mop",
-    mode: MODE_VACUUM_THEN_MOP,
-    modeTags: [
-      { value: RvcCleanMode.ModeTag.DeepClean },
-      { value: RvcCleanMode.ModeTag.Vacuum },
-      { value: RvcCleanMode.ModeTag.Mop },
-    ],
-  });
+  // VacuumThenMop only makes sense with cleaning type support
+  if (includeCleanTypes) {
+    modes.push({
+      label: "Vacuum Then Mop",
+      mode: MODE_VACUUM_THEN_MOP,
+      modeTags: [
+        { value: RvcCleanMode.ModeTag.DeepClean },
+        { value: RvcCleanMode.ModeTag.Vacuum },
+        { value: RvcCleanMode.ModeTag.Mop },
+      ],
+    });
+  }
 
   return modes;
 }
@@ -207,7 +218,7 @@ function buildFanSpeedModes(fanSpeedList: string[]): RvcCleanMode.ModeOption[] {
 
 const MOP_TAG_PATTERNS: Array<{ pattern: RegExp; tag: number }> = [
   {
-    pattern: /^(low|light|gentle|slightly_wet|leicht)$/i,
+    pattern: /^(low|light|gentle|mild|slightly_wet|leicht)$/i,
     tag: RvcCleanMode.ModeTag.Quiet,
   },
   {
@@ -450,6 +461,7 @@ function readSelectEntity(
 function createCleanModeConfig(
   fanSpeedList?: string[],
   mopIntensityList?: string[],
+  includeCleanTypes = true,
 ) {
   return {
     getCurrentMode: (entity: { attributes: unknown }, agent: Agent): number => {
@@ -457,14 +469,17 @@ function createCleanModeConfig(
         cleaning_mode?: string;
       };
 
-      // Determine cleaning type from select entity or vacuum attribute
-      let cleanType: CleanType;
-      if (attributes.cleaning_mode) {
-        cleanType = parseCleanType(attributes.cleaning_mode);
-      } else {
-        const selectEntityId = getCleaningModeSelectEntity(agent);
-        const { state } = readSelectEntity(selectEntityId, agent);
-        cleanType = parseCleanType(state);
+      // Determine cleaning type from select entity or vacuum attribute.
+      // Without cleaning type support, default to Sweeping (fan-speed only).
+      let cleanType: CleanType = CleanType.Sweeping;
+      if (includeCleanTypes) {
+        if (attributes.cleaning_mode) {
+          cleanType = parseCleanType(attributes.cleaning_mode);
+        } else {
+          const selectEntityId = getCleaningModeSelectEntity(agent);
+          const { state } = readSelectEntity(selectEntityId, agent);
+          cleanType = parseCleanType(state);
+        }
       }
 
       const mapping = agent.get(HomeAssistantEntityBehavior).state.mapping;
@@ -513,7 +528,7 @@ function createCleanModeConfig(
     },
 
     getSupportedModes: () =>
-      buildSupportedModes(fanSpeedList, mopIntensityList),
+      buildSupportedModes(fanSpeedList, mopIntensityList, includeCleanTypes),
 
     setCleanMode: (mode: number, agent: Agent) => {
       const homeAssistant = agent.get(HomeAssistantEntityBehavior);
@@ -595,6 +610,13 @@ function createCleanModeConfig(
       }
 
       // Cleaning-type modes: set the cleaning mode select entity
+      if (!includeCleanTypes) {
+        logger.debug(
+          `Ignoring cleaning type change (mode=${mode}): no cleaning mode entity`,
+        );
+        return undefined;
+      }
+
       const cleanType = modeIdToCleanType(mode);
       const selectEntityId = getCleaningModeSelectEntity(agent);
       const { options: availableOptions } = readSelectEntity(
@@ -626,11 +648,16 @@ export function createVacuumRvcCleanModeServer(
   _attributes: VacuumDeviceAttributes,
   fanSpeedList?: string[],
   mopIntensityList?: string[],
+  includeCleanTypes = true,
 ): ReturnType<typeof RvcCleanModeServer> {
-  const supportedModes = buildSupportedModes(fanSpeedList, mopIntensityList);
+  const supportedModes = buildSupportedModes(
+    fanSpeedList,
+    mopIntensityList,
+    includeCleanTypes,
+  );
 
   logger.info(
-    `Creating VacuumRvcCleanModeServer with ${supportedModes.length} modes (fanSpeedList=${JSON.stringify(fanSpeedList ?? [])}, mopIntensityList=${JSON.stringify(mopIntensityList ?? [])})`,
+    `Creating VacuumRvcCleanModeServer with ${supportedModes.length} modes (fanSpeedList=${JSON.stringify(fanSpeedList ?? [])}, mopIntensityList=${JSON.stringify(mopIntensityList ?? [])}, includeCleanTypes=${includeCleanTypes})`,
   );
   logger.info(
     `Modes: ${supportedModes.map((m) => `${m.mode}:${m.label}[${m.modeTags.map((t) => t.value).join(",")}]`).join(", ")}`,
@@ -642,7 +669,7 @@ export function createVacuumRvcCleanModeServer(
   };
 
   return RvcCleanModeServer(
-    createCleanModeConfig(fanSpeedList, mopIntensityList),
+    createCleanModeConfig(fanSpeedList, mopIntensityList, includeCleanTypes),
     initialState,
   );
 }

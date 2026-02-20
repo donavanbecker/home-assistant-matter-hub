@@ -94,15 +94,18 @@ export function VacuumDevice(
   const mopIntensityList = resolveMopIntensityList(
     homeAssistantEntity.mapping?.mopIntensityEntity,
   );
-  if (supportsCleaningModes(attributes) || hasCleaningModeEntity) {
+  const hasCleanTypes =
+    supportsCleaningModes(attributes) || hasCleaningModeEntity;
+  if (hasCleanTypes || fanSpeedList || mopIntensityList) {
     logger.info(
-      `${entityId}: Adding RvcCleanMode (multi-mode, isDreame=${supportsCleaningModes(attributes)}, mappedEntity=${hasCleaningModeEntity}, fanSpeedList=${JSON.stringify(fanSpeedList ?? [])}, mopIntensityList=${JSON.stringify(mopIntensityList ?? [])})`,
+      `${entityId}: Adding RvcCleanMode (multi-mode, hasCleanTypes=${hasCleanTypes}, fanSpeedList=${JSON.stringify(fanSpeedList ?? [])}, mopIntensityList=${JSON.stringify(mopIntensityList ?? [])})`,
     );
     device = device.with(
       createVacuumRvcCleanModeServer(
         attributes,
         fanSpeedList,
         mopIntensityList,
+        hasCleanTypes,
       ),
     );
   } else {

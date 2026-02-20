@@ -98,12 +98,15 @@ export function ServerModeVacuumDevice(
   const mopIntensityList = resolveMopIntensityList(
     homeAssistantEntity.mapping?.mopIntensityEntity,
   );
-  if (supportsCleaningModes(attributes) || hasCleaningModeEntity) {
+  const hasCleanTypes =
+    supportsCleaningModes(attributes) || hasCleaningModeEntity;
+  if (hasCleanTypes || fanSpeedList || mopIntensityList) {
     device = device.with(
       createVacuumRvcCleanModeServer(
         attributes,
         fanSpeedList,
         mopIntensityList,
+        hasCleanTypes,
       ),
     );
   } else {
