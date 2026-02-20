@@ -50,10 +50,15 @@ import { WaterHeaterDevice } from "./water-heater/index.js";
 /**
  * @deprecated
  */
+export interface LegacyEndpointOptions {
+  vacuumOnOff?: boolean;
+}
+
 export function createLegacyEndpointType(
   entity: HomeAssistantEntityInformation,
   mapping?: EntityMappingConfig,
   areaName?: string,
+  options?: LegacyEndpointOptions,
 ): EndpointType | undefined {
   const domain = entity.entity_id.split(".")[0] as HomeAssistantDomain;
   const customName = mapping?.customName;
@@ -68,11 +73,19 @@ export function createLegacyEndpointType(
   }
 
   if (!type) {
-    const factory = deviceCtrs[domain];
-    if (!factory) {
-      return undefined;
+    // Vacuum needs special handling for the vacuumOnOff feature flag
+    if (domain === "vacuum") {
+      type = VacuumDevice(
+        { entity, customName, mapping },
+        options?.vacuumOnOff,
+      );
+    } else {
+      const factory = deviceCtrs[domain];
+      if (!factory) {
+        return undefined;
+      }
+      type = factory({ entity, customName, mapping });
     }
-    type = factory({ entity, customName, mapping });
   }
 
   if (!type) {
@@ -182,7 +195,7 @@ const matterDeviceTypeFactories: Partial<
   thermostat: ClimateDevice,
   fan: FanDevice,
   air_purifier: AirPurifierEndpoint,
-  robot_vacuum_cleaner: VacuumDevice,
+  robot_vacuum_cleaner: (ha) => VacuumDevice(ha),
   humidifier_dehumidifier: HumidifierDevice,
   speaker: MediaPlayerDevice,
   basic_video_player: VideoPlayerDevice,

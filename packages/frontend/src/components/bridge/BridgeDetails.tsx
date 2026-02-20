@@ -9,6 +9,7 @@ import InfoIcon from "@mui/icons-material/Info";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import RemoveIcon from "@mui/icons-material/Remove";
 import SyncIcon from "@mui/icons-material/Sync";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import WifiIcon from "@mui/icons-material/Wifi";
 import Alert from "@mui/material/Alert";
 import AlertTitle from "@mui/material/AlertTitle";
@@ -44,6 +45,19 @@ export interface BridgeDetailsProps {
 export const BridgeDetails = ({ bridge }: BridgeDetailsProps) => {
   return (
     <Grid container spacing={2}>
+      {bridge.featureFlags?.vacuumOnOff && (
+        <Grid size={{ xs: 12 }}>
+          <Alert severity="warning" icon={<WarningAmberIcon />}>
+            <AlertTitle>Vacuum OnOff Cluster Enabled</AlertTitle>
+            The <strong>vacuumOnOff</strong> feature flag adds a non-standard
+            OnOff cluster to robot vacuum endpoints. This may cause issues with{" "}
+            <strong>Apple Home</strong> (broken UI, "Updating" status) and{" "}
+            <strong>Google Home</strong> (unexpected cluster on device type
+            0x74). Only use this if you primarily control vacuums via{" "}
+            <strong>Alexa</strong>.
+          </Alert>
+        </Grid>
+      )}
       <Grid size={{ xs: 12, md: 4 }}>
         <PairingCard bridge={bridge} />
       </Grid>

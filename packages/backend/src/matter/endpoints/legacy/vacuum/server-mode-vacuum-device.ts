@@ -3,11 +3,12 @@ import type { EndpointType } from "@matter/main";
 import { RoboticVacuumCleanerDevice } from "@matter/main/devices";
 import { HomeAssistantEntityBehavior } from "../../../behaviors/home-assistant-entity-behavior.js";
 import { IdentifyServer } from "../../../behaviors/identify-server.js";
+import { VacuumOnOffServer } from "./behaviors/vacuum-on-off-server.js";
 import { VacuumPowerSourceServer } from "./behaviors/vacuum-power-source-server.js";
 import {
   createDefaultRvcCleanModeServer,
   createVacuumRvcCleanModeServer,
-  hasFanSpeedSupport,
+  resolveFanSpeedList,
   supportsCleaningModes,
 } from "./behaviors/vacuum-rvc-clean-mode-server.js";
 import { VacuumRvcOperationalStateServer } from "./behaviors/vacuum-rvc-operational-state-server.js";
@@ -49,6 +50,7 @@ const ServerModeVacuumEndpointType = RoboticVacuumCleanerDevice.with(
  */
 export function ServerModeVacuumDevice(
   homeAssistantEntity: HomeAssistantEntityBehavior.State,
+  includeOnOff = false,
 ): EndpointType | undefined {
   if (homeAssistantEntity.entity.state === undefined) {
     return undefined;
@@ -62,10 +64,13 @@ export function ServerModeVacuumDevice(
     createVacuumRvcRunModeServer(attributes),
   ).set({ homeAssistantEntity });
 
-  // NOTE: OnOff is intentionally NOT included in server mode.
-  // It is not part of the RoboticVacuumCleaner device type spec and
-  // non-standard clusters can confuse Apple Home's UI rendering.
-  // Start/stop is handled via RvcRunMode.changeToMode(Cleaning/Idle).
+  // OnOff is NOT part of the RoboticVacuumCleaner device type spec.
+  // Including it may confuse Apple Home's UI rendering (shows "Updating"
+  // or renders as switch instead of vacuum). Only enabled via feature flag
+  // for Alexa compatibility (maps OnOff to PowerController for start/stop).
+  if (includeOnOff) {
+    device = device.with(VacuumOnOffServer);
+  }
 
   // PowerSource — always included.
   device = device.with(VacuumPowerSourceServer);
@@ -85,12 +90,13 @@ export function ServerModeVacuumDevice(
   // Alexa probes for cluster 0x55 during discovery and may refuse the device without it.
   const hasCleaningModeEntity =
     !!homeAssistantEntity.mapping?.cleaningModeEntity;
-  const hasFanSpeed =
-    !!homeAssistantEntity.mapping?.suctionLevelEntity ||
-    hasFanSpeedSupport(attributes);
+  const fanSpeedList = resolveFanSpeedList(
+    attributes,
+    homeAssistantEntity.mapping?.suctionLevelEntity,
+  );
   if (supportsCleaningModes(attributes) || hasCleaningModeEntity) {
     device = device.with(
-      createVacuumRvcCleanModeServer(attributes, hasFanSpeed),
+      createVacuumRvcCleanModeServer(attributes, fanSpeedList),
     );
   } else {
     device = device.with(createDefaultRvcCleanModeServer());

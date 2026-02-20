@@ -8,11 +8,12 @@ const logger = Logger.get("VacuumDevice");
 import { BasicInformationServer } from "../../../behaviors/basic-information-server.js";
 import { HomeAssistantEntityBehavior } from "../../../behaviors/home-assistant-entity-behavior.js";
 import { IdentifyServer } from "../../../behaviors/identify-server.js";
+import { VacuumOnOffServer } from "./behaviors/vacuum-on-off-server.js";
 import { VacuumPowerSourceServer } from "./behaviors/vacuum-power-source-server.js";
 import {
   createDefaultRvcCleanModeServer,
   createVacuumRvcCleanModeServer,
-  hasFanSpeedSupport,
+  resolveFanSpeedList,
   supportsCleaningModes,
 } from "./behaviors/vacuum-rvc-clean-mode-server.js";
 import { VacuumRvcOperationalStateServer } from "./behaviors/vacuum-rvc-operational-state-server.js";
@@ -32,6 +33,7 @@ const VacuumEndpointType = RoboticVacuumCleanerDevice.with(
 
 export function VacuumDevice(
   homeAssistantEntity: HomeAssistantEntityBehavior.State,
+  includeOnOff = false,
 ): EndpointType | undefined {
   if (homeAssistantEntity.entity.state === undefined) {
     return undefined;
@@ -50,12 +52,14 @@ export function VacuumDevice(
     createVacuumRvcRunModeServer(attributes),
   ).set({ homeAssistantEntity });
 
-  // NOTE: OnOff is intentionally NOT included.
-  // It is not part of the RoboticVacuumCleaner device type spec and
-  // non-standard clusters can confuse Apple Home's UI rendering.
-  // When vacuum is idle, OnOff.onOff=false may cause Apple Home to show
-  // "Updating" instead of using RvcOperationalState for the actual status.
-  // Start/stop is handled via RvcRunMode.changeToMode(Cleaning/Idle).
+  // OnOff is NOT part of the RoboticVacuumCleaner device type spec.
+  // Including it may confuse Apple Home's UI rendering (shows "Updating"
+  // or renders as switch instead of vacuum). Only enabled via feature flag
+  // for Alexa compatibility (maps OnOff to PowerController for start/stop).
+  if (includeOnOff) {
+    logger.info(`${entityId}: Adding OnOff cluster (vacuumOnOff flag enabled)`);
+    device = device.with(VacuumOnOffServer);
+  }
 
   // PowerSource — always included.
   // Controllers (Alexa, Apple Home) expect battery info on vacuum endpoints.
@@ -82,15 +86,16 @@ export function VacuumDevice(
   // Alexa probes for cluster 0x55 during discovery and may refuse the device without it.
   const hasCleaningModeEntity =
     !!homeAssistantEntity.mapping?.cleaningModeEntity;
-  const hasFanSpeed =
-    !!homeAssistantEntity.mapping?.suctionLevelEntity ||
-    hasFanSpeedSupport(attributes);
+  const fanSpeedList = resolveFanSpeedList(
+    attributes,
+    homeAssistantEntity.mapping?.suctionLevelEntity,
+  );
   if (supportsCleaningModes(attributes) || hasCleaningModeEntity) {
     logger.info(
-      `${entityId}: Adding RvcCleanMode (multi-mode, isDreame=${supportsCleaningModes(attributes)}, mappedEntity=${hasCleaningModeEntity}, fanSpeed=${hasFanSpeed})`,
+      `${entityId}: Adding RvcCleanMode (multi-mode, isDreame=${supportsCleaningModes(attributes)}, mappedEntity=${hasCleaningModeEntity}, fanSpeedList=${JSON.stringify(fanSpeedList ?? [])})`,
     );
     device = device.with(
-      createVacuumRvcCleanModeServer(attributes, hasFanSpeed),
+      createVacuumRvcCleanModeServer(attributes, fanSpeedList),
     );
   } else {
     logger.info(`${entityId}: Adding RvcCleanMode (default single-mode)`);

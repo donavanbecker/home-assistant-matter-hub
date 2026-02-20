@@ -218,7 +218,9 @@ export class LegacyEndpoint extends EntityEndpoint {
       deviceRegistry,
     };
     const areaName = registry.getAreaName(entityId);
-    const type = createLegacyEndpointType(payload, effectiveMapping, areaName);
+    const type = createLegacyEndpointType(payload, effectiveMapping, areaName, {
+      vacuumOnOff: registry.isVacuumOnOffEnabled(),
+    });
     if (!type) {
       return;
     }

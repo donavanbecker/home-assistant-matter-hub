@@ -51,6 +51,15 @@ interface AllBridgeFeatureFlags {
    * Default: false (disabled)
    */
   readonly autoForceSync: boolean;
+  /**
+   * Vacuum OnOff Cluster: Add an OnOff cluster to robot vacuum endpoints.
+   * This enables basic start/stop control in Alexa (mapped to PowerController).
+   * WARNING: This adds a non-standard cluster to the RVC device type and may cause
+   * issues with Apple Home (broken UI, "Updating" status) and Google Home.
+   * Only enable this if you primarily use Alexa to control your vacuum.
+   * Default: false (disabled)
+   */
+  readonly vacuumOnOff: boolean;
 }
 
 export type BridgeFeatureFlags = Partial<AllBridgeFeatureFlags>;

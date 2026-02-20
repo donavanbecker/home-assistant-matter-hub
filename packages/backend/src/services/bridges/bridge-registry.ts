@@ -194,6 +194,14 @@ export class BridgeRegistry {
   }
 
   /**
+   * Check if the vacuum OnOff cluster feature flag is enabled.
+   * When enabled, an OnOff cluster is added to vacuum endpoints for Alexa compatibility.
+   */
+  isVacuumOnOffEnabled(): boolean {
+    return this.dataProvider.featureFlags?.vacuumOnOff === true;
+  }
+
+  /**
    * Find a pressure sensor entity that belongs to the same HA device.
    * Returns the entity_id of the pressure sensor, or undefined if none found.
    */

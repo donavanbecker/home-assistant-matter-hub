@@ -74,11 +74,14 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
     };
 
     const customName = effectiveMapping?.customName;
-    const endpointType = ServerModeVacuumDevice({
-      entity: payload,
-      customName,
-      mapping: effectiveMapping,
-    });
+    const endpointType = ServerModeVacuumDevice(
+      {
+        entity: payload,
+        customName,
+        mapping: effectiveMapping,
+      },
+      registry.isVacuumOnOffEnabled(),
+    );
 
     if (!endpointType) {
       return undefined;

@@ -220,6 +220,18 @@ const featureFlagSchema: JSONSchema7 = {
       type: "boolean",
       default: false,
     },
+
+    vacuumOnOff: {
+      title: "Vacuum: Include OnOff Cluster (Alexa)",
+      description:
+        "Add an OnOff cluster to robot vacuum endpoints for basic start/stop control in Alexa. " +
+        "WARNING: OnOff is NOT part of the Matter RVC device type specification. " +
+        "Enabling this may break Apple Home (shows 'Updating' or renders as switch instead of vacuum) " +
+        "and Google Home (unexpected cluster on device type 0x74). " +
+        "Only enable if you primarily use Alexa.",
+      type: "boolean",
+      default: false,
+    },
   },
   additionalProperties: false,
 };

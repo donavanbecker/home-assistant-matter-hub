@@ -28,10 +28,15 @@ const logger = Logger.get("VacuumRvcCleanModeServer");
 const MODE_VACUUM = 0;
 const MODE_VACUUM_AND_MOP = 1;
 const MODE_MOP = 2;
-const MODE_QUIET = 3;
-const MODE_STANDARD = 4;
-const MODE_STRONG = 5;
 const MODE_VACUUM_THEN_MOP = 6;
+
+/** Base mode value for dynamically generated fan speed modes */
+const FAN_SPEED_MODE_BASE = 10;
+
+/** Check if a mode value represents a fan speed mode */
+function isFanSpeedMode(mode: number): boolean {
+  return mode >= FAN_SPEED_MODE_BASE;
+}
 
 enum CleanType {
   Sweeping = 0,
@@ -44,7 +49,9 @@ enum CleanType {
 // Supported mode lists
 // ---------------------------------------------------------------------------
 
-function buildSupportedModes(hasFanSpeed: boolean): RvcCleanMode.ModeOption[] {
+function buildSupportedModes(
+  fanSpeedList?: string[],
+): RvcCleanMode.ModeOption[] {
   const modes: RvcCleanMode.ModeOption[] = [
     {
       label: "Vacuum",
@@ -66,32 +73,11 @@ function buildSupportedModes(hasFanSpeed: boolean): RvcCleanMode.ModeOption[] {
     },
   ];
 
-  if (hasFanSpeed) {
-    // Fan-speed modes share the Vacuum tag so Apple Home shows them
-    // as "extra features" when the Vacuum cleaning type is active.
-    modes.push(
-      {
-        label: "Quiet",
-        mode: MODE_QUIET,
-        modeTags: [
-          { value: RvcCleanMode.ModeTag.Vacuum },
-          { value: RvcCleanMode.ModeTag.Quiet },
-        ],
-      },
-      {
-        label: "Standard",
-        mode: MODE_STANDARD,
-        modeTags: [{ value: RvcCleanMode.ModeTag.Vacuum }],
-      },
-      {
-        label: "Strong",
-        mode: MODE_STRONG,
-        modeTags: [
-          { value: RvcCleanMode.ModeTag.Vacuum },
-          { value: RvcCleanMode.ModeTag.Max },
-        ],
-      },
-    );
+  // Fan-speed modes are generated dynamically from fan_speed_list.
+  // Apple Home shows them as "extra features" when the Vacuum cleaning
+  // type is active (they share the Vacuum tag with an intensity tag).
+  if (fanSpeedList && fanSpeedList.length > 0) {
+    modes.push(...buildFanSpeedModes(fanSpeedList));
   }
 
   // VacuumThenMop always last — uses DeepClean + Vacuum + Mop tags
@@ -161,6 +147,49 @@ const FAN_MAX_ALIASES = [
   "high",
   "full",
 ];
+const FAN_NORMAL_ALIASES = [
+  "normal",
+  "standard",
+  "medium",
+  "auto",
+  "balanced",
+  "default",
+];
+
+function getFanSpeedTag(name: string): number | undefined {
+  const s = name.toLowerCase();
+  for (const a of FAN_QUIET_ALIASES) {
+    if (s === a || s.includes(a)) return RvcCleanMode.ModeTag.Quiet;
+  }
+  for (const a of FAN_MAX_ALIASES) {
+    if (s === a || s.includes(a)) return RvcCleanMode.ModeTag.Max;
+  }
+  for (const a of FAN_NORMAL_ALIASES) {
+    if (s === a || s.includes(a)) return RvcCleanMode.ModeTag.Auto;
+  }
+  return undefined;
+}
+
+function formatFanSpeedLabel(name: string): string {
+  return name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function buildFanSpeedModes(fanSpeedList: string[]): RvcCleanMode.ModeOption[] {
+  return fanSpeedList.map((name, index) => {
+    const tag = getFanSpeedTag(name);
+    const modeTags: { value: number }[] = [
+      { value: RvcCleanMode.ModeTag.Vacuum },
+    ];
+    if (tag !== undefined) {
+      modeTags.push({ value: tag });
+    }
+    return {
+      label: formatFanSpeedLabel(name),
+      mode: FAN_SPEED_MODE_BASE + index,
+      modeTags,
+    };
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -207,17 +236,21 @@ function modeIdToCleanType(mode: number): CleanType {
   }
 }
 
-function fanSpeedToModeId(speed: string | undefined): number | undefined {
+function fanSpeedToModeId(
+  speed: string | undefined,
+  fanSpeedList: string[],
+): number | undefined {
   if (!speed) return undefined;
   const s = speed.toLowerCase();
-  for (const a of FAN_QUIET_ALIASES) {
-    if (s === a || s.includes(a)) return MODE_QUIET;
-  }
-  for (const a of FAN_MAX_ALIASES) {
-    if (s === a || s.includes(a)) return MODE_STRONG;
-  }
-  // Standard / Medium / Auto → MODE_STANDARD
-  return MODE_STANDARD;
+  // Exact match
+  const exactIndex = fanSpeedList.findIndex((f) => f.toLowerCase() === s);
+  if (exactIndex >= 0) return FAN_SPEED_MODE_BASE + exactIndex;
+  // Contains match
+  const containsIndex = fanSpeedList.findIndex(
+    (f) => s.includes(f.toLowerCase()) || f.toLowerCase().includes(s),
+  );
+  if (containsIndex >= 0) return FAN_SPEED_MODE_BASE + containsIndex;
+  return undefined;
 }
 
 function findMatchingCleanOption(
@@ -245,22 +278,35 @@ function findMatchingCleanOption(
   return aliases[0];
 }
 
-function findFanSpeedOption(
-  mode: number,
+function matchFanSpeedOption(
+  name: string,
   availableOptions: string[] | undefined,
 ): string | undefined {
   if (!availableOptions || availableOptions.length === 0) return undefined;
-  const aliases = mode === MODE_QUIET ? FAN_QUIET_ALIASES : FAN_MAX_ALIASES;
+  const s = name.toLowerCase();
+  // Exact match
+  const exact = availableOptions.find((o) => o.toLowerCase() === s);
+  if (exact) return exact;
+  // Contains match
+  const contains = availableOptions.find(
+    (o) => o.toLowerCase().includes(s) || s.includes(o.toLowerCase()),
+  );
+  if (contains) return contains;
+  // Alias match via tag category
+  const tag = getFanSpeedTag(name);
+  const aliases =
+    tag === RvcCleanMode.ModeTag.Quiet
+      ? FAN_QUIET_ALIASES
+      : tag === RvcCleanMode.ModeTag.Max
+        ? FAN_MAX_ALIASES
+        : FAN_NORMAL_ALIASES;
   for (const a of aliases) {
-    const m = availableOptions.find((o) => o.toLowerCase() === a.toLowerCase());
+    const m = availableOptions.find(
+      (o) => o.toLowerCase() === a || o.toLowerCase().includes(a),
+    );
     if (m) return m;
   }
-  for (const a of aliases) {
-    const m = availableOptions.find((o) => o.toLowerCase().includes(a));
-    if (m) return m;
-  }
-  if (mode === MODE_QUIET) return availableOptions[0];
-  return availableOptions[availableOptions.length - 1];
+  return undefined;
 }
 
 /**
@@ -296,7 +342,7 @@ function readSelectEntity(
 // Config factory
 // ---------------------------------------------------------------------------
 
-function createCleanModeConfig(hasFanSpeed: boolean) {
+function createCleanModeConfig(fanSpeedList?: string[]) {
   return {
     getCurrentMode: (entity: { attributes: unknown }, agent: Agent): number => {
       const attributes = entity.attributes as VacuumDeviceAttributes & {
@@ -314,7 +360,8 @@ function createCleanModeConfig(hasFanSpeed: boolean) {
       }
 
       // Without fan speed, simply return the cleaning type mode
-      if (!hasFanSpeed) return cleanTypeToModeId(cleanType);
+      if (!fanSpeedList || fanSpeedList.length === 0)
+        return cleanTypeToModeId(cleanType);
 
       // With fan speed: if the cleaning type is vacuum (sweeping),
       // check the fan speed to pick the correct intensity mode.
@@ -332,7 +379,7 @@ function createCleanModeConfig(hasFanSpeed: boolean) {
             (attributes.fan_speed as string | undefined) ?? undefined;
         }
 
-        const speedMode = fanSpeedToModeId(speedState);
+        const speedMode = fanSpeedToModeId(speedState, fanSpeedList);
         if (speedMode !== undefined) {
           logger.debug(
             `Current mode: Vacuum + fan_speed="${speedState}" -> mode ${speedMode}`,
@@ -344,17 +391,21 @@ function createCleanModeConfig(hasFanSpeed: boolean) {
       return cleanTypeToModeId(cleanType);
     },
 
-    getSupportedModes: () => buildSupportedModes(hasFanSpeed),
+    getSupportedModes: () => buildSupportedModes(fanSpeedList),
 
     setCleanMode: (mode: number, agent: Agent) => {
       const homeAssistant = agent.get(HomeAssistantEntityBehavior);
       const vacuumEntityId = homeAssistant.entityId;
 
       // Fan-speed modes: set suction/fan speed, not cleaning type
-      if (
-        hasFanSpeed &&
-        (mode === MODE_QUIET || mode === MODE_STANDARD || mode === MODE_STRONG)
-      ) {
+      if (fanSpeedList && fanSpeedList.length > 0 && isFanSpeedMode(mode)) {
+        const fanSpeedIndex = mode - FAN_SPEED_MODE_BASE;
+        const fanSpeedName = fanSpeedList[fanSpeedIndex];
+        if (!fanSpeedName) {
+          logger.warn(`Invalid fan speed mode index: ${fanSpeedIndex}`);
+          return undefined;
+        }
+
         const mapping = homeAssistant.state.mapping;
 
         // Use suctionLevelEntity if configured
@@ -363,82 +414,29 @@ function createCleanModeConfig(hasFanSpeed: boolean) {
             mapping.suctionLevelEntity,
             agent,
           );
-          if (mode === MODE_STANDARD) {
-            // Standard: pick the "standard"/"medium"/"auto" option
-            const stdOption = options?.find((o) => {
-              const l = o.toLowerCase();
-              return (
-                l === "standard" ||
-                l === "medium" ||
-                l === "auto" ||
-                l === "normal"
-              );
+          const option = matchFanSpeedOption(fanSpeedName, options);
+          if (option) {
+            logger.info(
+              `Setting suction to: ${option} via ${mapping.suctionLevelEntity}`,
+            );
+            homeAssistant.callAction({
+              action: "select.select_option",
+              data: { option },
+              target: mapping.suctionLevelEntity,
             });
-            if (stdOption) {
-              logger.info(
-                `Setting suction to: ${stdOption} via ${mapping.suctionLevelEntity}`,
-              );
-              homeAssistant.callAction({
-                action: "select.select_option",
-                data: { option: stdOption },
-                target: mapping.suctionLevelEntity,
-              });
-            }
-          } else {
-            const option = findFanSpeedOption(mode, options);
-            if (option) {
-              logger.info(
-                `Setting suction to: ${option} via ${mapping.suctionLevelEntity}`,
-              );
-              homeAssistant.callAction({
-                action: "select.select_option",
-                data: { option },
-                target: mapping.suctionLevelEntity,
-              });
-            }
           }
           return undefined;
         }
 
-        // Otherwise use vacuum.set_fan_speed
-        const fanSpeedList = (
-          homeAssistant.entity.state?.attributes as VacuumDeviceAttributes
-        )?.fan_speed_list;
-
-        if (mode === MODE_STANDARD) {
-          const stdOption = fanSpeedList?.find((o) => {
-            const l = o.toLowerCase();
-            return (
-              l === "standard" ||
-              l === "medium" ||
-              l === "auto" ||
-              l === "normal"
-            );
-          });
-          if (stdOption) {
-            logger.info(
-              `Setting fan speed to: ${stdOption} via vacuum.set_fan_speed`,
-            );
-            return {
-              action: "vacuum.set_fan_speed",
-              data: { fan_speed: stdOption },
-              target: vacuumEntityId,
-            };
-          }
-        } else {
-          const option = findFanSpeedOption(mode, fanSpeedList);
-          if (option) {
-            logger.info(
-              `Setting fan speed to: ${option} via vacuum.set_fan_speed`,
-            );
-            return {
-              action: "vacuum.set_fan_speed",
-              data: { fan_speed: option },
-              target: vacuumEntityId,
-            };
-          }
-        }
-        return undefined;
+        // Otherwise use vacuum.set_fan_speed with the original name
+        logger.info(
+          `Setting fan speed to: ${fanSpeedName} via vacuum.set_fan_speed`,
+        );
+        return {
+          action: "vacuum.set_fan_speed",
+          data: { fan_speed: fanSpeedName },
+          target: vacuumEntityId,
+        };
       }
 
       // Cleaning-type modes: set the cleaning mode select entity
@@ -465,18 +463,17 @@ function createCleanModeConfig(hasFanSpeed: boolean) {
 
 /**
  * Create a VacuumRvcCleanModeServer with cleaning modes.
- * When hasFanSpeed is true, fan-speed modes (Quiet / Standard / Strong) are
- * added as flat sibling modes — this is the pattern Apple Home expects for
- * its "extra features" panel.
+ * Fan-speed modes are generated dynamically from the fanSpeedList.
+ * Apple Home shows them as "extra features" in the vacuum control panel.
  */
 export function createVacuumRvcCleanModeServer(
   _attributes: VacuumDeviceAttributes,
-  hasFanSpeed = false,
+  fanSpeedList?: string[],
 ): ReturnType<typeof RvcCleanModeServer> {
-  const supportedModes = buildSupportedModes(hasFanSpeed);
+  const supportedModes = buildSupportedModes(fanSpeedList);
 
   logger.info(
-    `Creating VacuumRvcCleanModeServer with ${supportedModes.length} modes (fanSpeed=${hasFanSpeed})`,
+    `Creating VacuumRvcCleanModeServer with ${supportedModes.length} modes (fanSpeedList=${JSON.stringify(fanSpeedList ?? [])})`,
   );
   logger.info(
     `Modes: ${supportedModes.map((m) => `${m.mode}:${m.label}[${m.modeTags.map((t) => t.value).join(",")}]`).join(", ")}`,
@@ -487,7 +484,7 @@ export function createVacuumRvcCleanModeServer(
     currentMode: MODE_VACUUM,
   };
 
-  return RvcCleanModeServer(createCleanModeConfig(hasFanSpeed), initialState);
+  return RvcCleanModeServer(createCleanModeConfig(fanSpeedList), initialState);
 }
 
 /**
@@ -537,4 +534,22 @@ export function hasFanSpeedSupport(
   attributes: VacuumDeviceAttributes,
 ): boolean {
   return !!attributes.fan_speed_list && attributes.fan_speed_list.length > 1;
+}
+
+/**
+ * Resolve the fan speed list for vacuum clean mode generation.
+ * Uses fan_speed_list from vacuum attributes when available,
+ * falls back to generic speeds when suctionLevelEntity is configured.
+ */
+export function resolveFanSpeedList(
+  attributes: VacuumDeviceAttributes,
+  suctionLevelEntity?: string,
+): string[] | undefined {
+  if (attributes.fan_speed_list && attributes.fan_speed_list.length > 1) {
+    return attributes.fan_speed_list;
+  }
+  if (suctionLevelEntity) {
+    return ["quiet", "standard", "strong"];
+  }
+  return undefined;
 }
