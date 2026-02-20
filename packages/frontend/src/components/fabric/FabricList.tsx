@@ -16,7 +16,7 @@ export const FabricList = (props: FabricListProps) => {
           key={fabric.fabricId}
           display="flex"
           alignItems="center"
-          gap={1}
+          gap={1.5}
           py={0.5}
         >
           <FabricIcon fabric={fabric} />

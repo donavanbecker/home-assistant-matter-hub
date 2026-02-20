@@ -1,3 +1,4 @@
+import type { BridgeFabric } from "@home-assistant-matter-hub/common";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
@@ -28,6 +29,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useCallback, useEffect, useState } from "react";
 import { BackupRestore } from "../backup/BackupRestore.tsx";
+import { FabricIcon } from "../fabric/FabricIcon.tsx";
 import { getVendorName } from "../fabric/vendor-names.ts";
 
 type SortField = "name" | "created";
@@ -462,6 +464,11 @@ export function HealthDashboard() {
                         {bridge.fabrics.map((fabric) => (
                           <Chip
                             key={fabric.fabricIndex}
+                            icon={
+                              <FabricIcon
+                                fabric={fabric as unknown as BridgeFabric}
+                              />
+                            }
                             label={
                               fabric.label || getVendorName(fabric.rootVendorId)
                             }

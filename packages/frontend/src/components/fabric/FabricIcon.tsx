@@ -52,8 +52,10 @@ export const FabricIcon = ({ fabric }: FabricIconProps) => {
         {BrandIcon ? (
           <BrandIcon
             style={{
-              maxHeight: "1em",
+              height: "1.4em",
+              width: "auto",
               maxWidth: "3em",
+              display: "block",
             }}
           />
         ) : (
