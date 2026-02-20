@@ -238,13 +238,7 @@ function findMatchingOption(
 /**
  * Aliases for suction level options, ordered low → high.
  */
-const SUCTION_QUIET_ALIASES = [
-  "quiet",
-  "silent",
-  "low",
-  "eco",
-  "gentle",
-];
+const SUCTION_QUIET_ALIASES = ["quiet", "silent", "low", "eco", "gentle"];
 
 const SUCTION_MAX_ALIASES = [
   "turbo",
@@ -379,10 +373,7 @@ function readSelectEntity(
 
 function createCleanModeConfig(hasSuction: boolean) {
   return {
-    getCurrentMode: (
-      entity: { attributes: unknown },
-      agent: Agent,
-    ): number => {
+    getCurrentMode: (entity: { attributes: unknown }, agent: Agent): number => {
       // Determine current cleaning type
       const attributes = entity.attributes as VacuumDeviceAttributes & {
         cleaning_mode?: string;
