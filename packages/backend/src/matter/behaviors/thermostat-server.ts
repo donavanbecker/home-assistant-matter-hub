@@ -17,6 +17,10 @@ import RunningMode = Thermostat.ThermostatRunningMode;
 import type { ActionContext } from "@matter/main";
 import { transactionIsOffline } from "../../utils/transaction-is-offline.js";
 
+// Per-instance timer for deferred setpoint nudge (#176).
+// WeakMap ensures timers are garbage-collected when the behavior instance is disposed.
+const nudgeTimers = new WeakMap<object, ReturnType<typeof setTimeout>>();
+
 // For dual-mode thermostats (heating + cooling), AutoMode is ENABLED so Apple Home
 // can offer Auto mode and dual setpoints. Without AutoMode, Apple Home loses Auto.
 //
@@ -344,13 +348,13 @@ export class ThermostatServerBase extends FullFeaturedBase {
 
     // Clamp setpoints to be within the calculated limits to prevent Matter.js validation errors
     // This handles cases where HA reports setpoints outside the valid range
-    let clampedHeatingSetpoint = this.clampSetpoint(
+    const clampedHeatingSetpoint = this.clampSetpoint(
       targetHeatingTemperature,
       minHeatLimit,
       maxHeatLimit,
       "heat",
     );
-    let clampedCoolingSetpoint = this.clampSetpoint(
+    const clampedCoolingSetpoint = this.clampSetpoint(
       targetCoolingTemperature,
       minCoolLimit,
       maxCoolLimit,
@@ -362,22 +366,19 @@ export class ThermostatServerBase extends FullFeaturedBase {
     // matter.js deduplicates identical attribute writes at the Datasource layer —
     // $Changing never fires for same-value writes, preventing auto-resume (#176).
     // The nudge is below controller display resolution (typically 0.5°C steps).
-    if (systemMode === Thermostat.SystemMode.Off) {
-      if (this.features.heating) {
-        const max = maxHeatLimit ?? WIDE_MAX;
-        clampedHeatingSetpoint =
-          clampedHeatingSetpoint < max
-            ? clampedHeatingSetpoint + 1
-            : clampedHeatingSetpoint - 1;
-      }
-      if (this.features.cooling) {
-        const max = maxCoolLimit ?? WIDE_MAX;
-        clampedCoolingSetpoint =
-          clampedCoolingSetpoint < max
-            ? clampedCoolingSetpoint + 1
-            : clampedCoolingSetpoint - 1;
-      }
-    }
+    //
+    // The nudge is applied via a deferred timer instead of inline, so the setpoint
+    // change doesn't ride along with the systemMode=Off DataReport. Sending both
+    // simultaneously can confuse Google Home into skipping voice confirmation for
+    // turn-off commands. The 1.5s delay gives controllers time to confirm the off
+    // transition before the nudged setpoint DataReport arrives.
+    this.scheduleSetpointNudge(
+      systemMode,
+      clampedHeatingSetpoint,
+      clampedCoolingSetpoint,
+      maxHeatLimit ?? WIDE_MAX,
+      maxCoolLimit ?? WIDE_MAX,
+    );
 
     logger.debug(
       `update: limits heat=[${minHeatLimit}, ${maxHeatLimit}], cool=[${minCoolLimit}, ${maxCoolLimit}], systemMode=${systemMode}, runningMode=${runningMode}`,
@@ -710,6 +711,48 @@ export class ThermostatServerBase extends FullFeaturedBase {
             return allOff;
         }
     }
+  }
+
+  private scheduleSetpointNudge(
+    systemMode: Thermostat.SystemMode,
+    heatingSetpoint: number,
+    coolingSetpoint: number,
+    maxHeat: number,
+    maxCool: number,
+  ) {
+    // Cancel any pending nudge
+    const existing = nudgeTimers.get(this);
+    if (existing) {
+      clearTimeout(existing);
+      nudgeTimers.delete(this);
+    }
+
+    if (systemMode !== Thermostat.SystemMode.Off) return;
+
+    const timer = setTimeout(
+      this.callback(() => {
+        if (this.state.systemMode !== Thermostat.SystemMode.Off) return;
+
+        // biome-ignore lint/suspicious/noExplicitAny: Partial patch across feature variants
+        const patch: any = {};
+        if (this.features.heating) {
+          patch.occupiedHeatingSetpoint =
+            heatingSetpoint < maxHeat
+              ? heatingSetpoint + 1
+              : heatingSetpoint - 1;
+        }
+        if (this.features.cooling) {
+          patch.occupiedCoolingSetpoint =
+            coolingSetpoint < maxCool
+              ? coolingSetpoint + 1
+              : coolingSetpoint - 1;
+        }
+        applyPatchState(this.state, patch);
+        logger.debug("Deferred setpoint nudge applied for auto-resume (#176)");
+      }),
+      1500,
+    );
+    nudgeTimers.set(this, timer);
   }
 
   private clampSetpoint(
