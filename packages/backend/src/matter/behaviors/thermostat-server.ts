@@ -412,10 +412,13 @@ export class ThermostatServerBase extends FullFeaturedBase {
       systemMode === Thermostat.SystemMode.Auto
         ? { thermostatRunningMode: runningMode }
         : {}),
-      ...(this.features.heating
+      // Skip setpoint updates while Off to preserve the deferred nudge (#176).
+      // HA state updates would overwrite the +0.01°C nudge, defeating same-value
+      // auto-resume. The correct setpoint is restored when the device turns on.
+      ...(this.features.heating && systemMode !== Thermostat.SystemMode.Off
         ? { occupiedHeatingSetpoint: clampedHeatingSetpoint }
         : {}),
-      ...(this.features.cooling
+      ...(this.features.cooling && systemMode !== Thermostat.SystemMode.Off
         ? { occupiedCoolingSetpoint: clampedCoolingSetpoint }
         : {}),
     });
