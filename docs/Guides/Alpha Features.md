@@ -3,7 +3,7 @@
 This guide covers features available in the Alpha version of Home-Assistant-Matter-Hub.
 
 > [!NOTE]
-> **Alpha is currently in sync with Stable (v2.0.25).** All alpha features have been promoted to stable. New alpha features will appear here as development continues.
+> Alpha contains new features beyond Stable (v2.0.25). See the **Current Alpha Features** section below for what's new.
 
 > [!WARNING]
 > Alpha versions are for testing only and may contain bugs. Use at your own risk!
@@ -29,6 +29,40 @@ docker run -d \
   -e HAMH_HOME_ASSISTANT_ACCESS_TOKEN=your_token \
   ghcr.io/riddix/home-assistant-matter-hub:alpha
 ```
+
+---
+
+## Current Alpha Features
+
+The following features are available in the current Alpha version and have not yet been promoted to Stable.
+
+### Select / Input Select Entity Support (ModeSelectDevice)
+
+Home Assistant `select` and `input_select` entities are now mapped to Matter `ModeSelectDevice` (0x0027). Each option in the select entity becomes a selectable mode in your Matter controller. When you change the mode from a controller, HAMH calls `select.select_option` back to Home Assistant.
+
+**Use cases:** Washing machine programs, HVAC operation modes, irrigation zones, scene selectors, or any entity with a fixed list of options.
+
+**Configuration:** No special setup needed. `select` and `input_select` entities matching your bridge filter are automatically exposed. You can also manually assign the `Mode Select` device type via Entity Mapping.
+
+### Compatibility Warnings in Bridge Editor
+
+The bridge configuration editor now shows dynamic warnings when potentially conflicting feature flags are enabled:
+
+- **Vacuum OnOff** — Warns that this breaks Apple Home and Google Home (Alexa only)
+- **Server Mode** — Reminds that only one device should be on the bridge
+- **Server Mode + Vacuum OnOff** — Error: conflicting combination (Server Mode targets Apple Home, Vacuum OnOff breaks it)
+- **Auto Force Sync + Auto Composed Devices** — Warns about increased network traffic
+
+Warnings update in real-time as you toggle flags, before you save.
+
+### Expandable Cluster Diagnostics on Device Cards
+
+Click the **Clusters** header on any device card (All Devices page or Bridge Details) to expand a full per-cluster state inspection. The expanded view shows:
+
+- **Home Assistant entity state** — Current HA state, device type ID, endpoint number
+- **All cluster attributes** — Every attribute value for each active cluster (onOff, thermostat, modeSelect, etc.)
+
+This removes the need to parse backend logs when debugging why a specific entity behaves unexpectedly in a controller.
 
 ---
 
