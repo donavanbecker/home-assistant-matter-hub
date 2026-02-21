@@ -132,10 +132,16 @@ export function matterApi(
   router.get("/bridges/:bridgeId/devices", async (req, res) => {
     const bridgeId = req.params.bridgeId;
     const bridge = bridgeService.bridges.find((b) => b.id === bridgeId);
-    if (bridge) {
-      res.status(200).json(endpointToJson(bridge.server));
-    } else {
+    if (!bridge) {
       res.status(404).send("Not Found");
+      return;
+    }
+    try {
+      res.status(200).json(endpointToJson(bridge.server));
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
     }
   });
 
