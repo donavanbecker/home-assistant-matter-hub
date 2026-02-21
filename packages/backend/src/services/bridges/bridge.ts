@@ -123,6 +123,17 @@ export class Bridge {
 
   async refreshDevices() {
     await this.endpointManager.refreshDevices();
+    // Prune stale entries from lastSyncedStates for entities that were removed
+    const currentEntityIds = new Set(
+      [...this.aggregator.parts].map(
+        (p) => (p as { entityId?: string }).entityId,
+      ),
+    );
+    for (const entityId of this.lastSyncedStates.keys()) {
+      if (!currentEntityIds.has(entityId)) {
+        this.lastSyncedStates.delete(entityId);
+      }
+    }
   }
 
   private setStatus(status: BridgeServerStatus) {

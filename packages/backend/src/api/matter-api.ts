@@ -33,8 +33,14 @@ export function matterApi(
     if (!isValid) {
       res.status(400).json(ajv.errors);
     } else {
-      const bridge = await bridgeService.create(body);
-      res.status(200).json(bridge.data);
+      try {
+        const bridge = await bridgeService.create(body);
+        res.status(200).json(bridge.data);
+      } catch (e) {
+        res.status(500).json({
+          error: e instanceof Error ? e.message : "Unknown error",
+        });
+      }
     }
   });
 
@@ -78,30 +84,48 @@ export function matterApi(
     } else if (bridgeId !== body.id) {
       res.status(400).send("Path variable `bridgeId` does not match `body.id`");
     } else {
-      const bridge = await bridgeService.update(body);
-      if (!bridge) {
-        res.status(404).send("Not Found");
-      } else {
-        res.status(200).json(bridge.data);
+      try {
+        const bridge = await bridgeService.update(body);
+        if (!bridge) {
+          res.status(404).send("Not Found");
+        } else {
+          res.status(200).json(bridge.data);
+        }
+      } catch (e) {
+        res.status(500).json({
+          error: e instanceof Error ? e.message : "Unknown error",
+        });
       }
     }
   });
 
   router.delete("/bridges/:bridgeId", async (req, res) => {
     const bridgeId = req.params.bridgeId;
-    await bridgeService.delete(bridgeId);
-    res.status(204).send();
+    try {
+      await bridgeService.delete(bridgeId);
+      res.status(204).send();
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
+    }
   });
 
   router.post("/bridges/:bridgeId/actions/factory-reset", async (req, res) => {
     const bridgeId = req.params.bridgeId;
     const bridge = bridgeService.bridges.find((b) => b.id === bridgeId);
-    if (bridge) {
+    if (!bridge) {
+      res.status(404).send("Not Found");
+      return;
+    }
+    try {
       await bridge.factoryReset();
       await bridge.start();
       res.status(200).json(bridge.data);
-    } else {
-      res.status(404).send("Not Found");
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
     }
   });
 
@@ -117,56 +141,86 @@ export function matterApi(
 
   router.post("/bridges/:bridgeId/actions/restart", async (req, res) => {
     const bridgeId = req.params.bridgeId;
-    const success = await bridgeService.restartBridge(bridgeId);
-    if (success) {
-      const bridge = bridgeService.get(bridgeId);
-      res.status(200).json(bridge?.data);
-    } else {
-      res.status(404).send("Not Found");
+    try {
+      const success = await bridgeService.restartBridge(bridgeId);
+      if (success) {
+        const bridge = bridgeService.get(bridgeId);
+        res.status(200).json(bridge?.data);
+      } else {
+        res.status(404).send("Not Found");
+      }
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
     }
   });
 
   router.post("/bridges/:bridgeId/actions/start", async (req, res) => {
     const bridgeId = req.params.bridgeId;
     const bridge = bridgeService.bridges.find((b) => b.id === bridgeId);
-    if (bridge) {
+    if (!bridge) {
+      res.status(404).send("Not Found");
+      return;
+    }
+    try {
       await bridge.start();
       res.status(200).json(bridge.data);
-    } else {
-      res.status(404).send("Not Found");
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
     }
   });
 
   router.post("/bridges/:bridgeId/actions/stop", async (req, res) => {
     const bridgeId = req.params.bridgeId;
     const bridge = bridgeService.bridges.find((b) => b.id === bridgeId);
-    if (bridge) {
+    if (!bridge) {
+      res.status(404).send("Not Found");
+      return;
+    }
+    try {
       await bridge.stop();
       res.status(200).json(bridge.data);
-    } else {
-      res.status(404).send("Not Found");
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
     }
   });
 
   router.post("/bridges/:bridgeId/actions/refresh", async (req, res) => {
     const bridgeId = req.params.bridgeId;
     const bridge = bridgeService.bridges.find((b) => b.id === bridgeId);
-    if (bridge) {
+    if (!bridge) {
+      res.status(404).send("Not Found");
+      return;
+    }
+    try {
       await bridge.refreshDevices();
       res.status(200).json(bridge.data);
-    } else {
-      res.status(404).send("Not Found");
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
     }
   });
 
   router.post("/bridges/:bridgeId/actions/force-sync", async (req, res) => {
     const bridgeId = req.params.bridgeId;
     const bridge = bridgeService.bridges.find((b) => b.id === bridgeId);
-    if (bridge) {
+    if (!bridge) {
+      res.status(404).send("Not Found");
+      return;
+    }
+    try {
       const syncedCount = await bridge.forceSync();
       res.status(200).json({ syncedCount, bridge: bridge.data });
-    } else {
-      res.status(404).send("Not Found");
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
     }
   });
 

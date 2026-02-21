@@ -13,6 +13,10 @@ import {
   type WindowCoveringConfig,
   WindowCoveringServer,
 } from "../../../../behaviors/window-covering-server.js";
+import {
+  adjustPositionForReading as adjustReading,
+  adjustPositionForWriting as adjustWriting,
+} from "./cover-position-utils.js";
 
 const logger = Logger.get("CoverWindowCoveringServer");
 
@@ -45,81 +49,24 @@ const usesMatterSemantics = (agent: Agent): boolean => {
 
 /**
  * Adjusts position when READING from HA to report to Matter controllers.
- * By default, inverts percentage (HA 80% open → Matter 20% = 80% closed).
- * With coverUseHomeAssistantPercentage flag, skips inversion for Alexa-friendly display.
- * With coverSwapOpenClose, FORCES inversion to fix Alexa open/close display.
+ * Delegates to the pure utility function for testability.
  */
 const adjustPositionForReading = (position: number, agent: Agent) => {
   const { featureFlags } = agent.env.get(BridgeDataProvider);
-  if (position == null) {
-    return null;
-  }
-  let percentValue = position;
-
-  // Skip inversion if:
-  // 1. User explicitly set coverDoNotInvertPercentage flag, OR
-  // 2. User set coverUseHomeAssistantPercentage for Alexa-friendly display, OR
-  // 3. Integration uses Matter-compatible semantics
-  // Note: coverSwapOpenClose forces inversion ONLY when coverUseHomeAssistantPercentage
-  // is not also set. When both are enabled, coverUseHomeAssistantPercentage takes
-  // precedence for position display; coverSwapOpenClose only affects commands.
-  const skipInversion =
-    featureFlags?.coverDoNotInvertPercentage === true ||
-    featureFlags?.coverUseHomeAssistantPercentage === true ||
-    usesMatterSemantics(agent);
-
-  if (featureFlags?.coverSwapOpenClose === true && !skipInversion) {
-    percentValue = 100 - percentValue;
-    logger.debug(
-      `adjustPositionForReading: HA=${position}%, coverSwapOpenClose=true, result=${percentValue}% (forced inversion)`,
-    );
-    return percentValue;
-  }
-
-  if (!skipInversion) {
-    percentValue = 100 - percentValue;
-  }
-
-  logger.debug(
-    `adjustPositionForReading: HA=${position}%, skipInversion=${skipInversion}, result=${percentValue}%`,
-  );
-
-  return percentValue;
+  const matterSem = usesMatterSemantics(agent);
+  const result = adjustReading(position, featureFlags, matterSem);
+  logger.debug(`adjustPositionForReading: HA=${position}%, result=${result}%`);
+  return result;
 };
 
 /**
  * Adjusts position when WRITING to HA from Matter controller commands.
- * By default, inverts percentage (Matter 80% closed → HA 20% open).
- * With coverUseHomeAssistantPercentage, also skips inversion so commands match display.
- * With coverSwapOpenClose, FORCES inversion to fix Alexa open/close commands.
+ * Delegates to the pure utility function for testability.
  */
 const adjustPositionForWriting = (position: number, agent: Agent) => {
   const { featureFlags } = agent.env.get(BridgeDataProvider);
-  if (position == null) {
-    return null;
-  }
-  let percentValue = position;
-
-  // Skip inversion for writing if:
-  // 1. User explicitly set coverDoNotInvertPercentage flag, OR
-  // 2. User set coverUseHomeAssistantPercentage (so commands match displayed %), OR
-  // 3. Integration uses Matter-compatible semantics
-  // Same precedence rule as reading: coverUseHomeAssistantPercentage wins over
-  // coverSwapOpenClose for position; coverSwapOpenClose only affects commands.
-  const skipInversion =
-    featureFlags?.coverDoNotInvertPercentage === true ||
-    featureFlags?.coverUseHomeAssistantPercentage === true ||
-    usesMatterSemantics(agent);
-
-  if (featureFlags?.coverSwapOpenClose === true && !skipInversion) {
-    percentValue = 100 - percentValue;
-    return percentValue;
-  }
-
-  if (!skipInversion) {
-    percentValue = 100 - percentValue;
-  }
-  return percentValue;
+  const matterSem = usesMatterSemantics(agent);
+  return adjustWriting(position, featureFlags, matterSem);
 };
 
 /**
