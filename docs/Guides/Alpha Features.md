@@ -64,6 +64,37 @@ Click the **Clusters** header on any device card (All Devices page or Bridge Det
 
 This removes the need to parse backend logs when debugging why a specific entity behaves unexpectedly in a controller.
 
+### Webhook Event Bridge (hamh_action)
+
+HAMH now fires `hamh_action` events on the Home Assistant event bus whenever a Matter controller interacts with an exposed device. This creates a bidirectional bridge: HA entities are exposed to Matter controllers, and controller actions are reported back to HA as events.
+
+**Two sources of events:**
+
+1. **Controller commands** (`source: matter_controller`) — When a controller sends a command (on/off, mode change, setpoint, etc.), HAMH fires `hamh_action` with the action and data.
+2. **GenericSwitch presses** (`source: matter_bridge`) — When HAMH emits a button press event to controllers, it also fires `hamh_action` with the press type and count.
+
+**HA automation trigger example:**
+
+```yaml
+trigger:
+  - platform: event
+    event_type: hamh_action
+    event_data:
+      entity_id: event.doorbell_press
+      action: press
+```
+
+**Event data fields:**
+
+| Field | Description |
+|-------|-------------|
+| `entity_id` | The HA entity that was acted upon |
+| `action` | The action performed (e.g., `homeassistant.turn_on`, `press`) |
+| `data` | Action-specific data (e.g., `{ option: "eco" }` for mode changes) |
+| `source` | `matter_controller` for controller commands, `matter_bridge` for GenericSwitch events |
+| `event_type` | (GenericSwitch only) The original HA event type (e.g., `press`, `double_press`) |
+| `press_count` | (GenericSwitch only) Number of presses detected (1, 2, or 3) |
+
 ---
 
 ## Features Now in Stable (v2.0.25)
