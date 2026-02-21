@@ -189,7 +189,7 @@ Room selection works with any integration that exposes room data as attributes:
 
 | Integration | Room Attribute | Cleaning Modes | Notes |
 |-------------|---------------|----------------|-------|
-| Roborock (Official) | Auto-detected via `roborock.get_maps` | — | Automatic since v2.1.0 (fallback: button entities) |
+| Roborock (Official) | Auto-detected via `roborock.get_maps` | — | Automatic since v2.0.25 (fallback: button entities) |
 | Roborock (Xiaomi Miot) | `rooms` or `segments` | — | Native support |
 | Dreame | `rooms` | Auto-detected | Nested format with map name |
 | Xiaomi | `rooms` | — | May require custom integration |
@@ -197,7 +197,7 @@ Room selection works with any integration that exposes room data as attributes:
 
 ### Roborock (Official Integration)
 
-Since v2.1.0, HAMH **automatically detects Roborock rooms** via the `roborock.get_maps` service call. No manual button entity mapping is needed — rooms are resolved directly from the Roborock cloud and appear in Apple Home's room selection.
+Since v2.0.25, HAMH **automatically detects Roborock rooms** via the `roborock.get_maps` service call. No manual button entity mapping is needed — rooms are resolved directly from the Roborock cloud and appear in Apple Home's room selection.
 
 The startup log will show: `Resolved X rooms via roborock.get_maps`
 

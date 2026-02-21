@@ -53,9 +53,9 @@ Home, ...) are not placed in the same network segment. Please make sure to revie
 ## What's New
 
 <details>
-<summary><strong>📦 Stable (v2.1.0) - Current</strong></summary>
+<summary><strong>📦 Stable (v2.0.25) - Current</strong></summary>
 
-**New in v2.1.0:**
+**New in v2.0.25:**
 
 | Feature | Description |
 |---------|-------------|
@@ -91,7 +91,7 @@ Home, ...) are not placed in the same network segment. Please make sure to revie
 <details>
 <summary><strong>🧪 Alpha (v2.1.0-alpha.x)</strong></summary>
 
-Alpha is currently in sync with Stable (v2.1.0). All alpha features have been promoted to stable. New alpha features will appear here as development continues.
+Alpha is currently in sync with Stable (v2.0.25). All alpha features have been promoted to stable. New alpha features will appear here as development continues.
 
 </details>
 

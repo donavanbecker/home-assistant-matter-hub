@@ -466,7 +466,7 @@ You can override the default device type mapping per entity using the Entity Map
 - Map a `switch` to Pump type
 - Force a specific light type
 
-> **Note:** Since v2.1.0, entity mapping changes take effect automatically within ~30 seconds. No bridge restart is required.
+> **Note:** Since v2.0.25, entity mapping changes take effect automatically within ~30 seconds. No bridge restart is required.
 
 ---
 

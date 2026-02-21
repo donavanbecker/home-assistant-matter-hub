@@ -3,7 +3,7 @@
 This guide covers features available in the Alpha version of Home-Assistant-Matter-Hub.
 
 > [!NOTE]
-> **Alpha is currently in sync with Stable (v2.1.0).** All alpha features have been promoted to stable. New alpha features will appear here as development continues.
+> **Alpha is currently in sync with Stable (v2.0.25).** All alpha features have been promoted to stable. New alpha features will appear here as development continues.
 
 > [!WARNING]
 > Alpha versions are for testing only and may contain bugs. Use at your own risk!
@@ -32,11 +32,11 @@ docker run -d \
 
 ---
 
-## Features Now in Stable (v2.1.0)
+## Features Now in Stable (v2.0.25)
 
 The following features have graduated from Alpha to Stable:
 
-**New in v2.1.0:**
+**New in v2.0.25:**
 - **Vacuum Mop Intensity** - `mopIntensityEntity` mapping adds mop intensity modes to Apple Home extra features
 - **Vacuum Auto-Detection** - Cleaning mode, suction level, and mop intensity entities auto-detected for Dreame, Roborock, Ecovacs
 - **Roborock Room Auto-Detect** - Rooms resolved via `roborock.get_maps` service — no manual button mapping needed (#189)
@@ -123,7 +123,7 @@ The following features have graduated from Alpha to Stable:
 
 ---
 
-## Feature Details (now in Stable v2.1.0)
+## Feature Details (now in Stable v2.0.25)
 
 The following sections provide detailed usage instructions for features that have been promoted to stable.
 

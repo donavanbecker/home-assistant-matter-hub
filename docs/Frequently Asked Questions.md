@@ -82,7 +82,7 @@ See [Temperature & Humidity Sensor](./Devices/Temperature%20Humidity%20Sensor.md
 
 ## The app keeps crashing or restarting on my HA Yellow / Raspberry Pi / VM
 
-Low-resource devices (1–2 GB RAM) or VMs with limited memory allocation can run out of memory. Since v2.1.0, HAMH dynamically sizes the Node.js heap to 25% of your system RAM (clamped between 256 MB and 1024 MB). The startup log shows the calculated value: `System RAM: 2048MB → Node.js heap: 512MB`. The total process memory (including matter.js cluster definitions, SQLite, and V8 overhead) can reach 400–600 MB even before bridges start.
+Low-resource devices (1–2 GB RAM) or VMs with limited memory allocation can run out of memory. Since v2.0.25, HAMH dynamically sizes the Node.js heap to 25% of your system RAM (clamped between 256 MB and 1024 MB). The startup log shows the calculated value: `System RAM: 2048MB → Node.js heap: 512MB`. The total process memory (including matter.js cluster definitions, SQLite, and V8 overhead) can reach 400–600 MB even before bridges start.
 
 The telltale sign of an OOM kill is the log showing `Killed` with no error message or stack trace — this means the Linux kernel terminated the process.
 
@@ -225,6 +225,6 @@ Enable in Bridge Settings → Feature Flags.
 
 ## I changed the device type in Entity Mapping but nothing happened
 
-Since v2.1.0, entity mapping changes (device type, custom name, or any other field) are detected automatically on the next refresh cycle (~30 seconds). The old endpoint is deleted and recreated with the new config. You'll see a log line like `Mapping changed for media_player.tv, recreating endpoint`.
+Since v2.0.25, entity mapping changes (device type, custom name, or any other field) are detected automatically on the next refresh cycle (~30 seconds). The old endpoint is deleted and recreated with the new config. You'll see a log line like `Mapping changed for media_player.tv, recreating endpoint`.
 
-On older versions, a bridge restart was required. If using v2.1.0+ and changes still don't apply, check the logs for errors during endpoint recreation.
+On older versions, a bridge restart was required. If using v2.0.25+ and changes still don't apply, check the logs for errors during endpoint recreation.
