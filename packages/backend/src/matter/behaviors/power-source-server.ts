@@ -3,10 +3,7 @@ import type {
   HomeAssistantEntityState,
 } from "@home-assistant-matter-hub/common";
 import { Logger } from "@matter/general";
-import {
-  PowerSourceServer as Base,
-  DescriptorServer,
-} from "@matter/main/behaviors";
+import { PowerSourceServer as Base } from "@matter/main/behaviors";
 import { PowerSource } from "@matter/main/clusters";
 import { applyPatchState } from "../../utils/apply-patch-state.js";
 import { HomeAssistantEntityBehavior } from "./home-assistant-entity-behavior.js";
@@ -33,19 +30,6 @@ class PowerSourceServerBase extends FeaturedBase {
 
   override async initialize() {
     await super.initialize();
-
-    // matter.js auto-adds the PowerSource device type (0x11) to the
-    // descriptor. When sitting alongside the primary device type (e.g.
-    // RoboticVacuumCleaner 0x74) this confuses Alexa — the device
-    // commissions but never appears in the app. Remove the utility
-    // device type; the PowerSource *cluster* stays in serverList so
-    // controllers still see battery data.
-    const descriptor = await this.agent.load(DescriptorServer);
-    const dtList = descriptor.state.deviceTypeList;
-    const psIdx = dtList.findIndex((dt) => dt.deviceType === 0x11);
-    if (psIdx !== -1 && dtList.length > 1) {
-      dtList.splice(psIdx, 1);
-    }
 
     const homeAssistant = await this.agent.load(HomeAssistantEntityBehavior);
     const entityId = homeAssistant.entityId;
