@@ -67,6 +67,17 @@ class RvcRunModeServerBase extends Base {
     const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
     const { newMode } = request;
 
+    // Validate mode exists in supportedModes (matches matter.js base behavior)
+    if (
+      newMode !== this.state.currentMode &&
+      !this.state.supportedModes.some((m) => m.mode === newMode)
+    ) {
+      return {
+        status: ModeBase.ModeChangeStatus.UnsupportedMode,
+        statusText: `Unsupported mode: ${newMode}`,
+      };
+    }
+
     // Check for room-specific cleaning mode
     if (isRoomMode(newMode) && this.state.config.cleanRoom) {
       homeAssistant.callAction(

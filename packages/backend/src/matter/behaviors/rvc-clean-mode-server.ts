@@ -79,6 +79,18 @@ class RvcCleanModeServerBase extends Base {
     const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
     const { newMode } = request;
 
+    // Validate mode exists in supportedModes (matches matter.js base behavior)
+    if (
+      newMode !== this.state.currentMode &&
+      !this.state.supportedModes.some((m) => m.mode === newMode)
+    ) {
+      logger.warn(`changeToMode(${newMode}) rejected: unsupported mode`);
+      return {
+        status: ModeBase.ModeChangeStatus.UnsupportedMode,
+        statusText: `Unsupported mode: ${newMode}`,
+      };
+    }
+
     const modeLabel = this.state.supportedModes.find((m) => m.mode === newMode);
     logger.info(
       `changeToMode(${newMode}) "${modeLabel?.label ?? "unknown"}" ` +
