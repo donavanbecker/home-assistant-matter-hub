@@ -325,7 +325,12 @@ function matchMopIntensityOption(
 function parseCleanType(modeString: string | undefined): CleanType {
   if (!modeString) return CleanType.Sweeping;
   const s = modeString.toLowerCase();
-  if (s.includes("mopping after") || s.includes("after sweeping")) {
+  if (
+    s.includes("mopping after") ||
+    s.includes("after sweeping") ||
+    s.includes("then_mop") ||
+    s.includes("then mop")
+  ) {
     return CleanType.MoppingAfterSweeping;
   }
   if (s.includes("and") || s.includes("sweeping and mopping")) {
@@ -380,6 +385,13 @@ function fanSpeedToModeId(
   return undefined;
 }
 
+// Fallback: when no direct match, try semantically similar clean types.
+// "Vacuum Then Mop" falls back to "Vacuum & Mop" when the entity
+// doesn't expose a dedicated option (e.g. Roborock template selects).
+const CLEAN_TYPE_FALLBACK: Partial<Record<CleanType, CleanType>> = {
+  [CleanType.MoppingAfterSweeping]: CleanType.SweepingAndMopping,
+};
+
 function findMatchingCleanOption(
   ct: CleanType,
   availableOptions: string[] | undefined,
@@ -387,18 +399,26 @@ function findMatchingCleanOption(
   const aliases = CLEANING_MODE_ALIASES[ct];
   if (!availableOptions || availableOptions.length === 0) return aliases[0];
 
-  for (const alias of aliases) {
-    const match = availableOptions.find(
-      (o) => o.toLowerCase() === alias.toLowerCase(),
-    );
-    if (match) return match;
+  const typesToTry: CleanType[] = [ct];
+  const fallback = CLEAN_TYPE_FALLBACK[ct];
+  if (fallback !== undefined) typesToTry.push(fallback);
+
+  for (const type of typesToTry) {
+    const typeAliases = CLEANING_MODE_ALIASES[type];
+    for (const alias of typeAliases) {
+      const match = availableOptions.find(
+        (o) => o.toLowerCase() === alias.toLowerCase(),
+      );
+      if (match) return match;
+    }
+    for (const alias of typeAliases) {
+      const match = availableOptions.find((o) =>
+        o.toLowerCase().includes(alias.toLowerCase()),
+      );
+      if (match) return match;
+    }
   }
-  for (const alias of aliases) {
-    const match = availableOptions.find((o) =>
-      o.toLowerCase().includes(alias.toLowerCase()),
-    );
-    if (match) return match;
-  }
+
   logger.warn(
     `No match for ${CLEAN_TYPE_LABELS[ct]} in [${availableOptions.join(", ")}]`,
   );
