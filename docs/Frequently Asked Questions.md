@@ -34,19 +34,11 @@ If you just can't get it working with your labels, try to delete your label and 
 
 ## My Vacuum does not appear in the Apple Home App
 
-Ensure that **all** home hubs in the Apple Home app are updated to **iOS/tvOS/AudioOS 18.4** or later – if **any** home hub is below 18.4, the vacuum device will not show up. To resolve this:
+1. **Use Server Mode** — Apple Home requires robot vacuums as standalone devices. Create a dedicated Server Mode bridge with only your vacuum.
+2. **Update all Home Hubs** — Ensure **all** home hubs are updated to **iOS/tvOS/AudioOS 18.4** or later. If **any** hub is below 18.4, the vacuum won't show up.
+3. **Re-pair** — After enabling Server Mode, remove the old accessory and pair the new bridge.
 
-1. **Check for updates**  
-   - **iPhone / iPad**:  
-     `Settings > General > Software Update`  
-   - **HomePod**:  
-     Open the Home app → Home Settings → Software Update  
-   - **Apple TV**:  
-     `Settings > System > Software Updates`
-
-2. **Install any pending updates**, then **restart** each hub.
-
-3. **Relaunch** the Home app and confirm the vacuum now appears under your accessories.
+See the [Robot Vacuum Guide](./Devices/Robot%20Vacuum.md) for full setup instructions.
 
 ## How do I access the Health Dashboard?
 
@@ -168,9 +160,29 @@ The FixedLabel data is kept in the bridge for future controller support. The roo
 
 Media players now support Play, Pause, Stop, Next Track, and Previous Track controls through Matter. However, not all controllers support these features yet. Volume control is also available.
 
+## How do I control my vacuum's cleaning mode (Vacuum / Mop / Vacuum & Mop)?
+
+HAMH needs a **cleaning mode select entity** to switch between modes. Dreame and Ecovacs vacuums have one auto-detected. For Roborock and others that don't expose one, you can create a Home Assistant **template select entity** with an automation that applies the correct fan speed and mop intensity settings.
+
+See [Creating a Cleaning Mode Helper](./Devices/Robot%20Vacuum.md#creating-a-cleaning-mode-helper-roborock--others) in the Robot Vacuum guide for step-by-step instructions.
+
+## Why does Apple Home show the same intensity options (Quiet / Automatic / Max) for both Vacuum and Mop mode?
+
+This is an Apple Home limitation. Apple renders intensity labels based on Matter mode tags, and both fan speed and mop intensity use the same tags (Quiet, Auto, Max). The routing behind the labels is correct — selecting "Quiet" in Mop mode sets the mop intensity, while "Quiet" in Vacuum mode sets fan speed.
+
+## My vacuum's mop intensity doesn't show in Apple Home
+
+Mop intensity requires a **cleaning mode entity** to be configured. Without one, HAMH cannot determine when the vacuum is in Mop mode. If your integration doesn't provide a cleaning mode entity natively, create one using the [Cleaning Mode Helper](./Devices/Robot%20Vacuum.md#creating-a-cleaning-mode-helper-roborock--others) approach.
+
+Also ensure you've set the **Mop Intensity Entity** in the Entity Mapping for your vacuum.
+
+## What are select / input_select entities used for?
+
+Since v2.0.26, `select` and `input_select` entities are automatically mapped to Matter **ModeSelectDevice**. Each option becomes a selectable mode in your controller. Use cases include washing machine programs, HVAC modes, irrigation zones, or scene selectors.
+
 ## What's the difference between Stable and Alpha?
 
-- **Stable**: Production-ready, recommended for daily use
+- **Stable** (v2.0.26): Production-ready, recommended for daily use
 - **Alpha**: New features for testing, may contain bugs
 
 See the [Alpha Features Guide](./Guides/Alpha%20Features.md) for details on alpha features.
@@ -188,7 +200,7 @@ When reporting Alpha issues, include:
 Since v2.0.24, thermostats support **auto-resume** — when off and you set a temperature (even the same one), it automatically turns on. This works with all voice assistants.
 
 If not working:
-- Update to v2.0.24+
+- Update to v2.0.26+
 - Only works for single-temp mode (not range/auto)
 - Thermostat must be in "Off" state
 
@@ -227,4 +239,19 @@ Enable in Bridge Settings → Feature Flags.
 
 Since v2.0.25, entity mapping changes (device type, custom name, or any other field) are detected automatically on the next refresh cycle (~30 seconds). The old endpoint is deleted and recreated with the new config. You'll see a log line like `Mapping changed for media_player.tv, recreating endpoint`.
 
-On older versions, a bridge restart was required. If using v2.0.25+ and changes still don't apply, check the logs for errors during endpoint recreation.
+If changes still don't apply, check the logs for errors during endpoint recreation.
+
+## How do I use the webhook event bridge (hamh_action)?
+
+Since v2.0.26, HAMH fires `hamh_action` events on the HA event bus when controllers interact with exposed devices. You can use these in HA automations:
+
+```yaml
+trigger:
+  - platform: event
+    event_type: hamh_action
+    event_data:
+      entity_id: event.doorbell_press
+      action: press
+```
+
+Event data includes `entity_id`, `action`, `data`, and `source` (either `matter_controller` or `matter_bridge`).

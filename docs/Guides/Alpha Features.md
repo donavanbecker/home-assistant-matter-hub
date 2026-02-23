@@ -3,7 +3,7 @@
 This guide covers features available in the Alpha version of Home-Assistant-Matter-Hub.
 
 > [!NOTE]
-> Alpha contains new features beyond Stable (v2.0.25). See the **Current Alpha Features** section below for what's new.
+> Alpha is currently in sync with Stable (v2.0.26). All alpha features have been promoted to stable. New alpha features will appear here as development continues.
 
 > [!WARNING]
 > Alpha versions are for testing only and may contain bugs. Use at your own risk!
@@ -34,74 +34,32 @@ docker run -d \
 
 ## Current Alpha Features
 
-The following features are available in the current Alpha version and have not yet been promoted to Stable.
-
-### Select / Input Select Entity Support (ModeSelectDevice)
-
-Home Assistant `select` and `input_select` entities are now mapped to Matter `ModeSelectDevice` (0x0027). Each option in the select entity becomes a selectable mode in your Matter controller. When you change the mode from a controller, HAMH calls `select.select_option` back to Home Assistant.
-
-**Use cases:** Washing machine programs, HVAC operation modes, irrigation zones, scene selectors, or any entity with a fixed list of options.
-
-**Configuration:** No special setup needed. `select` and `input_select` entities matching your bridge filter are automatically exposed. You can also manually assign the `Mode Select` device type via Entity Mapping.
-
-### Compatibility Warnings in Bridge Editor
-
-The bridge configuration editor now shows dynamic warnings when potentially conflicting feature flags are enabled:
-
-- **Vacuum OnOff** — Warns that this breaks Apple Home and Google Home (Alexa only)
-- **Server Mode** — Reminds that only one device should be on the bridge
-- **Server Mode + Vacuum OnOff** — Error: conflicting combination (Server Mode targets Apple Home, Vacuum OnOff breaks it)
-- **Auto Force Sync + Auto Composed Devices** — Warns about increased network traffic
-
-Warnings update in real-time as you toggle flags, before you save.
-
-### Expandable Cluster Diagnostics on Device Cards
-
-Click the **Clusters** header on any device card (All Devices page or Bridge Details) to expand a full per-cluster state inspection. The expanded view shows:
-
-- **Home Assistant entity state** — Current HA state, device type ID, endpoint number
-- **All cluster attributes** — Every attribute value for each active cluster (onOff, thermostat, modeSelect, etc.)
-
-This removes the need to parse backend logs when debugging why a specific entity behaves unexpectedly in a controller.
-
-### Webhook Event Bridge (hamh_action)
-
-HAMH now fires `hamh_action` events on the Home Assistant event bus whenever a Matter controller interacts with an exposed device. This creates a bidirectional bridge: HA entities are exposed to Matter controllers, and controller actions are reported back to HA as events.
-
-**Two sources of events:**
-
-1. **Controller commands** (`source: matter_controller`) — When a controller sends a command (on/off, mode change, setpoint, etc.), HAMH fires `hamh_action` with the action and data.
-2. **GenericSwitch presses** (`source: matter_bridge`) — When HAMH emits a button press event to controllers, it also fires `hamh_action` with the press type and count.
-
-**HA automation trigger example:**
-
-```yaml
-trigger:
-  - platform: event
-    event_type: hamh_action
-    event_data:
-      entity_id: event.doorbell_press
-      action: press
-```
-
-**Event data fields:**
-
-| Field | Description |
-|-------|-------------|
-| `entity_id` | The HA entity that was acted upon |
-| `action` | The action performed (e.g., `homeassistant.turn_on`, `press`) |
-| `data` | Action-specific data (e.g., `{ option: "eco" }` for mode changes) |
-| `source` | `matter_controller` for controller commands, `matter_bridge` for GenericSwitch events |
-| `event_type` | (GenericSwitch only) The original HA event type (e.g., `press`, `double_press`) |
-| `press_count` | (GenericSwitch only) Number of presses detected (1, 2, or 3) |
+Alpha is currently in sync with Stable (v2.0.26). No new alpha-only features at this time.
 
 ---
 
-## Features Now in Stable (v2.0.25)
+## Features Now in Stable (v2.0.26)
 
 The following features have graduated from Alpha to Stable:
 
-**New in v2.0.25:**
+**New in v2.0.26:**
+- **Authentication UI** - Configure credentials from the web UI Settings page (#197)
+- **Select Entity Support** - `select` and `input_select` entities mapped to Matter ModeSelectDevice
+- **Webhook Event Bridge** - `hamh_action` events on the HA event bus for controller command automations
+- **Cluster Diagnostics** - Expandable per-cluster state inspection on device cards
+- **Compatibility Warnings** - Dynamic warnings for conflicting feature flags in bridge editor
+- **Vacuum Cleaning Mode Fallback** - "Vacuum Then Mop" falls back to "Vacuum & Mop" when entity lacks option (#189)
+- **Vacuum Entity Filter Fix** - Server-mode entity filter changes now update correctly (#202)
+- **Vacuum PowerSource Fix** - Restored PowerSource device type for Alexa compatibility (#183)
+- **RVC Spec Compliance** - Mode validation in changeToMode prevents silent failures with Alexa
+- **Matter.js 0.16.10** - Updated from 0.16.8 for stability and spec compliance
+- **Docker Node 22** - Pinned to Node 22 to fix ERR_INVALID_PACKAGE_CONFIG (#200)
+- **Cover Inversion Fix** - coverSwapOpenClose now also inverts position reporting
+- **Media Player Keypad** - KeypadInputServer for BasicVideoPlayer media endpoints
+- **Vacuum OnOff Fix** - turnOff sends return_to_base instead of stop
+- **Session Logging** - Non-destructive session lifecycle logging (#105)
+
+**Previously in v2.0.25:**
 - **Vacuum Mop Intensity** - `mopIntensityEntity` mapping adds mop intensity modes to Apple Home extra features
 - **Vacuum Auto-Detection** - Cleaning mode, suction level, and mop intensity entities auto-detected for Dreame, Roborock, Ecovacs
 - **Roborock Room Auto-Detect** - Rooms resolved via `roborock.get_maps` service — no manual button mapping needed (#189)
@@ -188,7 +146,7 @@ The following features have graduated from Alpha to Stable:
 
 ---
 
-## Feature Details (now in Stable v2.0.25)
+## Feature Details (now in Stable v2.0.26)
 
 The following sections provide detailed usage instructions for features that have been promoted to stable.
 

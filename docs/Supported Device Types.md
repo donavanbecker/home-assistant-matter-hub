@@ -20,6 +20,7 @@ This document provides comprehensive information about all device types supporte
 | `valve` | Water Valve | | | |
 | `vacuum` | Robotic Vacuum | | | |
 | `water_heater` | Thermostat (Heating) | | | |
+| `select`, `input_select` | Mode Select | | | |
 | `event` | Generic Switch | | | |
 | `humidifier` | On/Off Plug-in Unit | | | |
 
@@ -419,6 +420,26 @@ Mapped to **RoboticVacuumCleaner**.
 - **Google Home** has limited RVC support — basic start/stop works, room selection and cleaning modes may vary
 
 See [Robot Vacuum Guide](./Devices/Robot%20Vacuum.md) for detailed setup instructions.
+
+---
+
+### Select / Input Select (`select`, `input_select`)
+
+Mapped to **ModeSelectDevice** (0x0027). Each option in the select entity becomes a selectable mode.
+
+**Behavior:**
+- Each option is exposed as a numbered mode
+- Changing mode from a controller calls `select.select_option` in HA
+- Current mode reflects the entity's current state
+
+**Use Cases:**
+- Washing machine programs
+- HVAC operation modes
+- Irrigation zones
+- Scene selectors
+- Any entity with a fixed list of options
+
+**Configuration:** No special setup needed. `select` and `input_select` entities matching your bridge filter are automatically exposed. You can also manually assign the `Mode Select` device type via Entity Mapping.
 
 ---
 
