@@ -2,7 +2,7 @@ import type { VacuumDeviceAttributes } from "@home-assistant-matter-hub/common";
 import type { EndpointType } from "@matter/main";
 import { RoboticVacuumCleanerDevice } from "@matter/main/devices";
 import { HomeAssistantEntityBehavior } from "../../../behaviors/home-assistant-entity-behavior.js";
-import { IdentifyServer } from "../../../behaviors/identify-server.js";
+import { VacuumIdentifyServer } from "./behaviors/vacuum-identify-server.js";
 import { VacuumOnOffServer } from "./behaviors/vacuum-on-off-server.js";
 import { VacuumPowerSourceServer } from "./behaviors/vacuum-power-source-server.js";
 import {
@@ -37,7 +37,7 @@ import { parseVacuumRooms } from "./utils/parse-vacuum-rooms.js";
  * The BasicInformation comes from the ServerNode itself, not the endpoint.
  */
 const ServerModeVacuumEndpointType = RoboticVacuumCleanerDevice.with(
-  IdentifyServer,
+  VacuumIdentifyServer,
   HomeAssistantEntityBehavior,
   VacuumRvcOperationalStateServer,
 );
