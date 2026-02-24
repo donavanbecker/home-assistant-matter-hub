@@ -20,6 +20,8 @@ import { JsonEditor } from "../misc/editors/JsonEditor";
 import type { ValidationError } from "../misc/editors/validation-error.ts";
 import { BridgeIconUpload } from "./BridgeIconUpload.tsx";
 import { FilterPreview } from "./FilterPreview.tsx";
+import { BridgeObjectFieldTemplate } from "./rjsf/BridgeObjectFieldTemplate.tsx";
+import { FeatureFlagsField } from "./rjsf/FeatureFlagsField.tsx";
 
 enum BridgeEditorMode {
   JSON_EDITOR = "JSON_EDITOR",
@@ -187,8 +189,13 @@ export const BridgeConfigEditor = (props: BridgeConfigEditorProps) => {
             value={config ?? {}}
             onChange={onChange}
             schema={bridgeConfigSchema}
-            uiSchema={{ icon: { "ui:widget": "hidden" } }}
+            uiSchema={{
+              icon: { "ui:widget": "hidden" },
+              featureFlags: { "ui:field": "featureFlags" },
+            }}
             customValidate={validatePort}
+            templates={{ ObjectFieldTemplate: BridgeObjectFieldTemplate }}
+            fields={{ featureFlags: FeatureFlagsField }}
           />
         )}
 
