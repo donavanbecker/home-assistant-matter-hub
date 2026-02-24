@@ -54,7 +54,12 @@ function buildSupportedModes(
   // Apple Home does not call ServiceArea.selectAreas before changeToMode,
   // so room modes in RvcRunMode are the only way to trigger room cleaning.
   // ServiceArea rooms are kept as well for controllers that do support it.
+  //
+  // IMPORTANT: Sort rooms alphabetically by name. Apple Home displays modes
+  // sorted alphabetically but uses positional indexing into the original
+  // mode array when calling changeToMode, so registration order must match.
   const rooms = parseVacuumRooms(attributes, includeUnnamedRooms);
+  rooms.sort((a, b) => a.name.localeCompare(b.name));
   for (const room of rooms) {
     const modeValue = getRoomModeValue(room);
     // Mode values must fit in uint8 (Matter spec: ModeBase mode is uint8)
