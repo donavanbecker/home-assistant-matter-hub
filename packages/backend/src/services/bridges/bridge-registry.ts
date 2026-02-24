@@ -249,8 +249,7 @@ export class BridgeRegistry {
         } else if (id.endsWith("_mode")) {
           const options = (state.attributes as { options?: string[] })?.options;
           if (
-            options &&
-            options.some((o) =>
+            options?.some((o) =>
               /^(vacuum|mop|sweep|vacuum_and_mop|vacuum_then_mop|mopping|sweeping|sweeping_and_mopping|mopping_after_sweeping)$/i.test(
                 o,
               ),
