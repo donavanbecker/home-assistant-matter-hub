@@ -174,7 +174,15 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
       cleaningModeOptions = (
         cmState?.attributes as { options?: string[] } | undefined
       )?.options;
-    } else if (supportsCleaningModes(vacAttrsForClean)) {
+    }
+    // Fallback: if no options from entity (unavailable / not loaded),
+    // use hardcoded defaults so mop modes are still generated.
+    // The runtime getCurrentMode/setCleanMode reads the entity live.
+    if (
+      !cleaningModeOptions &&
+      (effectiveMapping?.cleaningModeEntity ||
+        supportsCleaningModes(vacAttrsForClean))
+    ) {
       cleaningModeOptions = [
         "vacuum",
         "mop",

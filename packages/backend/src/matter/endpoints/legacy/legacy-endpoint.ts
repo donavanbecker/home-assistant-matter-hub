@@ -320,8 +320,14 @@ export class LegacyEndpoint extends EntityEndpoint {
         cleaningModeOptions = (
           cmState?.attributes as { options?: string[] } | undefined
         )?.options;
-      } else if (
-        supportsCleaningModes(state.attributes as VacuumDeviceAttributes)
+      }
+      // Fallback: if no options from entity (unavailable / not loaded),
+      // use hardcoded defaults so mop modes are still generated.
+      // The runtime getCurrentMode/setCleanMode reads the entity live.
+      if (
+        !cleaningModeOptions &&
+        (effectiveMapping?.cleaningModeEntity ||
+          supportsCleaningModes(state.attributes as VacuumDeviceAttributes))
       ) {
         cleaningModeOptions = [
           "vacuum",
