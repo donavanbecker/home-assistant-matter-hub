@@ -21,6 +21,7 @@ import type { ValidationError } from "../misc/editors/validation-error.ts";
 import { BridgeIconUpload } from "./BridgeIconUpload.tsx";
 import { FilterPreview } from "./FilterPreview.tsx";
 import { BridgeObjectFieldTemplate } from "./rjsf/BridgeObjectFieldTemplate.tsx";
+import { CompactArrayFieldTemplate } from "./rjsf/CompactArrayFieldTemplate.tsx";
 import { FeatureFlagsField } from "./rjsf/FeatureFlagsField.tsx";
 
 enum BridgeEditorMode {
@@ -192,6 +193,18 @@ export const BridgeConfigEditor = (props: BridgeConfigEditorProps) => {
             uiSchema={{
               icon: { "ui:widget": "hidden" },
               featureFlags: { "ui:field": "featureFlags" },
+              filter: {
+                include: {
+                  "ui:options": {
+                    ArrayFieldTemplate: CompactArrayFieldTemplate,
+                  },
+                },
+                exclude: {
+                  "ui:options": {
+                    ArrayFieldTemplate: CompactArrayFieldTemplate,
+                  },
+                },
+              },
             }}
             customValidate={validatePort}
             templates={{ ObjectFieldTemplate: BridgeObjectFieldTemplate }}
