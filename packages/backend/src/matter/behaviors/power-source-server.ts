@@ -86,12 +86,12 @@ class PowerSourceServerBase extends FeaturedBase {
     }
 
     // Determine charge state
-    // Always report IsCharging when on the charger, even at 100%.
-    // Apple Home shows "Charging: No" for IsAtFullCharge, which is confusing
-    // for devices like robot vacuums that are visibly docked and charging.
     let batChargeState = PowerSource.BatChargeState.Unknown;
     if (isCharging === true) {
-      batChargeState = PowerSource.BatChargeState.IsCharging;
+      batChargeState =
+        batteryPercent != null && batteryPercent >= 100
+          ? PowerSource.BatChargeState.IsAtFullCharge
+          : PowerSource.BatChargeState.IsCharging;
     } else if (isCharging === false) {
       batChargeState = PowerSource.BatChargeState.IsNotCharging;
     }
