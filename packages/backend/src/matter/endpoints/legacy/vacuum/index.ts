@@ -56,9 +56,9 @@ export function VacuumDevice(
   ).set({ homeAssistantEntity });
 
   // OnOff is NOT part of the RoboticVacuumCleaner device type spec.
-  // Including it may confuse Apple Home's UI rendering (shows "Updating"
-  // or renders as switch instead of vacuum). Only enabled via feature flag
-  // for Alexa compatibility (maps OnOff to PowerController for start/stop).
+  // Adding it makes the device non-conformant and causes Amazon Alexa
+  // to reject it entirely (#185, #183). Apple Home may also render the
+  // vacuum incorrectly. Only enable via feature flag if needed.
   if (includeOnOff) {
     logger.info(`${entityId}: Adding OnOff cluster (vacuumOnOff flag enabled)`);
     device = device.with(VacuumOnOffServer);

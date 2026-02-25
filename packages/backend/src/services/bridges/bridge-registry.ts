@@ -199,7 +199,9 @@ export class BridgeRegistry {
 
   /**
    * Check if the vacuum OnOff cluster feature flag is enabled.
-   * When enabled, an OnOff cluster is added to vacuum endpoints for Alexa compatibility.
+   * Defaults to OFF. OnOff is NOT part of the RoboticVacuumCleaner (0x74) device
+   * type spec. Adding it makes the device non-conformant and causes Amazon Alexa
+   * to reject it entirely (#185, #183). Only enable if a specific controller needs it.
    */
   isVacuumOnOffEnabled(): boolean {
     return this.dataProvider.featureFlags?.vacuumOnOff === true;
@@ -207,12 +209,14 @@ export class BridgeRegistry {
 
   /**
    * Check if the vacuum OnOff cluster should be included for server-mode vacuums.
-   * Server mode defaults to INCLUDING OnOff because Amazon Alexa requires
-   * PowerController (mapped from OnOff) for robotic vacuum devices.
-   * Users can explicitly set vacuumOnOff=false to disable it (e.g. for Apple Home).
+   * Defaults to OFF. OnOff is NOT part of the RoboticVacuumCleaner (0x74) device
+   * type spec. Adding it makes the device non-conformant and causes Amazon Alexa
+   * to reject it entirely (#185, #183). Apple Home may also render the vacuum
+   * incorrectly (shows "Updating" or switch UI). Only enable via feature flag
+   * if a specific controller requires it.
    */
   isServerModeVacuumOnOffEnabled(): boolean {
-    return this.dataProvider.featureFlags?.vacuumOnOff !== false;
+    return this.dataProvider.featureFlags?.vacuumOnOff === true;
   }
 
   isVacuumMinimalClustersEnabled(): boolean {
