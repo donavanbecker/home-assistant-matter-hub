@@ -7,8 +7,8 @@ import { HomeAssistantEntityBehavior } from "./home-assistant-entity-behavior.js
 import type { ValueGetter, ValueSetter } from "./utils/cluster-config.js";
 
 export enum RvcSupportedRunMode {
-  Idle = 1,
-  Cleaning = 2,
+  Idle = 0,
+  Cleaning = 1,
 }
 
 export interface RvcRunModeServerConfig {
