@@ -139,7 +139,7 @@ export class HomeAssistantRegistry extends Service {
     this._entities = allEntities;
     this._states = states;
 
-    logger.info(
+    logger.debug(
       `Loaded HA registry: ${keys(allEntities).length} entities, ${keys(realDevices).length} devices, ${keys(states).length} states`,
     );
     logMemoryUsage(logger, "after HA registry load");
