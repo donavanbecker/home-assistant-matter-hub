@@ -43,7 +43,7 @@ export function BridgeTemplateSelector({
         settings. You can customize everything afterwards.
       </Typography>
 
-      <Grid container spacing={1.5}>
+      <Grid container spacing={1.5} alignItems="flex-start">
         {bridgeTemplates.map((template) => {
           const isSelected = selectedTemplate === template.id;
           return (
@@ -60,7 +60,13 @@ export function BridgeTemplateSelector({
               >
                 <CardActionArea
                   onClick={() => onSelect(isSelected ? null : template)}
-                  sx={{ height: "100%", p: 0 }}
+                  sx={{
+                    p: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    justifyContent: "flex-start",
+                  }}
                 >
                   <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
                     <Box display="flex" alignItems="center" gap={1} mb={0.5}>
@@ -82,7 +88,7 @@ export function BridgeTemplateSelector({
                       color="text.secondary"
                       sx={{
                         display: "-webkit-box",
-                        WebkitLineClamp: 2,
+                        WebkitLineClamp: !isSelected ? 2 : "none",
                         WebkitBoxOrient: "vertical",
                         overflow: "hidden",
                       }}
