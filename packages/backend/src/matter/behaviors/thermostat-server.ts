@@ -371,6 +371,16 @@ export class ThermostatServerBase extends FullFeaturedBase {
       `update: limits heat=[${minHeatLimit}, ${maxHeatLimit}], cool=[${minCoolLimit}, ${maxCoolLimit}], systemMode=${systemMode}, runningMode=${runningMode}`,
     );
 
+    // Compute controlSequenceOfOperation and update the internal value BEFORE
+    // writing to state. Matter.js's ThermostatBaseServer stores this in
+    // internal.controlSequenceOfOperation and has a $Changing reactor that
+    // reverts any state write back to the internal value. We must update
+    // internal first so the reactor allows our new value through. The
+    // systemMode $Changing reactor also validates against the internal value.
+    const controlSequence = config.getControlSequence(entity.state, this.agent);
+    // biome-ignore lint/suspicious/noExplicitAny: Access protected internal state from Matter.js base
+    (this as any).internal.controlSequenceOfOperation = controlSequence;
+
     // Property order matters: applyPatchState sets properties sequentially, so if one
     // property write triggers an error, subsequent properties won't be set.
     // Limits are set FIRST to ensure they're applied even if mode changes trigger errors.
@@ -392,10 +402,7 @@ export class ThermostatServerBase extends FullFeaturedBase {
           }
         : {}),
       localTemperature: localTemperature,
-      controlSequenceOfOperation: config.getControlSequence(
-        entity.state,
-        this.agent,
-      ),
+      controlSequenceOfOperation: controlSequence,
       thermostatRunningState: this.getRunningState(systemMode, runningMode),
       systemMode: systemMode,
       // thermostatRunningMode: Only set for Auto mode. Matter.js's reactor handles
