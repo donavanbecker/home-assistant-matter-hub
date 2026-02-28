@@ -274,7 +274,8 @@ export class ComposedAirPurifierEndpoint extends Endpoint {
 
     // Track all entity IDs for change detection
     const trackedEntityIds = [primaryEntityId];
-    if (config.temperatureEntityId) trackedEntityIds.push(config.temperatureEntityId);
+    if (config.temperatureEntityId)
+      trackedEntityIds.push(config.temperatureEntityId);
     if (config.humidityEntityId) trackedEntityIds.push(config.humidityEntityId);
 
     const endpoint = new ComposedAirPurifierEndpoint(
