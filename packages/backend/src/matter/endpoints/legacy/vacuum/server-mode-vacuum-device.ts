@@ -112,6 +112,7 @@ export function ServerModeVacuumDevice(
         fanSpeedList,
         mopIntensityList,
         cleaningModeOptions,
+        homeAssistantEntity.mapping?.customFanSpeedTags
       ),
     );
   } else {
