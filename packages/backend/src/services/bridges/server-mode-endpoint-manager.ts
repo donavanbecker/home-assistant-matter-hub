@@ -10,6 +10,7 @@ import type { EntityEndpoint } from "../../matter/endpoints/entity-endpoint.js";
 import { LegacyEndpoint } from "../../matter/endpoints/legacy/legacy-endpoint.js";
 import type { ServerModeServerNode } from "../../matter/endpoints/server-mode-server-node.js";
 import { ServerModeVacuumEndpoint } from "../../matter/endpoints/server-mode-vacuum-endpoint.js";
+import { isHeapUnderPressure } from "../../utils/log-memory.js";
 import { subscribeEntities } from "../home-assistant/api/subscribe-entities.js";
 import type { HomeAssistantClient } from "../home-assistant/home-assistant-client.js";
 import type { HomeAssistantStates } from "../home-assistant/home-assistant-registry.js";
@@ -26,6 +27,7 @@ export class ServerModeEndpointManager extends Service {
   private unsubscribe?: () => void;
   private _failedEntities: FailedEntity[] = [];
   private deviceEndpoint?: EntityEndpoint;
+  private mappingFingerprint = "";
 
   get failedEntities(): FailedEntity[] {
     return this._failedEntities;
@@ -53,8 +55,25 @@ export class ServerModeEndpointManager extends Service {
     return this.mappingStorage.getMapping(this.bridgeId, entityId);
   }
 
+  private computeMappingFingerprint(
+    mapping: EntityMappingConfig | undefined,
+  ): string {
+    if (!mapping) return "";
+    return JSON.stringify(mapping);
+  }
+
   override async dispose(): Promise<void> {
     this.stopObserving();
+
+    // Delete device endpoint to free memory
+    if (this.deviceEndpoint) {
+      try {
+        await this.deviceEndpoint.delete();
+      } catch (e) {
+        this.log.warn(`Failed to delete device endpoint during dispose:`, e);
+      }
+      this.deviceEndpoint = undefined;
+    }
   }
 
   async startObserving(): Promise<void> {
@@ -115,9 +134,42 @@ export class ServerModeEndpointManager extends Service {
       return;
     }
 
-    // If we already have a device endpoint, update its state instead of recreating
+    // Recreate endpoint if the entity or mapping changed
+    const currentFp = this.computeMappingFingerprint(mapping);
     if (this.deviceEndpoint) {
-      this.log.debug(`Device endpoint already exists for ${entityId}`);
+      const entityChanged = this.deviceEndpoint.entityId !== entityId;
+      if (!entityChanged && currentFp === this.mappingFingerprint) {
+        this.log.debug(`Device endpoint already exists for ${entityId}`);
+        return;
+      }
+      this.log.info(
+        entityChanged
+          ? `Entity changed from ${this.deviceEndpoint.entityId} to ${entityId}, recreating endpoint`
+          : `Mapping changed for ${entityId}, recreating endpoint`,
+      );
+      try {
+        await this.deviceEndpoint.delete();
+      } catch (e) {
+        this.log.warn(
+          `Failed to delete endpoint ${entityId} for mapping change:`,
+          e,
+        );
+      }
+      this.serverNode.clearDevice();
+      this.deviceEndpoint = undefined;
+      this.mappingFingerprint = "";
+    }
+
+    if (isHeapUnderPressure()) {
+      this.log.error(
+        "Memory pressure detected — cannot create device endpoint. " +
+          "Reduce entities on other bridges or increase the Node.js heap size (NODE_OPTIONS=--max-old-space-size=1024).",
+      );
+      this._failedEntities.push({
+        entityId,
+        reason:
+          "Skipped due to memory pressure — reduce entities or increase heap size",
+      });
       return;
     }
 
@@ -140,6 +192,7 @@ export class ServerModeEndpointManager extends Service {
         }
         await this.serverNode.addDevice(endpoint);
         this.deviceEndpoint = endpoint;
+        this.mappingFingerprint = currentFp;
         this.log.info(
           `Server mode: Added vacuum ${entityId} as standalone device`,
         );
@@ -165,6 +218,7 @@ export class ServerModeEndpointManager extends Service {
       // Add directly to the server node (not to an aggregator)
       await this.serverNode.addDevice(endpoint);
       this.deviceEndpoint = endpoint;
+      this.mappingFingerprint = currentFp;
       this.log.info(`Server mode: Added device ${entityId}`);
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);

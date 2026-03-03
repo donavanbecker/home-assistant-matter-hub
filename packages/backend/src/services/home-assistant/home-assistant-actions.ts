@@ -10,8 +10,9 @@ import type { HomeAssistantClient } from "./home-assistant-client.js";
 export interface HomeAssistantAction {
   action: string;
   data?: object | undefined;
-  /** Optional: Override the target entity ID (defaults to the entity associated with the behavior) */
-  target?: string;
+  /** Optional: Override the target entity ID (defaults to the entity associated with the behavior).
+   *  Set to `false` to skip entity targeting entirely (for domain-level services like mqtt.publish). */
+  target?: string | false;
 }
 
 interface HomeAssistantActionCall extends HomeAssistantAction {
@@ -59,23 +60,36 @@ export class HomeAssistantActions extends Service {
   }
 
   private processAction(_key: string, calls: HomeAssistantActionCall[]) {
-    // Use custom target if provided, otherwise fall back to entityId
-    const entity_id = calls[0].target ?? calls[0].entityId;
+    // target === false means skip entity targeting (domain-level services like mqtt.publish)
+    const skipTarget = calls[0].target === false;
+    const entity_id = skipTarget
+      ? undefined
+      : calls[0].target || calls[0].entityId;
     const action = calls[0].action;
     const data = Object.assign({}, ...calls.map((c) => c.data));
     const [domain, actionName] = action.split(".");
-    this.callAction(domain, actionName, data, { entity_id }, false).catch(
-      (error) => {
-        const errorMsg = this.formatError(error);
-        this.log.error(
-          `Failed to call action '${action}' for entity '${entity_id}': ${errorMsg}`,
-        );
-      },
-    );
+    const target = entity_id ? { entity_id } : {};
+    this.callAction(domain, actionName, data, target, false).catch((error) => {
+      const errorMsg = this.formatError(error);
+      this.log.error(
+        `Failed to call action '${action}' for entity '${entity_id ?? "(no target)"}': ${errorMsg}`,
+      );
+    });
+    this.fireEvent("hamh_action", {
+      entity_id: entity_id ?? calls[0].entityId,
+      action,
+      data,
+      source: "matter_controller",
+    });
   }
 
   call(action: HomeAssistantAction, entityId: string) {
-    const key = `${entityId}-${action.action}`;
+    // Use the actual target entity for the debounce key so that actions
+    // targeting different entities (e.g. suction level vs cleaning mode)
+    // are debounced independently instead of being merged incorrectly.
+    const target =
+      action.target === false ? entityId : (action.target ?? entityId);
+    const key = `${target}-${action.action}`;
     this.debounceContext.get(key, 100)({ ...action, entityId });
   }
 
@@ -182,6 +196,20 @@ export class HomeAssistantActions extends Service {
       circuitBreakerOpen: this.circuitBreaker.isOpen,
       lastSuccessMs: Date.now() - this.lastSuccessTime,
     };
+  }
+
+  fireEvent(eventType: string, eventData?: Record<string, unknown>): void {
+    const connection = this.client.connection;
+    connection
+      .sendMessagePromise({
+        type: "fire_event",
+        event_type: eventType,
+        event_data: eventData,
+      })
+      .catch((error) => {
+        const errorMsg = this.formatError(error);
+        this.log.warn(`Failed to fire event '${eventType}': ${errorMsg}`);
+      });
   }
 
   override async dispose(): Promise<void> {

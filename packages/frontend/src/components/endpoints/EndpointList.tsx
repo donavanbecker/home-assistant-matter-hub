@@ -6,7 +6,9 @@ import DevicesIcon from "@mui/icons-material/Devices";
 import GridViewIcon from "@mui/icons-material/GridView";
 import ListIcon from "@mui/icons-material/List";
 import SortIcon from "@mui/icons-material/Sort";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import Alert from "@mui/material/Alert";
+import Badge from "@mui/material/Badge";
 import Box from "@mui/material/Box";
 import Dialog from "@mui/material/Dialog";
 import DialogContent from "@mui/material/DialogContent";
@@ -23,8 +25,10 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import type { DeviceImageInfo } from "../../api/device-images";
+import { resolveDeviceImages } from "../../api/device-images";
 import {
   fetchEntityMappings,
   updateEntityMapping,
@@ -58,6 +62,7 @@ export const EndpointList = (props: EndpointListProps) => {
   const [viewMode, setViewMode] = useState<"cards" | "tree">("cards");
   const [searchTerm, setSearchTerm] = useState("");
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [showOnlyUnavailable, setShowOnlyUnavailable] = useState(false);
 
   // Entity Mapping state
   const [mappingDialogOpen, setMappingDialogOpen] = useState(false);
@@ -70,6 +75,39 @@ export const EndpointList = (props: EndpointListProps) => {
     message: string;
     severity: "success" | "error";
   }>({ open: false, message: "", severity: "success" });
+
+  // Device image state
+  const [imageInfoMap, setImageInfoMap] = useState<
+    Record<string, DeviceImageInfo>
+  >({});
+
+  const allEntityIds = useMemo(() => {
+    const leaves = collectLeafEndpoints(props.endpoint);
+    const ids: string[] = [];
+    for (const ep of leaves) {
+      const state = ep.state as {
+        homeAssistantEntity?: { entity?: { entity_id?: string } };
+      };
+      const eid = state.homeAssistantEntity?.entity?.entity_id;
+      if (eid) ids.push(eid);
+    }
+    return ids;
+  }, [props.endpoint]);
+
+  const refreshImages = useCallback(() => {
+    if (allEntityIds.length === 0) return;
+    resolveDeviceImages(allEntityIds)
+      .then(setImageInfoMap)
+      .catch(() => {});
+  }, [allEntityIds]);
+
+  useEffect(() => {
+    refreshImages();
+  }, [refreshImages]);
+
+  const handleImageChanged = useCallback(() => {
+    refreshImages();
+  }, [refreshImages]);
 
   const handleEditMapping = useCallback(
     async (entityId: string, bridgeId: string) => {
@@ -112,10 +150,28 @@ export const EndpointList = (props: EndpointListProps) => {
     [props.bridgeId, selectedEntityId, props.onMappingSaved],
   );
 
+  const getEntityAvailability = useCallback((ep: EndpointData) => {
+    const state = ep.state as {
+      homeAssistantEntity?: {
+        entity?: { state?: { state?: string } };
+      };
+    };
+    const haState = state.homeAssistantEntity?.entity?.state?.state;
+    return haState === "unavailable" || haState === "unknown";
+  }, []);
+
+  const unavailableCount = useMemo(() => {
+    return collectLeafEndpoints(props.endpoint).filter(getEntityAvailability)
+      .length;
+  }, [props.endpoint, getEntityAvailability]);
+
   const endpoints = useMemo(() => {
     const leafEndpoints = collectLeafEndpoints(props.endpoint);
 
     const filtered = leafEndpoints.filter((ep) => {
+      if (showOnlyUnavailable && !getEntityAvailability(ep)) {
+        return false;
+      }
       const name = getEndpointName(ep.state) ?? ep.id.local;
       const type = ep.type.name;
       const search = searchTerm.toLowerCase();
@@ -140,7 +196,13 @@ export const EndpointList = (props: EndpointListProps) => {
           return 0;
       }
     });
-  }, [props.endpoint, searchTerm, sortBy]);
+  }, [
+    props.endpoint,
+    searchTerm,
+    sortBy,
+    showOnlyUnavailable,
+    getEntityAvailability,
+  ]);
 
   const handleCardClick = (endpoint: EndpointData) => {
     setSelectedItem(endpoint);
@@ -181,6 +243,26 @@ export const EndpointList = (props: EndpointListProps) => {
             onChange={(e) => setSearchTerm(e.target.value)}
             sx={{ flexGrow: 1, maxWidth: 300 }}
           />
+
+          {unavailableCount > 0 && (
+            <Tooltip
+              title={
+                showOnlyUnavailable
+                  ? "Show all entities"
+                  : `Show ${unavailableCount} unavailable`
+              }
+            >
+              <IconButton
+                size="small"
+                color={showOnlyUnavailable ? "warning" : "default"}
+                onClick={() => setShowOnlyUnavailable((v) => !v)}
+              >
+                <Badge badgeContent={unavailableCount} color="warning" max={99}>
+                  <WarningAmberIcon />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+          )}
 
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel id="sort-label">
@@ -229,6 +311,18 @@ export const EndpointList = (props: EndpointListProps) => {
                 bridgeId={props.bridgeId}
                 onClick={() => handleCardClick(ep)}
                 onEditMapping={props.bridgeId ? handleEditMapping : undefined}
+                imageInfo={
+                  imageInfoMap[
+                    (
+                      ep.state as {
+                        homeAssistantEntity?: {
+                          entity?: { entity_id?: string };
+                        };
+                      }
+                    ).homeAssistantEntity?.entity?.entity_id ?? ""
+                  ]
+                }
+                onImageChanged={handleImageChanged}
               />
             </Grid>
           ))}

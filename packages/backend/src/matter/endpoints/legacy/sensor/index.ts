@@ -3,6 +3,7 @@ import {
   SensorDeviceClass,
 } from "@home-assistant-matter-hub/common";
 import type { EndpointType } from "@matter/main";
+import { DeviceTypeId } from "@matter/main/types";
 import type { HomeAssistantEntityBehavior } from "../../../behaviors/home-assistant-entity-behavior.js";
 import { AirQualitySensorType } from "./devices/air-quality-sensor.js";
 import { BatterySensorType } from "./devices/battery-sensor.js";
@@ -14,14 +15,27 @@ import { Pm10SensorType } from "./devices/pm10-sensor.js";
 import { Pm25SensorType } from "./devices/pm25-sensor.js";
 import { PressureSensorType } from "./devices/pressure-sensor.js";
 import {
+  TemperatureHumidityPressureSensorType,
+  TemperatureHumidityPressureSensorWithBatteryType,
   TemperatureHumiditySensorType,
   TemperatureHumiditySensorWithBatteryType,
 } from "./devices/temperature-humidity-sensor.js";
+import {
+  TemperaturePressureSensorType,
+  TemperaturePressureSensorWithBatteryType,
+} from "./devices/temperature-pressure-sensor.js";
 import {
   TemperatureSensorType,
   TemperatureSensorWithBatteryType,
 } from "./devices/temperature-sensor.js";
 import { TvocSensorType } from "./devices/tvoc-sensor.js";
+
+// Device type entries for the descriptor's deviceTypeList.
+// Flat endpoints with multiple sensor clusters need all device types listed
+// so controllers like SmartThings properly display each measurement (#214).
+const tempDt = { deviceType: DeviceTypeId(0x0302), revision: 2 };
+const humidityDt = { deviceType: DeviceTypeId(0x0307), revision: 2 };
+const pressureDt = { deviceType: DeviceTypeId(0x0305), revision: 2 };
 
 export function SensorDevice(
   homeAssistantEntity: HomeAssistantEntityBehavior.State,
@@ -33,15 +47,44 @@ export function SensorDevice(
 
   if (deviceClass === SensorDeviceClass.temperature) {
     const hasHumidity = !!mapping?.humidityEntity;
+    const hasPressure = !!mapping?.pressureEntity;
     const hasBattery = !!mapping?.batteryEntity;
 
+    if (hasHumidity && hasPressure && hasBattery) {
+      return TemperatureHumidityPressureSensorWithBatteryType.set({
+        homeAssistantEntity,
+        descriptor: { deviceTypeList: [tempDt, humidityDt, pressureDt] },
+      });
+    }
+    if (hasHumidity && hasPressure) {
+      return TemperatureHumidityPressureSensorType.set({
+        homeAssistantEntity,
+        descriptor: { deviceTypeList: [tempDt, humidityDt, pressureDt] },
+      });
+    }
     if (hasHumidity && hasBattery) {
       return TemperatureHumiditySensorWithBatteryType.set({
         homeAssistantEntity,
+        descriptor: { deviceTypeList: [tempDt, humidityDt] },
       });
     }
     if (hasHumidity) {
-      return TemperatureHumiditySensorType.set({ homeAssistantEntity });
+      return TemperatureHumiditySensorType.set({
+        homeAssistantEntity,
+        descriptor: { deviceTypeList: [tempDt, humidityDt] },
+      });
+    }
+    if (hasPressure && hasBattery) {
+      return TemperaturePressureSensorWithBatteryType.set({
+        homeAssistantEntity,
+        descriptor: { deviceTypeList: [tempDt, pressureDt] },
+      });
+    }
+    if (hasPressure) {
+      return TemperaturePressureSensorType.set({
+        homeAssistantEntity,
+        descriptor: { deviceTypeList: [tempDt, pressureDt] },
+      });
     }
     if (hasBattery) {
       return TemperatureSensorWithBatteryType.set({ homeAssistantEntity });

@@ -8,12 +8,19 @@ import type { EndpointType } from "@matter/main";
 import { FixedLabelServer } from "@matter/main/behaviors";
 import type { HomeAssistantEntityBehavior } from "../../behaviors/home-assistant-entity-behavior.js";
 import { AirPurifierEndpoint } from "./air-purifier/index.js";
-import { AlarmControlPanelDevice } from "./alarm-control-panel/index.js";
+import {
+  AlarmControlPanelDevice,
+  AlarmOnOffDevice,
+} from "./alarm-control-panel/index.js";
 import { AutomationDevice } from "./automation/index.js";
 import { BinarySensorDevice } from "./binary-sensor/index.js";
+import { SmokeAlarmType } from "./binary-sensor/smoke-co-alarm.js";
+import { WaterFreezeDetectorType } from "./binary-sensor/water-freeze-detector.js";
+import { WaterLeakDetectorType } from "./binary-sensor/water-leak-detector.js";
 import { ButtonDevice } from "./button/index.js";
 import { ClimateDevice } from "./climate/index.js";
 import { CoverDevice } from "./cover/index.js";
+import { EventDevice } from "./event/index.js";
 import { FanDevice } from "./fan/index.js";
 import { HumidifierDevice } from "./humidifier/index.js";
 import { InputButtonDevice } from "./input-button/index.js";
@@ -29,6 +36,7 @@ import { PumpEndpoint } from "./pump/index.js";
 import { RemoteDevice } from "./remote/index.js";
 import { SceneDevice } from "./scene/index.js";
 import { ScriptDevice } from "./script/index.js";
+import { InputSelectDevice, SelectDevice } from "./select/index.js";
 import { AirQualitySensorType } from "./sensor/devices/air-quality-sensor.js";
 import { BatterySensorType } from "./sensor/devices/battery-sensor.js";
 import { FlowSensorType } from "./sensor/devices/flow-sensor.js";
@@ -46,10 +54,17 @@ import { WaterHeaterDevice } from "./water-heater/index.js";
 /**
  * @deprecated
  */
+export interface LegacyEndpointOptions {
+  vacuumOnOff?: boolean;
+  vacuumMinimalClusters?: boolean;
+  cleaningModeOptions?: string[];
+}
+
 export function createLegacyEndpointType(
   entity: HomeAssistantEntityInformation,
   mapping?: EntityMappingConfig,
   areaName?: string,
+  options?: LegacyEndpointOptions,
 ): EndpointType | undefined {
   const domain = entity.entity_id.split(".")[0] as HomeAssistantDomain;
   const customName = mapping?.customName;
@@ -64,11 +79,21 @@ export function createLegacyEndpointType(
   }
 
   if (!type) {
-    const factory = deviceCtrs[domain];
-    if (!factory) {
-      return undefined;
+    // Vacuum needs special handling for the vacuumOnOff feature flag
+    if (domain === "vacuum") {
+      type = VacuumDevice(
+        { entity, customName, mapping },
+        options?.vacuumOnOff,
+        options?.vacuumMinimalClusters,
+        options?.cleaningModeOptions,
+      );
+    } else {
+      const factory = deviceCtrs[domain];
+      if (!factory) {
+        return undefined;
+      }
+      type = factory({ entity, customName, mapping });
     }
-    type = factory({ entity, customName, mapping });
   }
 
   if (!type) {
@@ -84,18 +109,34 @@ export function createLegacyEndpointType(
 
 /**
  * Add FixedLabel cluster with room name to an endpoint type.
- * Google Home uses { label: "room", value: "<name>" } for automatic room assignment.
+ * Sets { label: "room", value: "<name>" } per Matter spec. No major controller
+ * (Google Home, Apple Home, Alexa) currently reads this for automatic room
+ * assignment — rooms must be assigned manually. The label is kept for future
+ * controller support.
+ *
+ * Uses MutableEndpoint.with() to properly extend behaviors instead of manual
+ * object spreading, which can lose MutableEndpoint metadata and cause
+ * "Behaviors have errors" during endpoint initialization.
  */
 function addFixedLabel(type: EndpointType, areaName: string): EndpointType {
-  const fixedLabelWithDefaults = FixedLabelServer.set({
-    labelList: [{ label: "room", value: areaName }],
+  // Matter spec: LabelStruct label and value fields are max 16 bytes each.
+  // Truncate area name to prevent validation failures.
+  const truncatedName =
+    areaName.length > 16 ? areaName.substring(0, 16) : areaName;
+  const fixedLabel = FixedLabelServer.set({
+    labelList: [{ label: "room", value: truncatedName }],
   });
+  // All factory functions return MutableEndpoint which has .with()
+  const mutable = type as EndpointType & {
+    with(...behaviors: unknown[]): EndpointType;
+  };
+  if (typeof mutable.with === "function") {
+    return mutable.with(fixedLabel);
+  }
+  // Fallback for non-mutable types (shouldn't happen in practice)
   return {
     ...type,
-    behaviors: {
-      ...type.behaviors,
-      fixedLabel: fixedLabelWithDefaults,
-    },
+    behaviors: { ...type.behaviors, fixedLabel },
   } as EndpointType;
 }
 
@@ -120,6 +161,8 @@ const deviceCtrs: Partial<
   button: ButtonDevice,
   automation: AutomationDevice,
   script: ScriptDevice,
+  select: SelectDevice,
+  input_select: InputSelectDevice,
   scene: SceneDevice,
   media_player: MediaPlayerDevice,
   humidifier: HumidifierDevice,
@@ -128,6 +171,7 @@ const deviceCtrs: Partial<
   alarm_control_panel: AlarmControlPanelDevice,
   remote: RemoteDevice,
   water_heater: WaterHeaterDevice,
+  event: EventDevice,
 };
 
 const matterDeviceTypeFactories: Partial<
@@ -154,14 +198,20 @@ const matterDeviceTypeFactories: Partial<
     ExtendedColorLightType(true, true).set({
       homeAssistantEntity: { entity: ha.entity, customName: ha.customName },
     }),
-  on_off_plugin_unit: SwitchDevice,
+  on_off_plugin_unit: (ha) => {
+    const domain = ha.entity.entity_id.split(".")[0];
+    if (domain === "alarm_control_panel") {
+      return AlarmOnOffDevice(ha);
+    }
+    return SwitchDevice(ha);
+  },
   on_off_switch: SwitchDevice,
   door_lock: LockDevice,
   window_covering: CoverDevice,
   thermostat: ClimateDevice,
   fan: FanDevice,
   air_purifier: AirPurifierEndpoint,
-  robot_vacuum_cleaner: VacuumDevice,
+  robot_vacuum_cleaner: (ha) => VacuumDevice(ha),
   humidifier_dehumidifier: HumidifierDevice,
   speaker: MediaPlayerDevice,
   basic_video_player: VideoPlayerDevice,
@@ -197,7 +247,21 @@ const matterDeviceTypeFactories: Partial<
     TvocSensorType.set({
       homeAssistantEntity: { entity: ha.entity, customName: ha.customName },
     }),
+  mode_select: SelectDevice,
   water_valve: ValveDevice,
   pump: PumpEndpoint,
   water_heater: WaterHeaterDevice,
+  generic_switch: EventDevice,
+  smoke_co_alarm: (ha) =>
+    SmokeAlarmType.set({
+      homeAssistantEntity: { entity: ha.entity, customName: ha.customName },
+    }),
+  water_freeze_detector: (ha) =>
+    WaterFreezeDetectorType.set({
+      homeAssistantEntity: { entity: ha.entity, customName: ha.customName },
+    }),
+  water_leak_detector: (ha) =>
+    WaterLeakDetectorType.set({
+      homeAssistantEntity: { entity: ha.entity, customName: ha.customName },
+    }),
 };

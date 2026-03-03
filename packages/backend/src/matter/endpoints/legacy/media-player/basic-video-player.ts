@@ -8,16 +8,18 @@ import { testBit } from "../../../../utils/test-bit.js";
 import { BasicInformationServer } from "../../../behaviors/basic-information-server.js";
 import { HomeAssistantEntityBehavior } from "../../../behaviors/home-assistant-entity-behavior.js";
 import { IdentifyServer } from "../../../behaviors/identify-server.js";
+import { MediaPlayerKeypadInputServer } from "./behaviors/media-player-keypad-input-server.js";
+import { MediaPlayerMediaInputServer } from "./behaviors/media-player-media-input-server.js";
 import { MediaPlayerMediaPlaybackServer } from "./behaviors/media-player-media-playback-server.js";
 import { MediaPlayerPowerOnOffServer } from "./behaviors/media-player-power-on-off-server.js";
 
 // BasicVideoPlayerDevice (deviceType 40) for TVs
 // Required behaviors: onOff, mediaPlayback, keypadInput
-// We implement onOff and mediaPlayback, keypadInput uses default
 const VideoPlayerEndpointType = BasicVideoPlayerDevice.with(
   BasicInformationServer,
   IdentifyServer,
   HomeAssistantEntityBehavior,
+  MediaPlayerKeypadInputServer,
 );
 
 export function VideoPlayerDevice(
@@ -48,6 +50,10 @@ export function VideoPlayerDevice(
   );
   if (supportsPlay || supportsPause) {
     device = device.with(MediaPlayerMediaPlaybackServer);
+  }
+
+  if (testBit(supportedFeatures, MediaPlayerDeviceFeature.SELECT_SOURCE)) {
+    device = device.with(MediaPlayerMediaInputServer);
   }
 
   return device.set({ homeAssistantEntity });

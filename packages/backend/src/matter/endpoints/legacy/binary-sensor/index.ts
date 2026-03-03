@@ -26,11 +26,13 @@ import {
   SmokeAlarmType,
   SmokeAlarmWithBatteryType,
 } from "./smoke-co-alarm.js";
+import { WaterFreezeDetectorType } from "./water-freeze-detector.js";
 import { WaterLeakDetectorType } from "./water-leak-detector.js";
 
 type CombinedType =
   | typeof ContactSensorType
   | typeof OccupancySensorType
+  | typeof WaterFreezeDetectorType
   | typeof WaterLeakDetectorType
   | typeof SmokeAlarmType
   | typeof CoAlarmType
@@ -40,20 +42,21 @@ const deviceClasses: Partial<Record<BinarySensorDeviceClass, CombinedType>> = {
   [BinarySensorDeviceClass.CarbonMonoxide]: CoAlarmType,
   [BinarySensorDeviceClass.Gas]: CoAlarmType,
 
+  [BinarySensorDeviceClass.BatteryCharging]: OnOffSensorType,
+  [BinarySensorDeviceClass.Light]: OnOffSensorType,
+  [BinarySensorDeviceClass.Plug]: OnOffSensorType,
+  [BinarySensorDeviceClass.Power]: OnOffSensorType,
+  [BinarySensorDeviceClass.Running]: OnOffSensorType,
+
   [BinarySensorDeviceClass.Battery]: ContactSensorType,
-  [BinarySensorDeviceClass.BatteryCharging]: ContactSensorType,
-  [BinarySensorDeviceClass.Cold]: ContactSensorType,
+  [BinarySensorDeviceClass.Cold]: WaterFreezeDetectorType,
   [BinarySensorDeviceClass.Connectivity]: ContactSensorType,
   [BinarySensorDeviceClass.Door]: ContactSensorType,
   [BinarySensorDeviceClass.GarageDoor]: ContactSensorType,
   [BinarySensorDeviceClass.Heat]: ContactSensorType,
-  [BinarySensorDeviceClass.Light]: ContactSensorType,
   [BinarySensorDeviceClass.Lock]: ContactSensorType,
   [BinarySensorDeviceClass.Opening]: ContactSensorType,
-  [BinarySensorDeviceClass.Plug]: ContactSensorType,
-  [BinarySensorDeviceClass.Power]: ContactSensorType,
   [BinarySensorDeviceClass.Problem]: ContactSensorType,
-  [BinarySensorDeviceClass.Running]: ContactSensorType,
   [BinarySensorDeviceClass.Safety]: ContactSensorType,
   [BinarySensorDeviceClass.Sound]: ContactSensorType,
   [BinarySensorDeviceClass.Tamper]: ContactSensorType,

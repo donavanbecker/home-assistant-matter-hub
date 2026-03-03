@@ -19,7 +19,7 @@
 ---
 
 > [!NOTE]
-> 🔀 **Community Fork** - This is a fork of the original [t0bst4r/home-assistant-matter-hub](https://github.com/t0bst4r/home-assistant-matter-hub), which was discontinued in January 2026. We continue active development with bug fixes, new features, and community support. Thank you **t0bst4r** for the original work! ❤️
+> 🔀 **Community Fork** - This is a fork of the original [t0bst4r/home-assistant-matter-hub](https://github.com/t0bst4r/home-assistant-matter-hub), which was discontinued in January 2026. We continue active development with bug fixes, new features, and community support. Thank you **[@t0bst4r](https://github.com/t0bst4r)** for the original work! ❤️
 >
 > **📦 Migrating?** See [Migration Guide](#migration-from-t0bst4r) - your paired devices will continue to work!
 
@@ -37,7 +37,7 @@ of port forwarding etc.
 
 | Channel | Branch | Current Version | Description |
 |---------|--------|-----------------|-------------|
-| **Stable** | `main` | v2.0.x | Production-ready, recommended for most users |
+| **Stable** | `main` | v2.0.27 | Production-ready, recommended for most users |
 | **Alpha** | `alpha` | v2.1.0-alpha.x | Pre-release with new features, for early adopters |
 | **Testing** | `testing` | v4.1.0-testing.x | ⚠️ **Highly unstable!** Experimental features, may break |
 
@@ -52,37 +52,51 @@ of port forwarding etc.
 ## 🎉 What's New
 
 <details>
-<summary><strong>📦 Stable Features (v2.0.x)</strong> - Click to expand</summary>
+<summary><strong>📦 Stable Features (v2.0.27)</strong> - Click to expand</summary>
+
+**New in v2.0.27:**
 
 | Feature | Description |
 |---------|-------------|
-| **🌬️ Fan Oscillation** | Rocking/oscillation via Matter ([#108](https://github.com/RiDDiX/home-assistant-matter-hub/discussions/108)) |
-| **🌬️ Wind Modes** | Natural Wind, Sleep Wind preset modes |
-| **🔋 PowerSource** | Battery support for Climate, Fan, Temperature sensors |
-| **🔒 Lock PIN** | PBKDF2 hashed PINs, lock without PIN, per-lock disable option ([#95](https://github.com/RiDDiX/home-assistant-matter-hub/issues/95)) |
-| **🚪 Cover/Blinds** | `coverSwapOpenClose` flag for Alexa ([#117](https://github.com/RiDDiX/home-assistant-matter-hub/issues/117)) |
-| **🔋 Battery Entity** | `batteryEntity` mapping for Roomba/Deebot/Climate/Fan ([#112](https://github.com/RiDDiX/home-assistant-matter-hub/issues/112)) |
-| **🤖 Vacuum Rooms** | Ecovacs Deebot, Roborock, Dreame room support ([#118](https://github.com/RiDDiX/home-assistant-matter-hub/pull/118), [#106](https://github.com/RiDDiX/home-assistant-matter-hub/issues/106)) |
-| **🤖 Vacuum Cleaning Modes** | Dreame cleaning mode entity mapping ([#110](https://github.com/RiDDiX/home-assistant-matter-hub/issues/110)) |
-| **� Force Sync** | Push device states to controllers, auto-sync every 5min |
-| **�🔋 Auto Entity Grouping** | Auto Battery/Humidity mapping feature flags |
-| **🏷️ Labels API** | `/api/matter/labels` for label-based filtering |
-| **🌡️ Thermostat** | Heat/Cool mode fix, AutoMode support |
-| **💡 Lights** | ColorTemp + HueSat fix, boundary order fix |
-| **🌡️ Sensors** | PM2.5/PM10/CO2/TVOC fixes, Apple Home defaults |
-| **🌬️ Air Purifier** | HEPA Filter Life Monitoring |
-| **📋 Copy to Clipboard** | Copy endpoint data button in UI ([#121](https://github.com/RiDDiX/home-assistant-matter-hub/pull/121)) |
-| **🐛 Bug Fixes** | Lock initialization fix ([#122](https://github.com/RiDDiX/home-assistant-matter-hub/issues/122)), vacuum log spam fix ([#123](https://github.com/RiDDiX/home-assistant-matter-hub/issues/123)) |
+| **🤖 Native Valetudo Support** | Auto-detect Valetudo select entities, map segments, use `segment_cleanup` via MQTT for room cleaning ([#205](https://github.com/RiDDiX/home-assistant-matter-hub/issues/205)) |
+| **🤖 Custom Service Areas** | Define custom room/zone names for generic zone-based robots without native room support ([#177](https://github.com/RiDDiX/home-assistant-matter-hub/issues/177)) |
+| **🤖 ServiceArea Maps** | Multi-floor vacuum support — rooms grouped by floor map in Apple Home |
+| **🤖 Vacuum Identify → Locate** | "Play Sound" in Apple Home triggers `vacuum.locate` to find your robot ([#189](https://github.com/RiDDiX/home-assistant-matter-hub/issues/189)) |
+| **🤖 Vacuum Charging State** | Reports `IsCharging` when docked — Apple Home shows correct charging indicator ([#206](https://github.com/RiDDiX/home-assistant-matter-hub/issues/206)) |
+| **🤖 Vacuum Minimal Clusters** | `vacuumMinimalClusters` feature flag strips non-essential clusters for Alexa compatibility ([#183](https://github.com/RiDDiX/home-assistant-matter-hub/issues/183)) |
+| **🌡️ Composed Air Purifier** | Air purifiers with thermostat/humidity sensors create real Matter Composed Devices (spec 9.4.4) |
+| **🚨 Alarm Control Panel** | `alarm_control_panel` entities exposed as Matter ModeSelect — arm/disarm modes available in controllers ([#209](https://github.com/RiDDiX/home-assistant-matter-hub/issues/209)) |
+| **🖥️ Dashboard Controls** | Bridge Start/Stop/Restart All buttons in header, Settings nav entry |
+| **🖥️ Process Memory Display** | RSS + heap usage shown in System Information page |
+| **🖥️ Compact Include/Exclude Editor** | Collapsible entity filter editor with search |
+| **🖥️ Improved Bridge Config UI** | Better layout and usability for bridge settings editor |
+| **🏢 Vendor Brand Icons** | 20+ new manufacturer icons (Razer, Roborock, iRobot, Signify, and more) |
+| **🐳 linux/arm/v7 Docker** | Added ARM v7 platform for standalone Docker image |
+| **📦 npm Package** | Published as `@riddix/hamh` on npm for standalone installations |
+| **🌡️ Thermostat #207 Fix** | heat_cool-only HVAC zones now dynamically report CoolingOnly/HeatingOnly based on hvac_action |
+| **🌡️ Thermostat #28 Fix** | Devices with auto+cool but no explicit heat (e.g. SmartIR ACs) no longer crash with conformance error |
+| **🤖 Vacuum Alexa Fixes** | Multiple fixes for OnOff, PowerSource, mode IDs, room sorting ([#183](https://github.com/RiDDiX/home-assistant-matter-hub/issues/183), [#185](https://github.com/RiDDiX/home-assistant-matter-hub/issues/185)) |
+| **🔧 Air Purifier Fix** | Added Rocking (oscillation) and Wind feature support, removed incorrect Lighting feature |
+| **🔧 Composed Sensor Fix** | Temperature not updating in composed sensors, missing device types in flat endpoints ([#214](https://github.com/RiDDiX/home-assistant-matter-hub/issues/214)) |
+| **⚡ Performance** | Fingerprint-based registry change detection, reduced refresh overhead |
+
+**Previously in v2.0.26:**
+
+| Feature | Description |
+|---------|-------------|
+| **🔐 Authentication UI** | Configure authentication credentials directly from the web UI Settings page ([#197](https://github.com/RiDDiX/home-assistant-matter-hub/issues/197)) |
+| **🔌 Select Entity Support** | `select` and `input_select` entities now mapped to Matter ModeSelectDevice |
+| **🔗 Webhook Event Bridge** | HAMH fires `hamh_action` events on the HA event bus for controller command automations |
+| **🔍 Cluster Diagnostics** | Expandable per-cluster state inspection on device cards |
+| **⚙ Matter.js 0.16.10** | Updated from 0.16.8 to 0.16.10 for stability and spec compliance |
+| **� Docker Node 22** | Pinned Docker runtime to Node 22 ([#200](https://github.com/RiDDiX/home-assistant-matter-hub/issues/200)) |
 
 </details>
 
 <details>
 <summary><strong>🧪 Alpha Features (v2.1.0-alpha.x)</strong> - Click to expand</summary>
 
-> [!NOTE]
-> Alpha and Stable are currently synchronized. New alpha features will appear here.
-
-Currently all features are in stable. Check back for upcoming features!
+**Alpha is currently in sync with Stable (v2.0.27).** All alpha features have been promoted to stable. New alpha features will appear here as development continues.
 
 </details>
 
@@ -108,8 +122,23 @@ Currently all features are in stable. Check back for upcoming features!
 <details>
 <summary><strong>📜 Previous Stable Versions</strong> - Click to expand</summary>
 
-### v2.0.x
-Force Sync, Lock PIN, Cover/Blinds improvements, Roborock Rooms, Auto Entity Grouping, Water Heater, Vacuum Server Mode
+### v2.0.26
+Authentication UI, Select entity support, Webhook event bridge, Cluster diagnostics, Matter.js 0.16.10, Docker Node 22, vacuum cleaning mode fallback, vacuum entity filter fix
+
+### v2.0.25
+Vacuum mop intensity, vacuum auto-detection, Roborock room auto-detect, live entity mapping, dynamic heap sizing, multi-fabric commissioning, fan speed label fix
+
+### v2.0.24
+Dashboard landing page, composed devices, bridge wizard feature flags, entity autocomplete, light transitions, live diagnostics, vacuum suction level, thermostat auto-resume, vacuum docked state, memory leak fix
+
+### v2.0.19–v2.0.23
+Bridge templates, live filter preview, entity diagnostics, multi-bridge bulk operations, entity health indicators, diagnostic export, EntityLabel/DeviceLabel filters, Power & Energy Measurement, Event domain (GenericSwitch)
+
+### v2.0.17 / v2.0.18
+Room Label (FixedLabel), thermostat overhaul, lock unlatch/unbolt, binary sensor fix, auto pressure mapping, vacuum fixes, dead session recovery, network map, mobile UI, Labels & Areas page, crash resilience, memory limit
+
+### v2.0.16
+Force Sync, Lock PIN, Cover/Blinds improvements, Roborock Rooms, Auto Entity Grouping, Water Heater, Vacuum Server Mode, OOM fix
 
 ### v1.10.4
 Climate/Thermostat fixes, Cover position fix, Vacuum battery, Humidifier improvements, Entity Mapping, Alexa brightness preserve
@@ -134,18 +163,21 @@ Matter Bridge, Multi-Fabric support, Health Monitoring, Bridge Wizard, AirQualit
 
 | Home Assistant Domain | Matter Device Type | Feature Flags |
 |-----------------------|-------------------|---------------|
-| `light` | On/Off, Dimmable, Color Temp, Extended Color | |
-| `switch`, `input_boolean` | On/Off Plug-in Unit | |
-| `lock` | Door Lock | PIN Credentials |
+| `light` | On/Off, Dimmable, Color Temp, Extended Color | `powerEntity`, `energyEntity` |
+| `switch`, `input_boolean` | On/Off Plug-in Unit | `powerEntity`, `energyEntity` |
+| `lock` | Door Lock | PIN Credentials, Unlatch/Unbolt |
 | `cover` | Window Covering | `coverSwapOpenClose` |
 | `climate` | Thermostat | Battery via `batteryEntity` |
-| `fan` | Fan, Air Purifier | Oscillation, Wind Modes |
-| `binary_sensor` | Contact, Occupancy, Smoke/CO, Water Leak | |
-| `sensor` | Temperature, Humidity, Pressure, Flow, Light, AirQuality | `batteryEntity`, `humidityEntity` |
+| `fan` | Fan, Air Purifier | Oscillation, Wind Modes, `filterLifeEntity` |
+| `alarm_control_panel` | Mode Select | Arm/Disarm modes |
+| `binary_sensor` | Contact, OnOff, Occupancy, Smoke/CO, Water Leak, Water Freeze | |
+| `sensor` | Temperature, Humidity, Pressure, Flow, Light, AirQuality | `batteryEntity`, `humidityEntity`, `pressureEntity` |
+| `event` | Generic Switch (Doorbell, Button Events) | |
 | `button`, `input_button` | Generic Switch | |
 | `media_player` | Speaker, Basic Video Player (TV) | |
 | `valve` | Water Valve, Pump | |
-| `vacuum` | Robot Vacuum Cleaner | `serverMode`, `roomEntities`, `batteryEntity` |
+| `select`, `input_select` | Mode Select | |
+| `vacuum` | Robot Vacuum Cleaner | `serverMode`, `roomEntities`, `batteryEntity`, `cleaningModeEntity`, `suctionLevelEntity`, `mopIntensityEntity`, `customServiceAreas`, `vacuumMinimalClusters` |
 | `humidifier` | Humidifier/Dehumidifier | |
 | `water_heater` | Thermostat (Heating) | |
 | `automation`, `script`, `scene` | On/Off Switch | |
@@ -302,27 +334,26 @@ Migrating from the original `t0bst4r/home-assistant-matter-hub` is straightforwa
 
 1. **Backup your data:**
    ```bash
-   # SSH into Home Assistant and find your add-on folder
-   ls /addon_configs/
-   # Look for folder ending with _hamh (e.g., a0c_hamh)
-   
    cp -r /addon_configs/*_hamh /config/hamh-backup
+   # Verify the backup was copied correctly
+   ls /config/hamh-backup
    ```
 
-2. **Uninstall the old add-on** (Settings → Add-ons → Uninstall)
+2. **Uninstall the old add-on** (Settings → Add-ons → Uninstall) and make sure the old folder is removed:
+   ```bash
+   rm -rf /addon_configs/*_hamh
+   ```
 
 3. **Add the new repository:**
    ```
    https://github.com/RiDDiX/home-assistant-addons
    ```
 
-4. **Install and start the new add-on**, then check the new _hamh folder:
-   ```bash
-   ls /addon_configs/
-   ```
+4. **Install and start the new add-on once** (creates the data folder), then **stop it**
 
-5. **Stop the add-on** and restore your backup:
+5. **Clear the new folder and restore your backup:**
    ```bash
+   rm -rf /addon_configs/*_hamh/*
    cp -r /config/hamh-backup/* /addon_configs/*_hamh/
    ```
 
@@ -362,6 +393,7 @@ This project thrives thanks to the amazing community! Special thanks to everyone
 | [@razzietheman](https://github.com/razzietheman) | 🥈 **Active Tester** - Bridge icons (#101), sorting (#80), feature requests (#31, #30), extensive UI/UX feedback |
 | [@markgaze](https://github.com/markgaze) | 🤖 **Code Contributor** - Ecovacs Deebot room support ([#118](https://github.com/RiDDiX/home-assistant-matter-hub/pull/118)) |
 | [@omerfaruk-aran](https://github.com/omerfaruk-aran) | 🔧 **Network Debugging Expert** - Systematic mDNS/multicast root cause analysis for "No Response" issues ([#129](https://github.com/RiDDiX/home-assistant-matter-hub/issues/129)) |
+| [@gustavakerstrom](https://github.com/gustavakerstrom) | 🤖 **Code Contributor** - Template description display fix ([#215](https://github.com/RiDDiX/home-assistant-matter-hub/pull/215)) |
 
 <details>
 <summary><strong>📋 Issue Tracker - All Contributors</strong> (click to expand)</summary>
@@ -382,6 +414,7 @@ Thank you to everyone who helps improve this project by reporting issues!
 | [@400HPMustang](https://github.com/400HPMustang) | #103 |
 | [@vandir](https://github.com/vandir) | #102 |
 | [@razzietheman](https://github.com/razzietheman) | #101 #100 #80 #31 #30 |
+| [@seitenprofi](https://github.com/seitenprofi) | #176 |
 | [@semonR](https://github.com/semonR) | #99 #58 |
 | [@italoc](https://github.com/italoc) | #78 |
 | [@marksev1](https://github.com/marksev1) | #62 |
@@ -418,6 +451,9 @@ Thank you to everyone who helps improve this project by reporting issues!
 | [@dinariox](https://github.com/dinariox) | 💎 Thank you for your generous support! |
 | StefanS | 💎 Thank you for your generous support! |
 | Manny B. | 💎 Thank you for your generous support! |
+| [@JRCondat](https://github.com/JRCondat) | 💎 Thank you for your generous support! |
+| Bonjon | 💎 Thank you for your generous support! |
+| TobiR | 💎 Thank you for your generous support! |
 | *Anonymous supporters* | 🙏 Thank you to those who prefer not to be named - your support is equally appreciated! |
 
 ### 🌟 Original Author

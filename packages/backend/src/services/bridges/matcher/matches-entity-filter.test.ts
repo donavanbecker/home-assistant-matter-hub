@@ -102,7 +102,7 @@ describe("matchEntityFilter.testMatcher", () => {
       ),
     ).toBeFalsy();
   });
-  it("should match label on device when entity has no matching label", () => {
+  it("should NOT match device label with legacy label type", () => {
     const entityWithoutLabel = { ...registry, labels: [] };
     const deviceWithLabel = { ...deviceRegistry, labels: ["device_label"] };
     expect(
@@ -114,7 +114,59 @@ describe("matchEntityFilter.testMatcher", () => {
         deviceWithLabel,
         entityWithoutLabel,
       ),
+    ).toBeFalsy();
+  });
+  it("should match entity label with EntityLabel type", () => {
+    expect(
+      testMatcher(
+        {
+          type: HomeAssistantMatcherType.EntityLabel,
+          value: "test_label",
+        },
+        undefined,
+        registry,
+      ),
     ).toBeTruthy();
+  });
+  it("should NOT match device label with EntityLabel type", () => {
+    const entityWithoutLabel = { ...registry, labels: [] };
+    const deviceWithLabel = { ...deviceRegistry, labels: ["device_label"] };
+    expect(
+      testMatcher(
+        {
+          type: HomeAssistantMatcherType.EntityLabel,
+          value: "device_label",
+        },
+        deviceWithLabel,
+        entityWithoutLabel,
+      ),
+    ).toBeFalsy();
+  });
+  it("should match device label with DeviceLabel type", () => {
+    const entityWithoutLabel = { ...registry, labels: [] };
+    const deviceWithLabel = { ...deviceRegistry, labels: ["device_label"] };
+    expect(
+      testMatcher(
+        {
+          type: HomeAssistantMatcherType.DeviceLabel,
+          value: "device_label",
+        },
+        deviceWithLabel,
+        entityWithoutLabel,
+      ),
+    ).toBeTruthy();
+  });
+  it("should NOT match entity label with DeviceLabel type", () => {
+    expect(
+      testMatcher(
+        {
+          type: HomeAssistantMatcherType.DeviceLabel,
+          value: "test_label",
+        },
+        deviceRegistry,
+        registry,
+      ),
+    ).toBeFalsy();
   });
   it("should not match label when neither entity nor device has it", () => {
     const entityWithoutLabel = { ...registry, labels: [] };
@@ -129,6 +181,83 @@ describe("matchEntityFilter.testMatcher", () => {
         entityWithoutLabel,
       ),
     ).toBeFalsy();
+  });
+  it("should match label case-insensitively (slugify fallback)", () => {
+    expect(
+      testMatcher(
+        {
+          type: HomeAssistantMatcherType.Label,
+          value: "Test_Label",
+        },
+        undefined,
+        registry,
+      ),
+    ).toBeTruthy();
+  });
+  it("should resolve label display name via labels registry", () => {
+    const labels = [
+      { label_id: "test_label", name: "Test Label" },
+      { label_id: "other", name: "Other" },
+    ];
+    expect(
+      testMatcher(
+        {
+          type: HomeAssistantMatcherType.Label,
+          value: "Test Label",
+        },
+        undefined,
+        registry,
+        undefined,
+        labels,
+      ),
+    ).toBeTruthy();
+  });
+  it("should resolve label display name for DeviceLabel type", () => {
+    const entityWithoutLabel = { ...registry, labels: [] };
+    const deviceWithLabel = { ...deviceRegistry, labels: ["matter"] };
+    const labels = [{ label_id: "matter", name: "Matter" }];
+    expect(
+      testMatcher(
+        {
+          type: HomeAssistantMatcherType.DeviceLabel,
+          value: "Matter",
+        },
+        deviceWithLabel,
+        entityWithoutLabel,
+        undefined,
+        labels,
+      ),
+    ).toBeTruthy();
+  });
+  it("should NOT match device label via legacy label type with label registry", () => {
+    const entityWithoutLabel = { ...registry, labels: [] };
+    const deviceWithLabel = { ...deviceRegistry, labels: ["matter"] };
+    const labels = [{ label_id: "matter", name: "Matter" }];
+    expect(
+      testMatcher(
+        {
+          type: HomeAssistantMatcherType.Label,
+          value: "Matter",
+        },
+        deviceWithLabel,
+        entityWithoutLabel,
+        undefined,
+        labels,
+      ),
+    ).toBeFalsy();
+  });
+  it("should slugify label value with special characters", () => {
+    const entityWithLabel = { ...registry, labels: ["my_smart_lights"] };
+    expect(
+      testMatcher(
+        {
+          type: HomeAssistantMatcherType.Label,
+          value: "My Smart Lights",
+        },
+        undefined,
+        entityWithLabel,
+      ),
+    ).toBeTruthy();
   });
 
   it("should match the platform", () => {

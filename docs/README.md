@@ -53,40 +53,60 @@ Home, ...) are not placed in the same network segment. Please make sure to revie
 ## What's New
 
 <details>
-<summary><strong>📦 Stable (v2.0.x) - Current</strong></summary>
+<summary><strong>📦 Stable (v2.0.27) - Current</strong></summary>
+
+**New in v2.0.27:**
 
 | Feature | Description |
 |---------|-------------|
-| **🌬️ Fan Oscillation** | Rocking/oscillation via Matter |
-| **🌬️ Wind Modes** | Natural Wind, Sleep Wind preset modes |
-| **🔋 PowerSource** | Battery support for Climate, Fan, Temperature sensors |
-| **� Lock PIN** | PBKDF2 hashed PINs, lock without PIN, per-lock disable |
-| **🚪 Cover/Blinds** | `coverSwapOpenClose` flag for Alexa |
-| **🔋 Battery Entity** | `batteryEntity` mapping for Roomba/Deebot/Climate/Fan |
-| **🤖 Vacuum Rooms** | Ecovacs Deebot, Roborock, Dreame room support |
-| **🤖 Vacuum Cleaning Modes** | Dreame cleaning mode entity mapping |
-| **🔄 Force Sync** | Push device states to controllers, auto-sync every 5min |
-| **🔋 Auto Grouping** | Auto Battery/Humidity mapping feature flags |
-| **🌡️ Thermostat** | Heat/Cool mode fix, AutoMode support |
-| **💡 Lights** | ColorTemp + HueSat fix |
-| **🌡️ Sensors** | PM2.5/PM10/CO2/TVOC fixes |
-| **🌬️ Air Purifier** | HEPA Filter Life Monitoring |
-| **📋 Copy to Clipboard** | Copy endpoint data button in UI |
+| **🤖 Native Valetudo Support** | Auto-detect Valetudo select entities, map segments, use `segment_cleanup` via MQTT for room cleaning ([#205](https://github.com/RiDDiX/home-assistant-matter-hub/issues/205)) |
+| **🤖 Custom Service Areas** | Define custom room/zone names for generic zone-based robots ([#177](https://github.com/RiDDiX/home-assistant-matter-hub/issues/177)) |
+| **🤖 ServiceArea Maps** | Multi-floor vacuum support — rooms grouped by floor map in Apple Home |
+| **🤖 Vacuum Identify → Locate** | "Play Sound" in Apple Home triggers `vacuum.locate` ([#189](https://github.com/RiDDiX/home-assistant-matter-hub/issues/189)) |
+| **🤖 Vacuum Charging State** | Reports `IsCharging` when docked ([#206](https://github.com/RiDDiX/home-assistant-matter-hub/issues/206)) |
+| **🚨 Alarm Control Panel** | `alarm_control_panel` entities exposed as Matter ModeSelect ([#209](https://github.com/RiDDiX/home-assistant-matter-hub/issues/209)) |
+| **🌡️ Composed Air Purifier** | Air purifiers with thermostat/humidity sensors create real Matter Composed Devices |
+| **🖥️ Dashboard Controls** | Bridge Start/Stop/Restart All buttons in header, Settings nav entry |
+| **🏢 Vendor Brand Icons** | 20+ new manufacturer icons (Razer, Roborock, iRobot, Signify, etc.) |
+| **🐳 linux/arm/v7 Docker** | Added ARM v7 platform for standalone Docker image |
+| **🌡️ Thermostat Fixes** | heat_cool-only zones dynamic control sequence ([#207](https://github.com/RiDDiX/home-assistant-matter-hub/issues/207)), SmartIR AC conformance fix ([#28](https://github.com/RiDDiX/home-assistant-matter-hub/issues/28)) |
+| **🔧 Air Purifier Fix** | Added Rocking (oscillation) and Wind feature support |
+| **⚡ Performance** | Fingerprint-based registry change detection, reduced refresh overhead |
+
+**Previously in v2.0.26:**
+
+| Feature | Description |
+|---------|-------------|
+| **🔐 Authentication UI** | Configure authentication credentials from the web UI Settings page ([#197](https://github.com/RiDDiX/home-assistant-matter-hub/issues/197)) |
+| **🔌 Select Entity Support** | `select` and `input_select` entities mapped to Matter ModeSelectDevice |
+| **🔗 Webhook Event Bridge** | `hamh_action` events on the HA event bus for controller command automations |
+| **🔍 Cluster Diagnostics** | Expandable per-cluster state inspection on device cards |
+| **⚙ Matter.js 0.16.10** | Updated for stability and spec compliance |
+| **🐳 Docker Node 22** | Fixes `ERR_INVALID_PACKAGE_CONFIG` ([#200](https://github.com/RiDDiX/home-assistant-matter-hub/issues/200)) |
 
 </details>
 
 <details>
 <summary><strong>🧪 Alpha (v2.1.0-alpha.x)</strong></summary>
 
-Alpha and Stable are currently synchronized. New alpha features will appear here.
+Alpha is currently in sync with Stable (v2.0.27). All alpha features have been promoted to stable. New alpha features will appear here as development continues.
 
 </details>
 
 <details>
-<summary><strong>📜 Previous Versions</strong></summary>
+<summary><strong>� Previous Versions</strong></summary>
 
-### v2.0.x
-Force Sync, Lock PIN, Cover/Blinds improvements, Roborock Rooms, Auto Entity Grouping, Water Heater, Vacuum Server Mode
+### v2.0.26
+Authentication UI, Select Entity Support, Webhook Event Bridge, Cluster Diagnostics, Matter.js 0.16.10, Docker Node 22
+
+### v2.0.25
+Vacuum mop intensity, vacuum auto-detection, Roborock room auto-detect, live entity mapping, dynamic heap sizing
+
+### v2.0.17–v2.0.23
+Thermostat overhaul, Lock Unlatch, Vacuum Server Mode, Bridge Templates, Live Filter Preview, Entity Diagnostics, Multi-Bridge Bulk Operations, Power & Energy Measurement, Event domain, Network Map, Mobile UI
+
+### v2.0.16
+Force Sync, Lock PIN, Cover/Blinds improvements, Roborock Rooms, Auto Entity Grouping, Water Heater, Vacuum Server Mode, OOM fix
 
 ### v1.9.0
 Custom bridge icons, Basic Video Player, Alexa deduplication, Health Check API, WebSocket, Full backup/restore

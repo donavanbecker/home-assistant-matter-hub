@@ -1,6 +1,8 @@
+import type { BridgeFabric } from "@home-assistant-matter-hub/common";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
+import BugReportIcon from "@mui/icons-material/BugReport";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import DevicesIcon from "@mui/icons-material/Devices";
 import ErrorIcon from "@mui/icons-material/Error";
@@ -10,6 +12,7 @@ import SortIcon from "@mui/icons-material/Sort";
 import WarningIcon from "@mui/icons-material/Warning";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
@@ -26,6 +29,8 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useCallback, useEffect, useState } from "react";
 import { BackupRestore } from "../backup/BackupRestore.tsx";
+import { FabricIcon } from "../fabric/FabricIcon.tsx";
+import { getVendorName } from "../fabric/vendor-names.ts";
 
 type SortField = "name" | "created";
 type SortDirection = "asc" | "desc";
@@ -44,6 +49,15 @@ interface BridgeHealthInfo {
     rootVendorId: number;
   }>;
   failedEntityCount: number;
+  connectivity?: {
+    totalSessions: number;
+    totalSubscriptions: number;
+    sessions: Array<{
+      id: number;
+      peerNodeId: string;
+      subscriptionCount: number;
+    }>;
+  };
 }
 
 interface DetailedHealthStatus {
@@ -77,26 +91,26 @@ const formatUptime = (seconds: number): string => {
   return `${minutes}m`;
 };
 
-const getVendorName = (vendorId: number): string => {
-  const vendors: Record<number, string> = {
-    4417: "Tuya",
-    4442: "LG ThinQ",
-    4447: "Aqara",
-    4448: "Amazon",
-    4937: "Apple Home",
-    4939: "Samsung SmartThings",
-    4996: "Apple (iCloud Keychain)",
-    6006: "Google",
-  };
-  return vendors[vendorId] ?? `Vendor ${vendorId}`;
-};
+export interface HealthDashboardProps {
+  sortField?: SortField;
+  sortDirection?: SortDirection;
+  onSortFieldChange?: (field: SortField) => void;
+  onSortDirectionChange?: (dir: SortDirection) => void;
+}
 
-export function HealthDashboard() {
+export function HealthDashboard(props: HealthDashboardProps = {}) {
   const [health, setHealth] = useState<DetailedHealthStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sortField, setSortField] = useState<SortField>("name");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [internalSortField, setInternalSortField] = useState<SortField>("name");
+  const [internalSortDirection, setInternalSortDirection] =
+    useState<SortDirection>("asc");
+
+  const sortField = props.sortField ?? internalSortField;
+  const sortDirection = props.sortDirection ?? internalSortDirection;
+  const setSortField = props.onSortFieldChange ?? setInternalSortField;
+  const setSortDirection =
+    props.onSortDirectionChange ?? setInternalSortDirection;
 
   const fetchHealth = useCallback(async () => {
     try {
@@ -120,6 +134,29 @@ export function HealthDashboard() {
     const interval = setInterval(fetchHealth, 10000);
     return () => clearInterval(interval);
   }, [fetchHealth]);
+
+  const handleDiagnosticExport = useCallback(async () => {
+    try {
+      const res = await fetch("api/diagnostic/export");
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const disposition = res.headers.get("Content-Disposition");
+        const filename =
+          disposition?.match(/filename="(.+)"/)?.[1] ??
+          `hamh-diagnostic-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      setError("Failed to export diagnostic data");
+    }
+  }, []);
 
   const handleRestart = async (bridgeId: string) => {
     try {
@@ -180,11 +217,21 @@ export function HealthDashboard() {
             size="small"
           />
         </Box>
-        <Tooltip title="Refresh">
-          <IconButton onClick={fetchHealth}>
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<BugReportIcon />}
+            onClick={handleDiagnosticExport}
+          >
+            Export Diagnostic
+          </Button>
+          <Tooltip title="Refresh">
+            <IconButton onClick={fetchHealth}>
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </Box>
 
       <Grid container spacing={2}>
@@ -260,7 +307,7 @@ export function HealthDashboard() {
             <IconButton
               size="small"
               onClick={() =>
-                setSortDirection((d) => (d === "asc" ? "desc" : "asc"))
+                setSortDirection(sortDirection === "asc" ? "desc" : "asc")
               }
             >
               {sortDirection === "asc" ? (
@@ -273,7 +320,7 @@ export function HealthDashboard() {
         </Box>
       </Box>
 
-      <Grid container spacing={2}>
+      <Grid container spacing={2} alignItems="stretch">
         {[...health.bridgeDetails]
           .sort((a, b) => {
             let cmp = 0;
@@ -285,10 +332,20 @@ export function HealthDashboard() {
             return sortDirection === "asc" ? cmp : -cmp;
           })
           .map((bridge) => (
-            <Grid size={{ xs: 12, md: 6 }} key={bridge.id}>
+            <Grid
+              size={{ xs: 12, sm: 6, md: 6, lg: 4, xl: 3 }}
+              key={bridge.id}
+              sx={{ display: "flex" }}
+            >
               <Card
                 variant="outlined"
                 sx={{
+                  width: "100%",
+                  height: "100%",
+                  minWidth: 280,
+                  maxWidth: 480,
+                  display: "flex",
+                  flexDirection: "column",
                   borderColor:
                     bridge.status === "running"
                       ? "success.main"
@@ -297,19 +354,43 @@ export function HealthDashboard() {
                         : "warning.main",
                 }}
               >
-                <CardContent>
+                <CardContent
+                  sx={{
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    p: 2,
+                    "&:last-child": { pb: 2 },
+                  }}
+                >
                   <Box
                     display="flex"
                     justifyContent="space-between"
-                    alignItems="center"
+                    alignItems="flex-start"
+                    flexShrink={0}
                   >
-                    <Box display="flex" alignItems="center" gap={1}>
+                    <Box
+                      display="flex"
+                      alignItems="center"
+                      gap={1}
+                      minWidth={0}
+                    >
                       <DevicesIcon />
-                      <Typography variant="subtitle1" fontWeight="bold">
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        noWrap
+                        sx={{ maxWidth: 140 }}
+                      >
                         {bridge.name}
                       </Typography>
                     </Box>
-                    <Box display="flex" alignItems="center" gap={1}>
+                    <Box
+                      display="flex"
+                      alignItems="center"
+                      gap={0.5}
+                      flexShrink={0}
+                    >
                       <Chip
                         label={bridge.status.toUpperCase()}
                         color={
@@ -335,28 +416,61 @@ export function HealthDashboard() {
                   </Box>
 
                   {bridge.statusReason && (
-                    <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                    <Typography
+                      variant="body2"
+                      color="error"
+                      sx={{ mt: 1, flexShrink: 0 }}
+                    >
                       {bridge.statusReason}
                     </Typography>
                   )}
 
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Port: {bridge.port} | Devices: {bridge.deviceCount} |
-                      Fabrics: {bridge.fabricCount}
+                  <Box sx={{ mt: "auto", pt: 1, flexShrink: 0 }}>
+                    <Box
+                      display="flex"
+                      flexWrap="wrap"
+                      gap={0.5}
+                      alignItems="center"
+                    >
+                      <Chip
+                        label={`Port ${bridge.port}`}
+                        size="small"
+                        variant="outlined"
+                        color="default"
+                      />
+                      <Chip
+                        label={`${bridge.deviceCount} Devices`}
+                        size="small"
+                        variant="outlined"
+                        color="default"
+                      />
+                      <Chip
+                        label={`${bridge.fabricCount} Fabrics`}
+                        size="small"
+                        variant="outlined"
+                        color="default"
+                      />
                       {bridge.failedEntityCount > 0 && (
                         <Chip
                           label={`${bridge.failedEntityCount} failed`}
                           color="error"
                           size="small"
-                          sx={{ ml: 1 }}
                         />
                       )}
-                    </Typography>
+                    </Box>
                   </Box>
 
+                  {bridge.connectivity && bridge.status === "running" && (
+                    <Box sx={{ mt: 1, flexShrink: 0 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Sessions: {bridge.connectivity.totalSessions} | Subs:{" "}
+                        {bridge.connectivity.totalSubscriptions}
+                      </Typography>
+                    </Box>
+                  )}
+
                   {bridge.fabrics.length > 0 && (
-                    <Box sx={{ mt: 1 }}>
+                    <Box sx={{ mt: 1, flexShrink: 0 }}>
                       <Typography variant="caption" color="text.secondary">
                         Connected to:
                       </Typography>
@@ -364,6 +478,11 @@ export function HealthDashboard() {
                         {bridge.fabrics.map((fabric) => (
                           <Chip
                             key={fabric.fabricIndex}
+                            icon={
+                              <FabricIcon
+                                fabric={fabric as unknown as BridgeFabric}
+                              />
+                            }
                             label={
                               fabric.label || getVendorName(fabric.rootVendorId)
                             }

@@ -59,6 +59,19 @@ export interface VacuumRoom {
   name: string;
   /** Optional icon for the room */
   icon?: string;
+  /**
+   * Original room ID from the vacuum integration, before any deduplication.
+   * For Dreame multi-floor vacuums, each floor reuses room IDs (1, 2, 3...),
+   * so `id` is made unique across floors while `originalId` preserves the
+   * per-floor ID needed for actual vacuum clean commands.
+   */
+  originalId?: number | string;
+  /**
+   * Floor/map name for multi-floor vacuums (e.g. Dreame nested format).
+   * When present, enables the Matter ServiceArea Maps feature so controllers
+   * can group and filter rooms by floor.
+   */
+  mapName?: string;
 }
 
 /**
@@ -113,4 +126,9 @@ export interface VacuumDeviceAttributes {
   segments?: VacuumRoomsData;
   /** Alternative attribute name used by some integrations */
   room_list?: VacuumRoomsData;
+  /**
+   * Xiaomi Miot / Roborock room mapping: [[segmentId, cloudRoomId, roomName], ...]
+   * Example: [[16, "152001108957", "Kitchen"], [17, "152001108956", "Bedroom"]]
+   */
+  room_mapping?: unknown[];
 }

@@ -4,7 +4,10 @@ import {
 } from "@home-assistant-matter-hub/common";
 import type { EndpointType } from "@matter/main";
 import type { FanControl } from "@matter/main/clusters";
-import { FanDevice as Device } from "@matter/main/devices";
+import {
+  FanDevice as Device,
+  OnOffPlugInUnitDevice,
+} from "@matter/main/devices";
 import { EntityStateProvider } from "../../../../services/bridges/entity-state-provider.js";
 import type { FeatureSelection } from "../../../../utils/feature-selection.js";
 import { testBit } from "../../../../utils/test-bit.js";
@@ -63,6 +66,27 @@ export function FanDevice(
   const presetModes = attributes.preset_modes ?? [];
   // Filter out "Auto" from presets for speed calculation
   const speedPresets = presetModes.filter((m) => m.toLowerCase() !== "auto");
+
+  // On/off-only fan: no speed control and no speed-capable preset modes.
+  // Use OnOffPlugInUnitDevice to avoid controllers showing percentage/speed
+  // controls from the FanControl cluster's mandatory percentSetting attribute.
+  if (!hasSetSpeed && speedPresets.length === 0) {
+    const onOffDevice = hasBattery
+      ? OnOffPlugInUnitDevice.with(
+          IdentifyServer,
+          BasicInformationServer,
+          HomeAssistantEntityBehavior,
+          FanOnOffServer,
+          FanPowerSourceServer,
+        )
+      : OnOffPlugInUnitDevice.with(
+          IdentifyServer,
+          BasicInformationServer,
+          HomeAssistantEntityBehavior,
+          FanOnOffServer,
+        );
+    return onOffDevice.set({ homeAssistantEntity });
+  }
 
   const features: FeatureSelection<FanControl.Cluster> = new Set();
 

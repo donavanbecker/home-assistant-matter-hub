@@ -1,5 +1,8 @@
 import type { HomeAssistantEntityInformation } from "@home-assistant-matter-hub/common";
-import { RvcRunModeServer as Base } from "@matter/main/behaviors";
+import {
+  RvcRunModeServer as Base,
+  ServiceAreaBehavior,
+} from "@matter/main/behaviors";
 import { ModeBase } from "@matter/main/clusters/mode-base";
 import { RvcRunMode } from "@matter/main/clusters/rvc-run-mode";
 import { applyPatchState } from "../../utils/apply-patch-state.js";
@@ -71,15 +74,43 @@ class RvcRunModeServerBase extends Base {
     const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
     const { newMode } = request;
 
-    // Check for room-specific cleaning mode
-    if (isRoomMode(newMode) && this.state.config.cleanRoom) {
-      homeAssistant.callAction(
-        this.state.config.cleanRoom(newMode, this.agent),
-      );
+    // Validate mode exists in supportedModes (matches matter.js base behavior)
+    if (
+      newMode !== this.state.currentMode &&
+      !this.state.supportedModes.some((m) => m.mode === newMode)
+    ) {
       return {
-        status: ModeBase.ModeChangeStatus.Success,
-        statusText: "Starting room cleaning",
+        status: ModeBase.ModeChangeStatus.UnsupportedMode,
+        statusText: `Unsupported mode: ${newMode}`,
       };
+    }
+
+    // Check for room-specific cleaning mode
+    if (isRoomMode(newMode)) {
+      // When selectedAreas exist (e.g. Apple Home sends selectAreas before
+      // changeToMode), prefer area-based cleaning over mode-based room selection.
+      try {
+        const serviceArea = this.agent.get(ServiceAreaBehavior);
+        if (serviceArea.state.selectedAreas?.length > 0) {
+          homeAssistant.callAction(this.state.config.start(void 0, this.agent));
+          return {
+            status: ModeBase.ModeChangeStatus.Success,
+            statusText: "Starting room cleaning",
+          };
+        }
+      } catch {
+        // ServiceArea not available, fall through to mode-based room cleaning
+      }
+
+      if (this.state.config.cleanRoom) {
+        homeAssistant.callAction(
+          this.state.config.cleanRoom(newMode, this.agent),
+        );
+        return {
+          status: ModeBase.ModeChangeStatus.Success,
+          statusText: "Starting room cleaning",
+        };
+      }
     }
 
     switch (newMode) {

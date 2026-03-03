@@ -1,5 +1,5 @@
 import BackupIcon from "@mui/icons-material/Backup";
-import CloudDownloadIcon from "@mui/icons-material/CloudDownload";
+
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import RestoreIcon from "@mui/icons-material/Restore";
 import SecurityIcon from "@mui/icons-material/Security";
@@ -256,7 +256,7 @@ export function BackupRestore() {
               }}
             >
               <Box display="flex" alignItems="center" gap={1} mb={1}>
-                <CloudDownloadIcon color="primary" />
+                <BackupIcon color="primary" />
                 <Typography variant="subtitle1" fontWeight="bold">
                   Config Backup
                 </Typography>
@@ -275,7 +275,7 @@ export function BackupRestore() {
                   loading ? (
                     <CircularProgress size={20} color="inherit" />
                   ) : (
-                    <CloudDownloadIcon />
+                    <BackupIcon />
                   )
                 }
                 onClick={() => handleDownloadBackup(false)}

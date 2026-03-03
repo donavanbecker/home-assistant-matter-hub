@@ -56,7 +56,11 @@ export class SpeakerLevelControlServerBase extends FeaturedBase {
     }
   }
 
-  public update({ state }: HomeAssistantEntityInformation) {
+  public update(entity: HomeAssistantEntityInformation) {
+    if (!entity.state) {
+      return;
+    }
+    const { state } = entity;
     const config = this.state.config;
 
     // For speakers, use 0-254 range (Google Home calculates: currentLevel / 254 * 100)
@@ -141,6 +145,8 @@ export class SpeakerLevelControlServerBase extends FeaturedBase {
     if (levelPercent === current) {
       return;
     }
+    // Update currentLevel immediately so controllers get instant feedback.
+    this.state.currentLevel = level;
     homeAssistant.callAction(
       config.moveToLevelPercent(levelPercent, this.agent),
     );

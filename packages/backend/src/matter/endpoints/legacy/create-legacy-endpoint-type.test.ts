@@ -83,6 +83,11 @@ const testEntities: Record<
   ],
   [HomeAssistantDomain.fan]: [
     createEntity<FanDeviceAttributes>("fan.f1", "on"),
+    createEntity<FanDeviceAttributes>("fan.f2", "on", {
+      supported_features: 1, // SET_SPEED
+      percentage: 50,
+      percentage_step: 33.33,
+    }),
   ],
   [HomeAssistantDomain.light]: [
     createEntity<LightDeviceAttributes>("light.l1", "on"),
@@ -109,7 +114,11 @@ const testEntities: Record<
       ],
     }),
   ],
-  [HomeAssistantDomain.lock]: [createEntity("lock.l1", "locked")],
+  [HomeAssistantDomain.lock]: [
+    createEntity("lock.l1", "locked"),
+    // Lock with OPEN feature (unlatch/unbolt support)
+    createEntity("lock.l2", "locked", { supported_features: 1 }),
+  ],
   [HomeAssistantDomain.sensor]: [
     createEntity<SensorDeviceAttributes>("sensor.s1", "20", {
       device_class: SensorDeviceClass.temperature,
@@ -154,11 +163,30 @@ const testEntities: Record<
       current_humidity: 45,
     }),
   ],
+  [HomeAssistantDomain.event]: [
+    createEntity("event.doorbell_press", "2024-01-01T00:00:00", {
+      device_class: "doorbell",
+      event_types: ["press", "double_press"],
+      event_type: "press",
+    }),
+  ],
   [HomeAssistantDomain.valve]: [createEntity("valve.v1", "open")],
   [HomeAssistantDomain.alarm_control_panel]: [
-    createEntity("alarm_control_panel.a1", "armed_away"),
+    createEntity("alarm_control_panel.a1", "armed_away", {
+      supported_features: 3, // ARM_HOME + ARM_AWAY
+    }),
   ],
   [HomeAssistantDomain.remote]: [createEntity("remote.r1", "on")],
+  [HomeAssistantDomain.select]: [
+    createEntity("select.mode1", "option_a", {
+      options: ["option_a", "option_b", "option_c"],
+    }),
+  ],
+  [HomeAssistantDomain.input_select]: [
+    createEntity("input_select.is1", "choice_1", {
+      options: ["choice_1", "choice_2", "choice_3"],
+    }),
+  ],
   [HomeAssistantDomain.water_heater]: [
     createEntity<WaterHeaterDeviceAttributes>("water_heater.wh1", "off", {
       min_temp: 30,

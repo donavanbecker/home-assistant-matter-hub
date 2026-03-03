@@ -13,6 +13,13 @@ function formatRoomName(name: string): string {
 }
 
 /**
+ * Counter for generating unique floor-based offsets when parsing
+ * Dreame multi-floor nested room data. Each floor's rooms get offset
+ * by floorCounter * 10000 to avoid areaId collisions across floors.
+ */
+let floorCounter = 0;
+
+/**
  * Parse a single room data source into VacuumRoom array.
  * Handles multiple formats:
  * - Direct array: [{ id: 1, name: "Kitchen" }, ...]
@@ -72,6 +79,17 @@ function parseRoomData(roomsData: unknown): VacuumRoom[] {
           "id" in value[0]
         ) {
           const nestedRooms = parseRoomData(value);
+          // Make IDs unique across floors by offsetting with floor index.
+          // Each floor's room IDs restart from 1, so without offset
+          // rooms from different floors collide (e.g. areaId 1 on 3 floors).
+          const floorIndex = floorCounter++;
+          for (const room of nestedRooms) {
+            room.mapName = key;
+            if (typeof room.id === "number") {
+              room.originalId = room.id;
+              room.id = floorIndex * 10000 + room.id;
+            }
+          }
           rooms.push(...nestedRooms);
         }
         // Ecovacs format 2: array of numeric IDs { bedroom: [1, 3], ... }
@@ -93,6 +111,34 @@ function parseRoomData(roomsData: unknown): VacuumRoom[] {
   }
 
   return [];
+}
+
+/**
+ * Parse Xiaomi Miot / Roborock room_mapping format.
+ * Format: [[segmentId, cloudRoomId, roomName], ...]
+ * Example: [[16, "152001108957", "Kitchen"], [17, "152001108956", "Bedroom"]]
+ */
+function parseRoomMapping(mapping: unknown): VacuumRoom[] {
+  if (!Array.isArray(mapping)) return [];
+
+  return mapping
+    .filter((entry): entry is unknown[] => {
+      return (
+        Array.isArray(entry) &&
+        entry.length >= 3 &&
+        (typeof entry[0] === "number" || typeof entry[0] === "string") &&
+        typeof entry[2] === "string"
+      );
+    })
+    .map((entry) => {
+      const rawId = entry[0];
+      const id =
+        typeof rawId === "string" ? Number.parseInt(rawId, 10) || rawId : rawId;
+      return {
+        id: id as number | string,
+        name: entry[2] as string,
+      };
+    });
 }
 
 /**
@@ -130,6 +176,9 @@ export function parseVacuumRooms(
   attributes: VacuumDeviceAttributes,
   includeUnnamedRooms = false,
 ): VacuumRoom[] {
+  // Reset floor counter for each parse call (avoids accumulating offsets across restarts/updates)
+  floorCounter = 0;
+
   // Try each attribute source in order, return first one with valid rooms
   // This ensures that if 'rooms' exists but has no valid data, we still check 'segments'
   const sources = [attributes.rooms, attributes.segments, attributes.room_list];
@@ -145,12 +194,21 @@ export function parseVacuumRooms(
     }
   }
 
+  // Try room_mapping (Xiaomi Miot / Roborock format: [[segmentId, cloudId, name], ...])
+  let mappingRooms = parseRoomMapping(attributes.room_mapping);
+  if (mappingRooms.length > 0) {
+    if (!includeUnnamedRooms) {
+      mappingRooms = mappingRooms.filter((room) => !isUnnamedRoom(room.name));
+    }
+    return mappingRooms;
+  }
+
   return [];
 }
 
 /**
  * Base mode value for room-specific cleaning modes.
- * Room modes start at 100 to avoid conflicts with standard modes (Idle=0, Cleaning=1).
+ * Room modes start at 100 to avoid conflicts with standard modes (Idle=1, Cleaning=2).
  */
 export const ROOM_MODE_BASE = 100;
 
@@ -204,6 +262,39 @@ export function getRoomIdFromMode(mode: number): number {
 }
 
 /**
+ * Detect if the vacuum uses Xiaomi Miot Auto or xiaomi_miio integration format.
+ * These vacuums store rooms as a flat array of { id, name } objects and are the
+ * only ones supporting the `app_segment_clean` command via `vacuum.send_command`.
+ *
+ * This distinguishes them from Ecovacs (dict format), Dreame (nested dict), etc.
+ */
+export function isXiaomiMiotVacuum(
+  attributes: VacuumDeviceAttributes,
+): boolean {
+  // Roborock / Xiaomi Miot vacuums with room_mapping attribute
+  if (
+    Array.isArray(attributes.room_mapping) &&
+    attributes.room_mapping.length > 0
+  ) {
+    return true;
+  }
+
+  const sources = [attributes.rooms, attributes.segments, attributes.room_list];
+  for (const source of sources) {
+    if (
+      Array.isArray(source) &&
+      source.length > 0 &&
+      typeof source[0] === "object" &&
+      source[0] !== null &&
+      "id" in source[0]
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Detect if the vacuum uses Dreame integration format.
  * Dreame vacuums have rooms nested under a map name key: { "Map Name": [rooms...] }
  * This is different from Roborock/Xiaomi which use flat arrays or simple objects.
@@ -221,4 +312,51 @@ export function isDreameVacuum(attributes: VacuumDeviceAttributes): boolean {
     }
   }
   return false;
+}
+
+/**
+ * Detect if the vacuum uses the Roborock integration format.
+ * Rooms resolved via roborock.get_maps have format: { "16": "Kitchen", "17": "Bedroom" }
+ * Keys are numeric segment IDs (as strings), values are room names.
+ * Room cleaning uses vacuum.send_command with app_segment_clean.
+ */
+export function isRoborockVacuum(attributes: VacuumDeviceAttributes): boolean {
+  const roomsData = attributes.rooms;
+  if (!roomsData || typeof roomsData !== "object" || Array.isArray(roomsData)) {
+    return false;
+  }
+
+  const entries = Object.entries(roomsData);
+  if (entries.length === 0) return false;
+
+  // Roborock format: numeric string keys, string values (room names)
+  return entries.every(
+    ([key, value]) => /^\d+$/.test(key) && typeof value === "string",
+  );
+}
+
+/**
+ * Detect if the vacuum uses the Ecovacs/Deebot integration format.
+ * Ecovacs vacuums store rooms as a flat dict of { room_name: numeric_id }:
+ *   { flur: 0, wohnzimmer: 8, esszimmer: 9, kuche: 1, ... }
+ *
+ * Room cleaning uses `vacuum.send_command` with `spot_area` command:
+ *   { command: "spot_area", params: { mapID: 0, cleanings: 1, rooms: "8,1,6" } }
+ *
+ * This is distinct from Dreame (nested arrays) and Xiaomi Miot (flat array of {id,name}).
+ */
+export function isEcovacsVacuum(attributes: VacuumDeviceAttributes): boolean {
+  const roomsData = attributes.rooms;
+  if (!roomsData || typeof roomsData !== "object" || Array.isArray(roomsData)) {
+    return false;
+  }
+
+  // Ecovacs format: all values are plain numbers (room IDs), keys are room names
+  // This excludes Dreame (values are arrays) and simple id:name objects (keys are numeric)
+  const entries = Object.entries(roomsData);
+  if (entries.length === 0) return false;
+
+  return entries.every(
+    ([key, value]) => typeof value === "number" && !/^\d+$/.test(key),
+  );
 }

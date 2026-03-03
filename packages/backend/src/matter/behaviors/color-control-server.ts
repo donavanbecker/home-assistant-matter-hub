@@ -31,6 +31,7 @@ const FeaturedBase = Base.with("ColorTemperature", "HueSaturation");
 
 export class ColorControlServerBase extends FeaturedBase {
   declare state: ColorControlServerBase.State;
+  private pendingTransitionTime: number | undefined;
 
   override async initialize() {
     // CRITICAL: Set default values BEFORE super.initialize() to prevent validation errors.
@@ -193,6 +194,13 @@ export class ColorControlServerBase extends FeaturedBase {
     });
   }
 
+  override moveToColorTemperature(
+    request: ColorControl.MoveToColorTemperatureRequest,
+  ) {
+    this.pendingTransitionTime = request.transitionTime;
+    return super.moveToColorTemperature(request);
+  }
+
   override moveToColorTemperatureLogic(targetMireds: number) {
     const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
     const current = homeAssistant.entity.state;
@@ -207,6 +215,13 @@ export class ColorControlServerBase extends FeaturedBase {
     }
 
     const action = this.state.config.setTemperature(targetKelvin, this.agent);
+    this.applyTransition(action);
+    // Update state immediately so controllers get instant feedback
+    // in the command response, matching the OnOffServer pattern.
+    applyPatchState(this.state, {
+      colorTemperatureMireds: targetMireds,
+      colorMode: ColorControl.ColorMode.ColorTemperatureMireds,
+    });
     homeAssistant.callAction(action);
   }
 
@@ -216,6 +231,13 @@ export class ColorControlServerBase extends FeaturedBase {
 
   override moveToSaturationLogic(targetSaturation: number) {
     this.moveToHueAndSaturationLogic(this.state.currentHue, targetSaturation);
+  }
+
+  override moveToHueAndSaturation(
+    request: ColorControl.MoveToHueAndSaturationRequest,
+  ) {
+    this.pendingTransitionTime = request.transitionTime;
+    return super.moveToHueAndSaturation(request);
   }
 
   override moveToHueAndSaturationLogic(
@@ -235,7 +257,23 @@ export class ColorControlServerBase extends FeaturedBase {
     }
     const color = ColorConverter.fromMatterHS(targetHue, targetSaturation);
     const action = this.state.config.setColor(color, this.agent);
+    this.applyTransition(action);
+    // Update state immediately so controllers get instant feedback
+    // in the command response, matching the OnOffServer pattern.
+    applyPatchState(this.state, {
+      currentHue: targetHue,
+      currentSaturation: targetSaturation,
+      colorMode: ColorControl.ColorMode.CurrentHueAndCurrentSaturation,
+    });
     homeAssistant.callAction(action);
+  }
+
+  private applyTransition(action: { data?: object }) {
+    const tenths = this.pendingTransitionTime;
+    this.pendingTransitionTime = undefined;
+    if (tenths && tenths > 0) {
+      action.data = { ...action.data, transition: tenths / 10 };
+    }
   }
 
   private getColorModeFromFeatures(mode: ColorControlMode | undefined) {

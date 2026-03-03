@@ -63,22 +63,29 @@ A include- or exclude-item is an object having a `type` and a `value` property.
 | `regex` | Regular expression matching entity IDs. Full regex support. | `^light\.(kitchen\|bedroom)_.*` |
 | `domain` | Match entities by their domain (the part before the dot). | `light`, `switch`, `sensor` |
 | `platform` | Match entities by their integration/platform. | `hue`, `zwave`, `mqtt` |
-| `label` | Match entities by their label slug. | `voice_control` |
+| `entity_label` | Match entities by their label. Accepts display name or slug. Only checks entity-level labels. | `Voice Control` |
+| `device_label` | Match entities by their parent device's label. All entities of that device match. | `smart_home` |
 | `area` | Match entities by their area slug. | `living_room` |
 | `entity_category` | Match entities by their category. | `config`, `diagnostic` |
-| `device_name` | Match entities by their device name (case-insensitive, supports wildcards). | `Living Room*` |
+| `device_name` | Match entities by their device name (case-insensitive, wildcards). | `Living Room*` |
+| `product_name` | Match entities by their product/model name (case-insensitive, wildcards). | `Hue Color Bulb` |
+| `device_class` | Match entities by their device class attribute. | `temperature`, `motion` |
+
+> [!NOTE]
+> The dropdown in the web UI now shows **tooltips** with detailed descriptions when hovering over each filter type.
+
+> [!WARNING]
+> The old `label` filter type is **deprecated** — use `entity_label` or `device_label` instead for clarity.
 
 ### Pattern vs Regex
 
 **Pattern** uses simple wildcard matching:
 - `*` matches any characters (zero or more)
-- All other characters are matched literally
-- Example: `light.living_room_*` matches `light.living_room_lamp`, `light.living_room_ceiling`
+- Example: `light.living_room_*` matches `light.living_room_lamp`
 
 **Regex** uses full JavaScript regular expressions:
-- More powerful and flexible
-- Can match complex patterns
-- Example: `^(light|switch)\.kitchen_.*` matches all lights and switches in the kitchen
+- More powerful for complex patterns
+- Example: `^(light|switch)\.kitchen_.*` matches kitchen lights and switches
 
 ### Device Name Filter
 
@@ -88,12 +95,35 @@ The `device_name` filter matches against the device's name (not the entity ID):
 - Matches against: user-defined name → device name → default name
 - Example: `*Philips*` matches all devices with "Philips" in their name
 
+### Product Name Filter
+
+The `product_name` filter matches against the device's model or product name:
+- Case-insensitive matching
+- Supports `*` wildcard for pattern matching
+- Matches against: model → default model
+- Example: `Hue*Bulb` matches all devices with a model name containing "Hue" and "Bulb"
+
+### Device Class Filter
+
+The `device_class` filter matches against the entity's `device_class` attribute:
+- Exact match (case-sensitive)
+- Common device classes: `temperature`, `humidity`, `motion`, `door`, `window`, `battery`, `power`, `energy`, `illuminance`, `pressure`
+- Example: `temperature` matches all entities with `device_class: temperature`
+
 The `value` property is a string containing the corresponding value. You can add multiple include or exclude rules which
 are then combined.
 All entities which match one of the include-rules will be included, but all entities which match one of the exclude
 rules will be excluded.
 
-Labels have to be applied at an entity level, not under device.
+Labels can be applied at the entity level or at the device level:
+- Use `entity_label` to match labels assigned directly to entities
+- Use `device_label` to match labels assigned to the parent device (all entities of that device will match)
+- The old `label` type still works but only matches entity labels — use the new types for explicit control
+
+You can use either the **display name** (e.g. `My Smart Lights`) or the **slug** (e.g. `my_smart_lights`) as the filter value. The display name is automatically resolved to the correct slug.
+
+> [!TIP]
+> Use the **Filter Reference** page in the web UI to browse all available filter values (domains, platforms, entity categories, device classes, device names, product names, labels, and areas) with click-to-copy functionality.
 
 > [!WARNING]
 > When performing changes on entities, like adding or removing a label, you need to refresh the matter-hub application
@@ -230,19 +260,44 @@ This configuration:
 - **Includes**: All entities in the "living_room" area, entities with the "voice_control" label, and all lights starting with "guest_"
 - **Excludes**: Diagnostic and config entities, any entity ending with "_battery", and any device with "Test" in its name
 
+## Feature Flags
+
+Feature flags control advanced behavior of the bridge. Configure them in the **Bridge Settings → Feature Flags** section of the web UI.
+
+> [!WARNING]
+> **autoComposedDevices is a BREAKING CHANGE**: Enabling this flag changes the Matter endpoint structure for temperature sensors with auto-mapped humidity/pressure. Controllers will see these as **new devices** and you'll need to re-assign rooms, routines, and voice aliases. Only enable for new bridges or be prepared to reconfigure.
+
+| Feature Flag | Description | Default |
+|--------------|-------------|---------|
+| `autoComposedDevices` | Master toggle: combines related entities (battery, humidity, pressure, power, energy) into single Matter endpoints. **WARNING: Breaking change - see above.** | `false` |
+| `autoBatteryMapping` | Automatically combines battery sensors with their parent device | `false` |
+| `autoHumidityMapping` | Automatically combines humidity sensors with temperature sensors | `true` |
+| `autoPressureMapping` | Automatically combines pressure sensors with temperature sensors | `true` |
+| `autoForceSync` | Periodically push all device states to controllers every 90 seconds. Enable if devices get out of sync. | `false` |
+| `coverSwapOpenClose` | Swap open/close commands for covers (fixes reversed Alexa commands) | `false` |
+| `coverDoNotInvertPercentage` | Skip percentage inversion for covers (not Matter-compliant) | `false` |
+| `coverUseHomeAssistantPercentage` | Use HA percentages directly (Alexa-friendly) | `false` |
+| `includeHiddenEntities` | Include entities marked as hidden in Home Assistant | `false` |
+| `serverMode` | Expose device as standalone Matter device (required for Robot Vacuums with Apple Home/Alexa). Only ONE device per bridge! | `false` |
+
 ## Issues with labels
+
+> [!NOTE]
+>
+> You can use the label's **display name** (as shown in Home Assistant) directly as the filter value.
+> For example, if your label is called "My Smart Lights", you can enter `My Smart Lights` as the value — it will be resolved automatically.
+>
+> If you prefer, you can still use the **slug** (e.g. `my_smart_lights`). Slugs are always lowercase and use underscores instead of spaces.
 
 > [!WARNING]
 >
-> - Labels and areas in Home Assistant are technically represented by their "slugs".
-> - Slugs are technical identifiers used in the background.
-> - Slugs are always lowercase and only allow a-z and underscores, so everything else will be replaced with an `underscore`.
-> - Even when renaming a label or area, the slug doesn't change. Never.
+> - If you renamed a label in Home Assistant, the slug does **not** change. In that case, use the current display name or the original slug.
+> - Areas work differently — they still require the slug (e.g. `living_room`, not `Living Room`).
 >
-> You can retrieve the slug using the following templates in Home Assistant:
+> You can retrieve slugs using the following templates in Home Assistant:
 >
 > - `{{ labels() }}` - returns all labels
 > - `{{ labels("light.my_entity") }}` - returns the labels of a specific entity
 > - `{{ areas() }}` - returns all areas
 
-If you can’t get it working with your labels, you can delete your label and re-create it.
+If you can't get it working with your labels, you can delete your label and re-create it.

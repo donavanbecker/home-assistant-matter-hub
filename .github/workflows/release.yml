@@ -44,10 +44,16 @@ jobs:
         run: pnpm run lint
       - name: Test
         run: pnpm run test
+
+      - name: Prepare Manual Version
+        if: github.event.inputs.version != ''
+        run: pnpm run release:version ${{ github.event.inputs.version }}
+
       - name: Build
         run: pnpm run build
         env:
           BASE_URL: /home-assistant-matter-hub
+          APP_VERSION: ${{ github.event.inputs.version || '' }}
 
       - name: Release
         env:
@@ -147,8 +153,46 @@ jobs:
           push: true
           channel: ${{ needs.release.outputs.release-channel }}
           dockerfile: ${{ matrix.dockerfile }}
-          node-version: ${{ needs.release.outputs.node-version }}
           package-version: ${{ needs.release.outputs.release-version }}
+
+  npm-publish:
+    name: "Publish to npm"
+    runs-on: ubuntu-latest
+    needs: [release]
+    if: needs.release.outputs.release-version != ''
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-node
+
+      - name: Download Package
+        uses: actions/download-artifact@v6
+        with:
+          name: package.tgz
+          path: apps/home-assistant-matter-hub/
+          merge-multiple: true
+
+      - name: Repack as @riddix/hamh
+        run: |
+          cd apps/home-assistant-matter-hub
+          mkdir -p repack && tar xzf package.tgz -C repack
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('repack/package/package.json','utf8'));
+            pkg.name = '@riddix/hamh';
+            pkg.repository = 'github:RiDDiX/home-assistant-matter-hub';
+            fs.writeFileSync('repack/package/package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          cd repack && tar czf ../package-npm.tgz package && cd ..
+          rm -rf repack
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm publish apps/home-assistant-matter-hub/package-npm.tgz --provenance --no-git-checks --access public --tag ${{ needs.release.outputs.release-channel }}
 
   publish-pages:
     name: "Publish Documentation"

@@ -1,11 +1,16 @@
 import type {
   HomeAssistantDeviceRegistry,
   HomeAssistantEntityRegistry,
+  HomeAssistantEntityState,
   HomeAssistantFilter,
   SensorDeviceAttributes,
+  VacuumRoom,
 } from "@home-assistant-matter-hub/common";
 import { SensorDeviceClass } from "@home-assistant-matter-hub/common";
+import { Logger } from "@matter/general";
+import { callService } from "home-assistant-js-websocket";
 import { keys, pickBy, values } from "lodash-es";
+import type { HomeAssistantClient } from "../home-assistant/home-assistant-client.js";
 import type {
   HomeAssistantDevices,
   HomeAssistantEntities,
@@ -31,8 +36,18 @@ export class BridgeRegistry {
 
   // Track battery entities that have been auto-assigned to other devices
   private _usedBatteryEntities: Set<string> = new Set();
+  // Cache for battery entity lookups (deviceId -> entityId or null)
+  private _batteryEntityCache: Map<string, string | null> = new Map();
   // Track humidity entities that have been auto-assigned to temperature sensors
   private _usedHumidityEntities: Set<string> = new Set();
+  // Track pressure entities that have been auto-assigned to temperature sensors
+  private _usedPressureEntities: Set<string> = new Set();
+  // Track power entities that have been auto-assigned to switch/plug entities
+  private _usedPowerEntities: Set<string> = new Set();
+  // Track energy entities that have been auto-assigned to switch/plug entities
+  private _usedEnergyEntities: Set<string> = new Set();
+  // Track entities consumed by composed devices (e.g., sensors/climate grouped under air purifier)
+  private _usedComposedSubEntities: Set<string> = new Set();
 
   deviceOf(entityId: string): HomeAssistantDeviceRegistry {
     const entity = this._entities[entityId];
@@ -97,22 +112,35 @@ export class BridgeRegistry {
    * Returns the entity_id of the battery sensor, or undefined if none found.
    */
   findBatteryEntityForDevice(deviceId: string): string | undefined {
+    // Check cache first
+    if (this._batteryEntityCache.has(deviceId)) {
+      const cached = this._batteryEntityCache.get(deviceId);
+      return cached === null ? undefined : cached;
+    }
+
     // Search the FULL HA registry, not the filtered bridge entities.
     // The battery sensor might not match the bridge filter (e.g., vacuum
     // server bridges only include vacuum.* entities, not sensor.*).
     const entities = values(this.registry.entities);
-    for (const entity of entities) {
-      if (entity.device_id !== deviceId) continue;
+    const sameDevice = entities.filter((e) => e.device_id === deviceId);
+
+    for (const entity of sameDevice) {
       if (!entity.entity_id.startsWith("sensor.")) continue;
 
       const state = this.registry.states[entity.entity_id];
-      if (!state) continue;
+      if (!state) {
+        continue;
+      }
 
       const attrs = state.attributes as SensorDeviceAttributes;
       if (attrs.device_class === SensorDeviceClass.battery) {
+        // Cache the result
+        this._batteryEntityCache.set(deviceId, entity.entity_id);
         return entity.entity_id;
       }
     }
+    // Cache the negative result
+    this._batteryEntityCache.set(deviceId, null);
     return undefined;
   }
 
@@ -134,7 +162,22 @@ export class BridgeRegistry {
    * Check if auto battery mapping is enabled for this bridge.
    */
   isAutoBatteryMappingEnabled(): boolean {
-    return this.dataProvider.featureFlags?.autoBatteryMapping === true;
+    return (
+      this.dataProvider.featureFlags?.autoBatteryMapping === true ||
+      this.dataProvider.featureFlags?.autoComposedDevices === true
+    );
+  }
+
+  /**
+   * Check if auto composed devices mode is enabled.
+   * When enabled, temperature sensors with auto-mapped humidity/pressure/battery
+   * create real Matter Composed Devices (BridgedNodeEndpoint with sub-endpoints)
+   * instead of adding extra clusters to a flat TemperatureSensor endpoint.
+   * This ensures Apple Home, Google Home, and Alexa properly display
+   * humidity and pressure readings using their correct device types.
+   */
+  isAutoComposedDevicesEnabled(): boolean {
+    return this.dataProvider.featureFlags?.autoComposedDevices === true;
   }
 
   /**
@@ -147,7 +190,10 @@ export class BridgeRegistry {
    * See: https://github.com/RiDDiX/home-assistant-matter-hub/issues/133
    */
   isAutoHumidityMappingEnabled(): boolean {
-    return this.dataProvider.featureFlags?.autoHumidityMapping === true;
+    return (
+      this.dataProvider.featureFlags?.autoHumidityMapping === true ||
+      this.dataProvider.featureFlags?.autoComposedDevices === true
+    );
   }
 
   /**
@@ -174,6 +220,57 @@ export class BridgeRegistry {
   }
 
   /**
+   * Find a temperature sensor entity that belongs to the same HA device.
+   * Returns the entity_id of the temperature sensor, or undefined if none found.
+   */
+  findTemperatureEntityForDevice(deviceId: string): string | undefined {
+    const entities = values(this.registry.entities);
+    for (const entity of entities) {
+      if (entity.device_id !== deviceId) continue;
+      if (!entity.entity_id.startsWith("sensor.")) continue;
+
+      const state = this.registry.states[entity.entity_id];
+      if (!state) continue;
+
+      const attrs = state.attributes as SensorDeviceAttributes;
+      if (attrs.device_class === SensorDeviceClass.temperature) {
+        return entity.entity_id;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Find a climate entity that belongs to the same HA device.
+   * Returns the entity_id of the climate entity, or undefined if none found.
+   */
+  findClimateEntityForDevice(deviceId: string): string | undefined {
+    const entities = values(this.registry.entities);
+    for (const entity of entities) {
+      if (entity.device_id !== deviceId) continue;
+      if (!entity.entity_id.startsWith("climate.")) continue;
+
+      const state = this.registry.states[entity.entity_id];
+      if (state) return entity.entity_id;
+    }
+    return undefined;
+  }
+
+  /**
+   * Mark an entity as consumed by a composed device.
+   */
+  markComposedSubEntityUsed(entityId: string): void {
+    this._usedComposedSubEntities.add(entityId);
+  }
+
+  /**
+   * Check if an entity has been consumed by a composed device.
+   */
+  isComposedSubEntityUsed(entityId: string): boolean {
+    return this._usedComposedSubEntities.has(entityId);
+  }
+
+  /**
    * Mark a humidity entity as used (auto-assigned to a temperature sensor).
    */
   markHumidityEntityUsed(entityId: string): void {
@@ -187,9 +284,328 @@ export class BridgeRegistry {
     return this._usedHumidityEntities.has(entityId);
   }
 
+  /**
+   * Check if auto pressure mapping is enabled for this bridge.
+   * Default: true (enabled by default).
+   * When enabled, pressure sensors on the same device as a temperature sensor
+   * are combined into a single endpoint with PressureMeasurement cluster.
+   */
+  isAutoPressureMappingEnabled(): boolean {
+    return (
+      this.dataProvider.featureFlags?.autoPressureMapping !== false ||
+      this.dataProvider.featureFlags?.autoComposedDevices === true
+    );
+  }
+
+  /**
+   * Check if the vacuum OnOff cluster feature flag is enabled.
+   * Defaults to OFF. OnOff is NOT part of the RoboticVacuumCleaner (0x74) device
+   * type spec. Adding it makes the device non-conformant and causes Amazon Alexa
+   * to reject it entirely (#185, #183). Only enable if a specific controller needs it.
+   */
+  isVacuumOnOffEnabled(): boolean {
+    return this.dataProvider.featureFlags?.vacuumOnOff === true;
+  }
+
+  /**
+   * Check if the vacuum OnOff cluster should be included for server-mode vacuums.
+   * Defaults to OFF. OnOff is NOT part of the RoboticVacuumCleaner (0x74) device
+   * type spec. Adding it makes the device non-conformant and causes Amazon Alexa
+   * to reject it entirely (#185, #183). Apple Home may also render the vacuum
+   * incorrectly (shows "Updating" or switch UI). Only enable via feature flag
+   * if a specific controller requires it.
+   */
+  isServerModeVacuumOnOffEnabled(): boolean {
+    return this.dataProvider.featureFlags?.vacuumOnOff === true;
+  }
+
+  isVacuumMinimalClustersEnabled(): boolean {
+    return this.dataProvider.featureFlags?.vacuumMinimalClusters === true;
+  }
+
+  /**
+   * Auto-detect vacuum-related select entities on the same HA device.
+   * HA integrations (Dreame, Roborock, Ecovacs, Valetudo, etc.) expose vacuum
+   * features as select entities with well-known suffixes. This finds them
+   * automatically so users don't need to configure each entity manually.
+   */
+  findVacuumSelectEntities(deviceId: string): {
+    cleaningModeEntity?: string;
+    suctionLevelEntity?: string;
+    mopIntensityEntity?: string;
+  } {
+    const entities = values(this.registry.entities);
+    const sameDevice = entities.filter(
+      (e) => e.device_id === deviceId && e.entity_id.startsWith("select."),
+    );
+
+    let cleaningModeEntity: string | undefined;
+    let suctionLevelEntity: string | undefined;
+    let mopIntensityEntity: string | undefined;
+
+    for (const entity of sameDevice) {
+      const state = this.registry.states[entity.entity_id];
+      if (!state) continue;
+
+      const id = entity.entity_id.toLowerCase();
+
+      // Cleaning mode: Dreame/Ecovacs use "cleaning_mode", Valetudo uses
+      // plain "_mode" with vacuum-related options (vacuum, mop, etc.).
+      if (!cleaningModeEntity) {
+        if (id.includes("cleaning_mode")) {
+          cleaningModeEntity = entity.entity_id;
+        } else if (id.endsWith("_mode")) {
+          const options = (state.attributes as { options?: string[] })?.options;
+          if (
+            options?.some((o) =>
+              /^(vacuum|mop|sweep|vacuum_and_mop|vacuum_then_mop|mopping|sweeping|sweeping_and_mopping|mopping_after_sweeping)$/i.test(
+                o,
+              ),
+            )
+          ) {
+            cleaningModeEntity = entity.entity_id;
+          }
+        }
+      }
+
+      // Suction level: Dreame/Ecovacs use "suction_level",
+      // Valetudo uses "_fan" (e.g. select.valetudo_broesel_fan).
+      if (
+        !suctionLevelEntity &&
+        (id.includes("suction_level") || id.endsWith("_fan"))
+      ) {
+        suctionLevelEntity = entity.entity_id;
+      }
+
+      // Mop intensity / water level: Dreame uses "mop_intensity" /
+      // "mop_pad_humidity", others use "water_volume" / "water_amount",
+      // Valetudo uses "_water" (e.g. select.valetudo_broesel_water).
+      if (
+        !mopIntensityEntity &&
+        (id.includes("mop_intensity") ||
+          id.includes("mop_pad_humidity") ||
+          id.includes("water_volume") ||
+          id.includes("water_amount") ||
+          id.endsWith("_water"))
+      ) {
+        mopIntensityEntity = entity.entity_id;
+      }
+    }
+
+    return { cleaningModeEntity, suctionLevelEntity, mopIntensityEntity };
+  }
+
+  private static readonly valetudoLogger = Logger.get("ValetudoRooms");
+
+  /**
+   * Find Valetudo map segments from the sensor.*_map_segments entity on the
+   * same HA device. Valetudo exposes room/segment data via MQTT as a sensor
+   * with numeric segment IDs in its attributes.
+   *
+   * Attribute format:
+   * - Unnamed segments: { "1": 1, "2": 2, "4": 4 }
+   * - Named segments:   { "1": "Kitchen", "2": "Living Room" }
+   */
+  findValetudoMapSegments(deviceId: string): VacuumRoom[] {
+    const entities = values(this.registry.entities);
+    const mapSensor = entities.find(
+      (e) =>
+        e.device_id === deviceId &&
+        e.entity_id.startsWith("sensor.") &&
+        e.entity_id.endsWith("_map_segments"),
+    );
+
+    if (!mapSensor) return [];
+
+    const state = this.registry.states[mapSensor.entity_id];
+    if (!state) return [];
+
+    const attrs = state.attributes as Record<string, unknown>;
+    const rooms: VacuumRoom[] = [];
+
+    for (const [key, value] of Object.entries(attrs)) {
+      // Only process numeric keys (segment IDs); skip HA metadata
+      // like icon, friendly_name, unit_of_measurement, etc.
+      if (!/^\d+$/.test(key)) continue;
+
+      const segmentId = Number.parseInt(key, 10);
+      const name = typeof value === "string" ? value : `Segment ${key}`;
+      rooms.push({ id: segmentId, name });
+    }
+
+    if (rooms.length > 0) {
+      BridgeRegistry.valetudoLogger.info(
+        `Found ${rooms.length} Valetudo segments via ${mapSensor.entity_id}`,
+      );
+    }
+    return rooms;
+  }
+
+  private static readonly roborockLogger = Logger.get("RoborockRooms");
+
+  /**
+   * Resolve rooms for a Roborock vacuum by calling roborock.get_maps.
+   * Returns parsed VacuumRoom[] with segment IDs, or empty array if
+   * the service is unavailable or the vacuum is not Roborock.
+   */
+  async resolveRoborockRooms(entityId: string): Promise<VacuumRoom[]> {
+    if (!this.client) return [];
+
+    try {
+      const raw = await callService(
+        this.client.connection,
+        "roborock",
+        "get_maps",
+        undefined,
+        { entity_id: entityId },
+        true,
+      );
+
+      // callService with returnResponse=true returns { context, response: { ... } }
+      const wrapper = raw as Record<string, unknown> | undefined;
+      const responseData =
+        (wrapper?.response as Record<string, unknown>) ?? wrapper;
+
+      const entityData = responseData?.[entityId] as
+        | { maps?: Array<{ rooms?: Record<string, string>; name?: string }> }
+        | undefined;
+
+      if (!entityData?.maps) {
+        BridgeRegistry.roborockLogger.debug(
+          `${entityId}: roborock.get_maps returned no maps (keys: ${Object.keys(responseData ?? {}).join(", ")})`,
+        );
+        return [];
+      }
+
+      const rooms: VacuumRoom[] = [];
+      for (const map of entityData.maps) {
+        if (!map.rooms) continue;
+        for (const [segmentId, roomName] of Object.entries(map.rooms)) {
+          const id = /^\d+$/.test(segmentId)
+            ? Number.parseInt(segmentId, 10)
+            : segmentId;
+          rooms.push({ id, name: roomName });
+        }
+      }
+
+      if (rooms.length > 0) {
+        BridgeRegistry.roborockLogger.info(
+          `${entityId}: Resolved ${rooms.length} rooms via roborock.get_maps`,
+        );
+      }
+      return rooms;
+    } catch (error) {
+      const msg =
+        error instanceof Error
+          ? error.message
+          : typeof error === "object" && error !== null
+            ? JSON.stringify(error)
+            : String(error);
+      BridgeRegistry.roborockLogger.warn(
+        `${entityId}: roborock.get_maps failed: ${msg}`,
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Find a pressure sensor entity that belongs to the same HA device.
+   * Returns the entity_id of the pressure sensor, or undefined if none found.
+   */
+  findPressureEntityForDevice(deviceId: string): string | undefined {
+    const entities = values(this.registry.entities);
+    for (const entity of entities) {
+      if (entity.device_id !== deviceId) continue;
+      if (!entity.entity_id.startsWith("sensor.")) continue;
+
+      const state = this.registry.states[entity.entity_id];
+      if (!state) continue;
+
+      const attrs = state.attributes as SensorDeviceAttributes;
+      if (
+        attrs.device_class === SensorDeviceClass.pressure ||
+        attrs.device_class === SensorDeviceClass.atmospheric_pressure
+      ) {
+        return entity.entity_id;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Mark a pressure entity as used (auto-assigned to a temperature sensor).
+   */
+  markPressureEntityUsed(entityId: string): void {
+    this._usedPressureEntities.add(entityId);
+  }
+
+  /**
+   * Check if a pressure entity has been auto-assigned to a temperature sensor.
+   */
+  isPressureEntityUsed(entityId: string): boolean {
+    return this._usedPressureEntities.has(entityId);
+  }
+
+  /**
+   * Find a power sensor entity (device_class: power) on the same HA device.
+   */
+  findPowerEntityForDevice(deviceId: string): string | undefined {
+    const entities = values(this.registry.entities);
+    for (const entity of entities) {
+      if (entity.device_id !== deviceId) continue;
+      if (!entity.entity_id.startsWith("sensor.")) continue;
+
+      const state = this.registry.states[entity.entity_id];
+      if (!state) continue;
+
+      const attrs = state.attributes as SensorDeviceAttributes;
+      if (attrs.device_class === SensorDeviceClass.power) {
+        return entity.entity_id;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Find an energy sensor entity (device_class: energy) on the same HA device.
+   */
+  findEnergyEntityForDevice(deviceId: string): string | undefined {
+    const entities = values(this.registry.entities);
+    for (const entity of entities) {
+      if (entity.device_id !== deviceId) continue;
+      if (!entity.entity_id.startsWith("sensor.")) continue;
+
+      const state = this.registry.states[entity.entity_id];
+      if (!state) continue;
+
+      const attrs = state.attributes as SensorDeviceAttributes;
+      if (attrs.device_class === SensorDeviceClass.energy) {
+        return entity.entity_id;
+      }
+    }
+    return undefined;
+  }
+
+  markPowerEntityUsed(entityId: string): void {
+    this._usedPowerEntities.add(entityId);
+  }
+
+  isPowerEntityUsed(entityId: string): boolean {
+    return this._usedPowerEntities.has(entityId);
+  }
+
+  markEnergyEntityUsed(entityId: string): void {
+    this._usedEnergyEntities.add(entityId);
+  }
+
+  isEnergyEntityUsed(entityId: string): boolean {
+    return this._usedEnergyEntities.has(entityId);
+  }
+
   constructor(
     private readonly registry: HomeAssistantRegistry,
     private readonly dataProvider: BridgeDataProvider,
+    private readonly client?: HomeAssistantClient,
   ) {
     this.refresh();
   }
@@ -224,6 +640,12 @@ export class BridgeRegistry {
     // Clear used entities on refresh to allow re-assignment
     this._usedBatteryEntities.clear();
     this._usedHumidityEntities.clear();
+    this._usedPressureEntities.clear();
+    this._usedPowerEntities.clear();
+    this._usedEnergyEntities.clear();
+    this._usedComposedSubEntities.clear();
+    // Clear battery lookup cache
+    this._batteryEntityCache.clear();
 
     this._entities = pickBy(this.registry.entities, (entity) => {
       const device = this.registry.devices[entity.device_id];
@@ -242,7 +664,8 @@ export class BridgeRegistry {
       }
 
       // Check filter matching
-      return this.matchesFilter(filter, entity, device);
+      const state = this.registry.states[entity.entity_id];
+      return this.matchesFilter(filter, entity, device, state);
     });
     this._states = pickBy(
       this.registry.states,
@@ -267,17 +690,17 @@ export class BridgeRegistry {
   private preCalculateAutoAssignments(): void {
     const entities = values(this._entities);
 
-    // First pass: Find all temperature sensors and mark their humidity entities
-    if (this.isAutoHumidityMappingEnabled()) {
-      for (const entity of entities) {
-        if (!entity.device_id) continue;
-        if (!entity.entity_id.startsWith("sensor.")) continue;
+    // First pass: Find all temperature sensors and mark their humidity + pressure entities
+    for (const entity of entities) {
+      if (!entity.device_id) continue;
+      if (!entity.entity_id.startsWith("sensor.")) continue;
 
-        const state = this._states[entity.entity_id];
-        if (!state) continue;
+      const state = this._states[entity.entity_id];
+      if (!state) continue;
 
-        const attrs = state.attributes as SensorDeviceAttributes;
-        if (attrs.device_class === SensorDeviceClass.temperature) {
+      const attrs = state.attributes as SensorDeviceAttributes;
+      if (attrs.device_class === SensorDeviceClass.temperature) {
+        if (this.isAutoHumidityMappingEnabled()) {
           const humidityEntityId = this.findHumidityEntityForDevice(
             entity.device_id,
           );
@@ -285,10 +708,39 @@ export class BridgeRegistry {
             this._usedHumidityEntities.add(humidityEntityId);
           }
         }
+        if (this.isAutoPressureMappingEnabled()) {
+          const pressureEntityId = this.findPressureEntityForDevice(
+            entity.device_id,
+          );
+          if (pressureEntityId && pressureEntityId !== entity.entity_id) {
+            this._usedPressureEntities.add(pressureEntityId);
+          }
+        }
       }
     }
 
-    // Second pass: Find all "main" entities and mark their battery entities
+    // Second pass: Find power and energy entities for switch/light entities
+    for (const entity of entities) {
+      if (!entity.device_id) continue;
+      const domain = entity.entity_id.split(".")[0];
+      if (domain !== "switch" && domain !== "light") continue;
+
+      const powerEntityId = this.findPowerEntityForDevice(entity.device_id);
+      if (powerEntityId && powerEntityId !== entity.entity_id) {
+        if (!this._usedPowerEntities.has(powerEntityId)) {
+          this._usedPowerEntities.add(powerEntityId);
+        }
+      }
+
+      const energyEntityId = this.findEnergyEntityForDevice(entity.device_id);
+      if (energyEntityId && energyEntityId !== entity.entity_id) {
+        if (!this._usedEnergyEntities.has(energyEntityId)) {
+          this._usedEnergyEntities.add(energyEntityId);
+        }
+      }
+    }
+
+    // Third pass: Find all "main" entities and mark their battery entities
     // A "main" entity is any entity that is NOT already marked as used
     if (this.isAutoBatteryMappingEnabled()) {
       for (const entity of entities) {
@@ -323,16 +775,25 @@ export class BridgeRegistry {
     filter: HomeAssistantFilter,
     entity: HomeAssistantEntityRegistry,
     device: HomeAssistantDeviceRegistry,
+    entityState?: HomeAssistantEntityState,
   ) {
+    const labels = this.registry.labels;
     if (
       filter.include.length > 0 &&
-      !testMatchers(filter.include, device, entity, filter.includeMode)
+      !testMatchers(
+        filter.include,
+        device,
+        entity,
+        filter.includeMode,
+        entityState,
+        labels,
+      )
     ) {
       return false;
     }
     if (
       filter.exclude.length > 0 &&
-      testMatchers(filter.exclude, device, entity)
+      testMatchers(filter.exclude, device, entity, "any", entityState, labels)
     ) {
       return false;
     }

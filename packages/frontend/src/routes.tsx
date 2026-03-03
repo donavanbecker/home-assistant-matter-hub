@@ -1,7 +1,8 @@
-import { Navigate, type RouteObject } from "react-router";
+import type { RouteObject } from "react-router";
 import { AppPage } from "./pages/AppPage.tsx";
 import { BridgeDetailsPage } from "./pages/bridge-details/BridgeDetailsPage.tsx";
 import { BridgesPage } from "./pages/bridges/BridgesPage.tsx";
+import { DashboardPage } from "./pages/dashboard/DashboardPage.tsx";
 import { DevicesPage } from "./pages/devices/DevicesPage.tsx";
 import { CreateBridgePage } from "./pages/edit-bridge/CreateBridgePage.tsx";
 import { EditBridgePage } from "./pages/edit-bridge/EditBridgePage.tsx";
@@ -9,10 +10,12 @@ import { HealthPage } from "./pages/health/HealthPage.tsx";
 import { LabelsPage } from "./pages/labels/LabelsPage.tsx";
 import { LockCredentialsPage } from "./pages/lock-credentials/LockCredentialsPage.tsx";
 import { NetworkMapPage } from "./pages/network-map/NetworkMapPage.tsx";
+import { SettingsPage } from "./pages/settings/SettingsPage.tsx";
 import { StartupPage } from "./pages/startup/StartupPage.tsx";
 
 const documentationUrl = "https://riddix.github.io/home-assistant-matter-hub";
 export const navigation = {
+  dashboard: "/",
   bridges: "/bridges",
   bridge: (bridgeId: string) => `/bridges/${bridgeId}`,
   createBridge: "/bridges/create",
@@ -22,6 +25,7 @@ export const navigation = {
   health: "/health",
   labels: "/labels",
   lockCredentials: "/lock-credentials",
+  settings: "/settings",
   startup: "/startup",
 
   githubRepository: "https://github.com/riddix/home-assistant-matter-hub/",
@@ -39,7 +43,7 @@ export const routes: RouteObject[] = [
     children: [
       {
         path: "",
-        element: <Navigate to={navigation.bridges} replace={true} />,
+        element: <DashboardPage />,
       },
       { path: navigation.bridges, element: <BridgesPage /> },
       { path: navigation.createBridge, element: <CreateBridgePage /> },
@@ -50,6 +54,7 @@ export const routes: RouteObject[] = [
       { path: navigation.health, element: <HealthPage /> },
       { path: navigation.labels, element: <LabelsPage /> },
       { path: navigation.lockCredentials, element: <LockCredentialsPage /> },
+      { path: navigation.settings, element: <SettingsPage /> },
       { path: navigation.startup, element: <StartupPage /> },
     ],
   },

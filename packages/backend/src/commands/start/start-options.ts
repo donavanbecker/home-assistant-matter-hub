@@ -11,4 +11,5 @@ export interface StartOptions {
   "home-assistant-refresh-interval": number;
   "http-auth-username": string | undefined;
   "http-auth-password": string | undefined;
+  "http-base-path": string | undefined;
 }

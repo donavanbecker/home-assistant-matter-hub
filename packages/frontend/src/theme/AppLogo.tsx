@@ -12,7 +12,7 @@ export const AppLogo = (props: { large: boolean }) => {
   return (
     <Box
       component={Link}
-      to={navigation.bridges}
+      to={navigation.dashboard}
       sx={{
         display: "flex",
         alignItems: "center",

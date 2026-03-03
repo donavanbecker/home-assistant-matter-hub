@@ -33,8 +33,14 @@ export function matterApi(
     if (!isValid) {
       res.status(400).json(ajv.errors);
     } else {
-      const bridge = await bridgeService.create(body);
-      res.status(200).json(bridge.data);
+      try {
+        const bridge = await bridgeService.create(body);
+        res.status(200).json(bridge.data);
+      } catch (e) {
+        res.status(500).json({
+          error: e instanceof Error ? e.message : "Unknown error",
+        });
+      }
     }
   });
 
@@ -78,95 +84,235 @@ export function matterApi(
     } else if (bridgeId !== body.id) {
       res.status(400).send("Path variable `bridgeId` does not match `body.id`");
     } else {
-      const bridge = await bridgeService.update(body);
-      if (!bridge) {
-        res.status(404).send("Not Found");
-      } else {
-        res.status(200).json(bridge.data);
+      try {
+        const bridge = await bridgeService.update(body);
+        if (!bridge) {
+          res.status(404).send("Not Found");
+        } else {
+          res.status(200).json(bridge.data);
+        }
+      } catch (e) {
+        res.status(500).json({
+          error: e instanceof Error ? e.message : "Unknown error",
+        });
       }
     }
   });
 
   router.delete("/bridges/:bridgeId", async (req, res) => {
     const bridgeId = req.params.bridgeId;
-    await bridgeService.delete(bridgeId);
-    res.status(204).send();
+    try {
+      await bridgeService.delete(bridgeId);
+      res.status(204).send();
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
+    }
   });
 
   router.post("/bridges/:bridgeId/actions/factory-reset", async (req, res) => {
     const bridgeId = req.params.bridgeId;
     const bridge = bridgeService.bridges.find((b) => b.id === bridgeId);
-    if (bridge) {
+    if (!bridge) {
+      res.status(404).send("Not Found");
+      return;
+    }
+    try {
       await bridge.factoryReset();
       await bridge.start();
       res.status(200).json(bridge.data);
-    } else {
-      res.status(404).send("Not Found");
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
     }
   });
 
   router.get("/bridges/:bridgeId/devices", async (req, res) => {
     const bridgeId = req.params.bridgeId;
     const bridge = bridgeService.bridges.find((b) => b.id === bridgeId);
-    if (bridge) {
-      res.status(200).json(endpointToJson(bridge.server));
-    } else {
+    if (!bridge) {
       res.status(404).send("Not Found");
+      return;
+    }
+    try {
+      res.status(200).json(endpointToJson(bridge.server));
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
     }
   });
 
   router.post("/bridges/:bridgeId/actions/restart", async (req, res) => {
     const bridgeId = req.params.bridgeId;
-    const success = await bridgeService.restartBridge(bridgeId);
-    if (success) {
-      const bridge = bridgeService.get(bridgeId);
-      res.status(200).json(bridge?.data);
-    } else {
-      res.status(404).send("Not Found");
+    try {
+      const success = await bridgeService.restartBridge(bridgeId);
+      if (success) {
+        const bridge = bridgeService.get(bridgeId);
+        res.status(200).json(bridge?.data);
+      } else {
+        res.status(404).send("Not Found");
+      }
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
     }
   });
 
   router.post("/bridges/:bridgeId/actions/start", async (req, res) => {
     const bridgeId = req.params.bridgeId;
     const bridge = bridgeService.bridges.find((b) => b.id === bridgeId);
-    if (bridge) {
+    if (!bridge) {
+      res.status(404).send("Not Found");
+      return;
+    }
+    try {
       await bridge.start();
       res.status(200).json(bridge.data);
-    } else {
-      res.status(404).send("Not Found");
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
     }
   });
 
   router.post("/bridges/:bridgeId/actions/stop", async (req, res) => {
     const bridgeId = req.params.bridgeId;
     const bridge = bridgeService.bridges.find((b) => b.id === bridgeId);
-    if (bridge) {
+    if (!bridge) {
+      res.status(404).send("Not Found");
+      return;
+    }
+    try {
       await bridge.stop();
       res.status(200).json(bridge.data);
-    } else {
-      res.status(404).send("Not Found");
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
     }
   });
 
   router.post("/bridges/:bridgeId/actions/refresh", async (req, res) => {
     const bridgeId = req.params.bridgeId;
     const bridge = bridgeService.bridges.find((b) => b.id === bridgeId);
-    if (bridge) {
+    if (!bridge) {
+      res.status(404).send("Not Found");
+      return;
+    }
+    try {
       await bridge.refreshDevices();
       res.status(200).json(bridge.data);
-    } else {
-      res.status(404).send("Not Found");
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
     }
   });
 
   router.post("/bridges/:bridgeId/actions/force-sync", async (req, res) => {
     const bridgeId = req.params.bridgeId;
     const bridge = bridgeService.bridges.find((b) => b.id === bridgeId);
-    if (bridge) {
+    if (!bridge) {
+      res.status(404).send("Not Found");
+      return;
+    }
+    try {
       const syncedCount = await bridge.forceSync();
       res.status(200).json({ syncedCount, bridge: bridge.data });
-    } else {
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Unknown error",
+      });
+    }
+  });
+
+  router.post(
+    "/bridges/:bridgeId/actions/open-commissioning-window",
+    async (req, res) => {
+      const bridgeId = req.params.bridgeId;
+      const bridge = bridgeService.bridges.find((b) => b.id === bridgeId);
+      if (!bridge) {
+        res.status(404).send("Not Found");
+        return;
+      }
+      try {
+        await bridge.openCommissioningWindow();
+        res.status(200).json({ success: true, bridge: bridge.data });
+      } catch (e) {
+        res.status(400).json({
+          error: e instanceof Error ? e.message : "Unknown error",
+        });
+      }
+    },
+  );
+
+  router.post("/bridges/actions/start-all", async (_, res) => {
+    try {
+      await bridgeService.startAll();
+      res
+        .status(200)
+        .json({ success: true, count: bridgeService.bridges.length });
+    } catch (e) {
+      res
+        .status(500)
+        .json({ error: e instanceof Error ? e.message : "Unknown error" });
+    }
+  });
+
+  router.post("/bridges/actions/stop-all", async (_, res) => {
+    try {
+      await bridgeService.stopAll();
+      res
+        .status(200)
+        .json({ success: true, count: bridgeService.bridges.length });
+    } catch (e) {
+      res
+        .status(500)
+        .json({ error: e instanceof Error ? e.message : "Unknown error" });
+    }
+  });
+
+  router.post("/bridges/actions/restart-all", async (_, res) => {
+    try {
+      await bridgeService.restartAll();
+      res
+        .status(200)
+        .json({ success: true, count: bridgeService.bridges.length });
+    } catch (e) {
+      res
+        .status(500)
+        .json({ error: e instanceof Error ? e.message : "Unknown error" });
+    }
+  });
+
+  router.post("/bridges/:bridgeId/clone", async (req, res) => {
+    const bridgeId = req.params.bridgeId;
+    const source = bridgeService.get(bridgeId);
+    if (!source) {
       res.status(404).send("Not Found");
+      return;
+    }
+    const data = source.data;
+    const newPort = bridgeService.getNextAvailablePort();
+    try {
+      const clone = await bridgeService.create({
+        name: `${data.name} (Copy)`,
+        port: newPort,
+        filter: data.filter,
+        featureFlags: data.featureFlags,
+        countryCode: data.countryCode,
+        icon: data.icon,
+        priority: data.priority,
+      });
+      res.status(200).json(clone.data);
+    } catch (e) {
+      res
+        .status(500)
+        .json({ error: e instanceof Error ? e.message : "Unknown error" });
     }
   });
 
@@ -197,6 +343,61 @@ export function matterApi(
     res.status(200).json(areas);
   });
 
+  router.get("/filter-values", async (_, res) => {
+    if (!haRegistry) {
+      res.status(503).json({ error: "Home Assistant registry not available" });
+      return;
+    }
+
+    const entities = Object.values(haRegistry.entities);
+    const devices = haRegistry.devices;
+    const states = haRegistry.states;
+
+    const domains = new Set<string>();
+    const platforms = new Set<string>();
+    const entityCategories = new Set<string>();
+    const deviceClasses = new Set<string>();
+    const deviceNames = new Set<string>();
+    const productNames = new Set<string>();
+
+    for (const entity of entities) {
+      const domain = entity.entity_id.split(".")[0];
+      if (domain) domains.add(domain);
+
+      if (entity.platform) platforms.add(entity.platform);
+      if (
+        typeof entity.entity_category === "string" &&
+        entity.entity_category
+      ) {
+        entityCategories.add(entity.entity_category);
+      }
+
+      const state = states[entity.entity_id];
+      const deviceClass = state?.attributes?.device_class;
+      if (typeof deviceClass === "string" && deviceClass) {
+        deviceClasses.add(deviceClass);
+      }
+
+      const device = entity.device_id ? devices[entity.device_id] : undefined;
+      if (device) {
+        const name = device.name_by_user || device.name;
+        if (name) deviceNames.add(name);
+        if (device.model) productNames.add(device.model);
+      }
+    }
+
+    const sort = (s: Set<string>) => [...s].sort((a, b) => a.localeCompare(b));
+
+    res.status(200).json({
+      domains: sort(domains),
+      platforms: sort(platforms),
+      entityCategories: sort(entityCategories),
+      deviceClasses: sort(deviceClasses),
+      deviceNames: sort(deviceNames),
+      productNames: sort(productNames),
+    });
+  });
+
   router.post("/filter-preview", async (req, res) => {
     if (!haRegistry) {
       res.status(503).json({ error: "Home Assistant registry not available" });
@@ -211,6 +412,7 @@ export function matterApi(
     const entities = Object.values(haRegistry.entities);
     const devices = haRegistry.devices;
     const states = haRegistry.states;
+    const labels = haRegistry.labels;
 
     const matchingEntities: Array<{
       entity_id: string;
@@ -220,16 +422,23 @@ export function matterApi(
 
     for (const entity of entities) {
       const device = entity.device_id ? devices[entity.device_id] : undefined;
+      const state = states[entity.entity_id];
 
       const included =
         filter.include.length === 0 ||
-        testMatchers(filter.include, device, entity, filter.includeMode);
+        testMatchers(
+          filter.include,
+          device,
+          entity,
+          filter.includeMode,
+          state,
+          labels,
+        );
       const excluded =
         filter.exclude.length > 0 &&
-        testMatchers(filter.exclude, device, entity);
+        testMatchers(filter.exclude, device, entity, undefined, state, labels);
 
       if (included && !excluded) {
-        const state = states[entity.entity_id];
         matchingEntities.push({
           entity_id: entity.entity_id,
           friendly_name: state?.attributes?.friendly_name as string | undefined,

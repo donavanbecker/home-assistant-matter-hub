@@ -303,13 +303,17 @@ export function homeAssistantApi(
       return;
     }
 
-    // Find all button entities belonging to the same device
+    // Find all button entities belonging to the same device,
+    // excluding maintenance buttons (reset consumable counters etc.)
     const allEntities = Object.values(haRegistry.entities);
     const states = haRegistry.states;
-    const buttonEntities = allEntities.filter(
-      (e) =>
-        e.device_id === entity.device_id && e.entity_id.startsWith("button."),
-    );
+    const buttonEntities = allEntities.filter((e) => {
+      if (e.device_id !== entity.device_id) return false;
+      if (!e.entity_id.startsWith("button.")) return false;
+      const id = e.entity_id.toLowerCase();
+      if (id.includes("reset") || id.includes("consumable")) return false;
+      return true;
+    });
 
     const buttons = buttonEntities.map((btn) => {
       const state = states[btn.entity_id];

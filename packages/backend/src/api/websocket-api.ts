@@ -1,26 +1,31 @@
 import type * as http from "node:http";
+import type { WebSocketMessage } from "@home-assistant-matter-hub/common";
 import { type WebSocket, WebSocketServer } from "ws";
 import type { BetterLogger } from "../core/app/logger.js";
 import type { BridgeService } from "../services/bridges/bridge-service.js";
-
-export interface WebSocketMessage {
-  type: "bridges_update" | "bridge_update" | "ping" | "pong";
-  data?: unknown;
-  bridgeId?: string;
-}
+import { diagnosticEventBus } from "../services/diagnostics/diagnostic-event-bus.js";
+import type { DiagnosticService } from "../services/diagnostics/diagnostic-service.js";
 
 export class WebSocketApi {
   private wss?: WebSocketServer;
   private clients: Set<WebSocket> = new Set();
+  private diagnosticSubscribers: Set<WebSocket> = new Set();
   private pingInterval?: ReturnType<typeof setInterval>;
+  private unsubscribeDiagnostics?: () => void;
+  private diagnosticService?: DiagnosticService;
 
   constructor(
     private readonly log: BetterLogger,
     private readonly bridgeService: BridgeService,
   ) {}
 
-  attach(server: http.Server) {
-    this.wss = new WebSocketServer({ server, path: "/api/ws" });
+  setDiagnosticService(service: DiagnosticService) {
+    this.diagnosticService = service;
+  }
+
+  attach(server: http.Server, basePath = "/") {
+    const wsPath = `${basePath === "/" ? "" : basePath}/api/ws`;
+    this.wss = new WebSocketServer({ server, path: wsPath });
 
     this.wss.on("connection", (ws) => {
       this.clients.add(ws);
@@ -37,6 +42,7 @@ export class WebSocketApi {
 
       ws.on("close", () => {
         this.clients.delete(ws);
+        this.diagnosticSubscribers.delete(ws);
         this.log.debug(
           `WebSocket client disconnected. Total: ${this.clients.size}`,
         );
@@ -45,16 +51,30 @@ export class WebSocketApi {
       ws.on("error", (error) => {
         this.log.error(`WebSocket error: ${error.message}`);
         this.clients.delete(ws);
+        this.diagnosticSubscribers.delete(ws);
       });
 
       this.sendInitialState(ws);
+    });
+
+    this.unsubscribeDiagnostics = diagnosticEventBus.subscribe((event) => {
+      const msg: WebSocketMessage = {
+        type: "diagnostic_event",
+        data: event,
+      };
+      const payload = JSON.stringify(msg);
+      for (const client of this.diagnosticSubscribers) {
+        if (client.readyState === client.OPEN) {
+          client.send(payload);
+        }
+      }
     });
 
     this.pingInterval = setInterval(() => {
       this.broadcast({ type: "ping" });
     }, 30000);
 
-    this.log.info("WebSocket server attached at /api/ws");
+    this.log.info(`WebSocket server attached at ${wsPath}`);
   }
 
   private handleMessage(ws: WebSocket, message: WebSocketMessage) {
@@ -64,6 +84,21 @@ export class WebSocketApi {
         break;
       case "pong":
         break;
+      case "subscribe_diagnostics":
+        this.diagnosticSubscribers.add(ws);
+        if (this.diagnosticService) {
+          const snapshot = this.diagnosticService.getSnapshot();
+          ws.send(
+            JSON.stringify({
+              type: "diagnostic_snapshot",
+              data: snapshot,
+            } satisfies WebSocketMessage),
+          );
+        }
+        break;
+      case "unsubscribe_diagnostics":
+        this.diagnosticSubscribers.delete(ws);
+        break;
       default:
         this.log.debug(`Unknown message type: ${message.type}`);
     }
@@ -71,11 +106,11 @@ export class WebSocketApi {
 
   private sendInitialState(ws: WebSocket) {
     const bridges = this.bridgeService.bridges.map((b) => b.data);
-    const message: WebSocketMessage = {
+    const msg: WebSocketMessage = {
       type: "bridges_update",
       data: bridges,
     };
-    ws.send(JSON.stringify(message));
+    ws.send(JSON.stringify(msg));
   }
 
   broadcastBridgesUpdate() {
@@ -104,10 +139,12 @@ export class WebSocketApi {
   }
 
   close() {
+    this.unsubscribeDiagnostics?.();
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
     }
     this.wss?.close();
     this.clients.clear();
+    this.diagnosticSubscribers.clear();
   }
 }

@@ -1,11 +1,13 @@
-import type {
-  EntityMappingConfig,
-  MatterDeviceType,
-} from "@home-assistant-matter-hub/common";
 import {
+  type CustomServiceArea,
   domainToDefaultMatterTypes,
+  type EntityMappingConfig,
+  type MatterDeviceType,
   matterDeviceTypeLabels,
+  RvcCleanModeModeTag,
 } from "@home-assistant-matter-hub/common";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import DeleteIcon from "@mui/icons-material/Delete";
 import Autocomplete from "@mui/material/Autocomplete";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -17,13 +19,15 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
+import IconButton from "@mui/material/IconButton";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { EntityAutocomplete } from "./EntityAutocomplete.tsx";
 
 interface RelatedButton {
   entity_id: string;
@@ -57,13 +61,36 @@ export function EntityMappingDialog({
   const [filterLifeEntity, setFilterLifeEntity] = useState("");
   const [cleaningModeEntity, setCleaningModeEntity] = useState("");
   const [humidityEntity, setHumidityEntity] = useState("");
+  const [pressureEntity, setPressureEntity] = useState("");
   const [batteryEntity, setBatteryEntity] = useState("");
   const [roomEntities, setRoomEntities] = useState<string[]>([]);
   const [disableLockPin, setDisableLockPin] = useState(false);
+  const [powerEntity, setPowerEntity] = useState("");
+  const [energyEntity, setEnergyEntity] = useState("");
+  const [suctionLevelEntity, setSuctionLevelEntity] = useState("");
+  const [mopIntensityEntity, setMopIntensityEntity] = useState("");
+  const [customServiceAreas, setCustomServiceAreas] = useState<
+    CustomServiceArea[]
+  >([]);
   const [availableButtons, setAvailableButtons] = useState<RelatedButton[]>([]);
   const [loadingButtons, setLoadingButtons] = useState(false);
 
   const isNewMapping = !entityId;
+  const [customFanSpeedTagsList, setCustomFanSpeedTagsList] = useState<
+    { option: string; tag: number }[]
+  >([]);
+
+  const availableModeTags = useMemo(() => {
+    return Object.entries(RvcCleanModeModeTag)
+      .filter(
+        ([_, value]) =>
+          typeof value === "number" &&
+          value !== RvcCleanModeModeTag.Vacuum &&
+          value !== RvcCleanModeModeTag.Mop &&
+          value !== RvcCleanModeModeTag.VacuumThenMop,
+      )
+      .map(([key, value]) => ({ label: key, value: value as number }));
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -74,10 +101,21 @@ export function EntityMappingDialog({
       setFilterLifeEntity(currentMapping?.filterLifeEntity || "");
       setCleaningModeEntity(currentMapping?.cleaningModeEntity || "");
       setHumidityEntity(currentMapping?.humidityEntity || "");
+      setPressureEntity(currentMapping?.pressureEntity || "");
       setBatteryEntity(currentMapping?.batteryEntity || "");
       setRoomEntities(currentMapping?.roomEntities || []);
       setDisableLockPin(currentMapping?.disableLockPin || false);
+      setPowerEntity(currentMapping?.powerEntity || "");
+      setEnergyEntity(currentMapping?.energyEntity || "");
+      setSuctionLevelEntity(currentMapping?.suctionLevelEntity || "");
+      setMopIntensityEntity(currentMapping?.mopIntensityEntity || "");
+      setCustomServiceAreas(currentMapping?.customServiceAreas || []);
       setAvailableButtons([]);
+      setCustomFanSpeedTagsList(
+        Object.entries(currentMapping?.customFanSpeedTags || {}).map(
+          ([option, tag]) => ({ option, tag: tag as number }),
+        ),
+      );
     }
   }, [open, entityId, currentMapping]);
 
@@ -111,6 +149,15 @@ export function EntityMappingDialog({
 
   const handleSave = useCallback(() => {
     if (!editEntityId.trim()) return;
+    const customFanSpeedTags = customFanSpeedTagsList.reduce(
+      (acc, curr) => {
+        if (curr.option.trim()) {
+          acc[curr.option.trim()] = curr.tag;
+        }
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
     onSave({
       entityId: editEntityId.trim(),
       matterDeviceType: matterDeviceType || undefined,
@@ -119,9 +166,20 @@ export function EntityMappingDialog({
       filterLifeEntity: filterLifeEntity.trim() || undefined,
       cleaningModeEntity: cleaningModeEntity.trim() || undefined,
       humidityEntity: humidityEntity.trim() || undefined,
+      pressureEntity: pressureEntity.trim() || undefined,
       batteryEntity: batteryEntity.trim() || undefined,
       roomEntities: roomEntities.length > 0 ? roomEntities : undefined,
+      customServiceAreas:
+        customServiceAreas.length > 0 ? customServiceAreas : undefined,
       disableLockPin: disableLockPin || undefined,
+      powerEntity: powerEntity.trim() || undefined,
+      energyEntity: energyEntity.trim() || undefined,
+      suctionLevelEntity: suctionLevelEntity.trim() || undefined,
+      mopIntensityEntity: mopIntensityEntity.trim() || undefined,
+      customFanSpeedTags:
+        Object.keys(customFanSpeedTags).length > 0
+          ? customFanSpeedTags
+          : undefined,
     });
   }, [
     editEntityId,
@@ -131,9 +189,16 @@ export function EntityMappingDialog({
     filterLifeEntity,
     cleaningModeEntity,
     humidityEntity,
+    pressureEntity,
     batteryEntity,
     roomEntities,
     disableLockPin,
+    powerEntity,
+    energyEntity,
+    suctionLevelEntity,
+    mopIntensityEntity,
+    customServiceAreas,
+    customFanSpeedTagsList,
     onSave,
   ]);
 
@@ -157,6 +222,14 @@ export function EntityMappingDialog({
   const showLockPinField =
     matterDeviceType === "door_lock" || currentDomain === "lock";
 
+  // Show power/energy entity fields for switches, lights, and plugs
+  const showEnergyFields =
+    currentDomain === "switch" ||
+    currentDomain === "light" ||
+    matterDeviceType === "on_off_plugin_unit" ||
+    matterDeviceType === "on_off_switch" ||
+    matterDeviceType === "dimmable_plugin_unit";
+
   const availableTypes = Object.entries(matterDeviceTypeLabels) as [
     MatterDeviceType,
     string,
@@ -173,15 +246,12 @@ export function EntityMappingDialog({
       </DialogTitle>
       <DialogContent>
         {isNewMapping && (
-          <TextField
-            fullWidth
-            margin="normal"
+          <EntityAutocomplete
+            value={editEntityId}
+            onChange={setEditEntityId}
             label="Entity ID"
             placeholder="light.living_room"
-            value={editEntityId}
-            onChange={(e) => setEditEntityId(e.target.value)}
-            helperText="Enter the Home Assistant entity ID (e.g., light.living_room)"
-            required
+            helperText="Search or enter the Home Assistant entity ID (e.g., light.living_room)"
           />
         )}
         <FormControl fullWidth margin="normal">
@@ -231,30 +301,122 @@ export function EntityMappingDialog({
         />
 
         {showFilterLifeField && (
-          <TextField
-            fullWidth
-            margin="normal"
+          <EntityAutocomplete
+            value={filterLifeEntity}
+            onChange={setFilterLifeEntity}
             label="Filter Life Sensor (optional)"
             placeholder="sensor.air_purifier_filter_life"
-            value={filterLifeEntity}
-            onChange={(e) => setFilterLifeEntity(e.target.value)}
             helperText="Sensor entity that provides filter life percentage (0-100%) for HEPA filter monitoring"
+            domain="sensor"
           />
         )}
 
         {showCleaningModeField && (
-          <TextField
-            fullWidth
-            margin="normal"
-            label="Cleaning Mode Entity (optional)"
-            placeholder="select.vacuum_cleaning_mode"
-            value={cleaningModeEntity}
-            onChange={(e) => setCleaningModeEntity(e.target.value)}
-            helperText="Select entity that controls the vacuum cleaning mode (e.g., select.r2_d2_cleaning_mode for Dreame vacuums)"
-          />
+          <>
+            <EntityAutocomplete
+              value={cleaningModeEntity}
+              onChange={setCleaningModeEntity}
+              label="Cleaning Mode Entity (optional)"
+              placeholder="select.vacuum_cleaning_mode"
+              helperText="Select entity that controls the vacuum cleaning mode (e.g., select.r2_d2_cleaning_mode for Dreame vacuums)"
+              domain="select"
+            />
+            <EntityAutocomplete
+              value={suctionLevelEntity}
+              onChange={setSuctionLevelEntity}
+              label="Suction Level Entity (optional)"
+              placeholder="select.vacuum_suction_level"
+              helperText="Select entity that controls suction level. Adds Quiet/Max intensity options to Apple Home's extra features panel."
+              domain="select"
+            />
+            <EntityAutocomplete
+              value={mopIntensityEntity}
+              onChange={setMopIntensityEntity}
+              label="Mop Intensity Entity (optional)"
+              placeholder="select.vacuum_mop_pad_humidity"
+              helperText="Select entity that controls mop water level / intensity. Adds intensity options when mopping in Apple Home."
+              domain="select"
+            />
+            <Box sx={{ mt: 2, mb: 1 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Custom Tag Mapping
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mb: 1, display: "block" }}
+              >
+                Map home assistant speeds to matter tags. When configured these
+                will override default speeds.
+              </Typography>
+              {customFanSpeedTagsList.map((mapping, index) => (
+                <Box
+                  key={`${mapping.option}-${mapping.tag}`}
+                  sx={{
+                    display: "flex",
+                    gap: 1,
+                    mb: 1,
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <TextField
+                    size="small"
+                    label="HA Option (e.g. Max+)"
+                    value={mapping.option}
+                    onChange={(e) => {
+                      const updated = [...customFanSpeedTagsList];
+                      updated[index] = { ...mapping, option: e.target.value };
+                      setCustomFanSpeedTagsList(updated);
+                    }}
+                  />
+                  <FormControl size="small" sx={{ flex: 1 }}>
+                    <InputLabel>Matter Tag</InputLabel>
+                    <Select
+                      value={mapping.tag}
+                      label="Matter Tag"
+                      onChange={(e) => {
+                        const updated = [...customFanSpeedTagsList];
+                        updated[index] = { ...mapping, tag: e.target.value };
+                        setCustomFanSpeedTagsList(updated);
+                      }}
+                    >
+                      {availableModeTags.map((tag) => (
+                        <MenuItem key={tag.value} value={tag.value}>
+                          {tag.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => {
+                      setCustomFanSpeedTagsList(
+                        customFanSpeedTagsList.filter((_, i) => i !== index),
+                      );
+                    }}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              ))}
+              <Button
+                size="small"
+                startIcon={<AddCircleOutlineIcon />}
+                onClick={() =>
+                  setCustomFanSpeedTagsList([
+                    ...customFanSpeedTagsList,
+                    { option: "", tag: RvcCleanModeModeTag.Auto },
+                  ])
+                }
+              >
+                Add Tag Mapping
+              </Button>
+            </Box>
+          </>
         )}
 
-        {showRoomEntitiesField && (
+        {showRoomEntitiesField && customServiceAreas.length === 0 && (
           <Box sx={{ mt: 2, mb: 1 }}>
             <Typography variant="subtitle2" gutterBottom>
               Room Button Entities (Roborock)
@@ -328,25 +490,142 @@ export function EntityMappingDialog({
 
         {showHumidityBatteryFields && (
           <>
-            <TextField
-              fullWidth
-              margin="normal"
+            <EntityAutocomplete
+              value={humidityEntity}
+              onChange={setHumidityEntity}
               label="Humidity Sensor (optional)"
               placeholder="sensor.h_t_bad_humidity"
-              value={humidityEntity}
-              onChange={(e) => setHumidityEntity(e.target.value)}
               helperText="Combine with a humidity sensor to create a single Temperature+Humidity device"
+              domain="sensor"
             />
-            <TextField
-              fullWidth
-              margin="normal"
+            <EntityAutocomplete
+              value={pressureEntity}
+              onChange={setPressureEntity}
+              label="Pressure Sensor (optional)"
+              placeholder="sensor.h_t_bad_pressure"
+              helperText="Combine with a pressure sensor to create a single Temperature+Pressure device"
+              domain="sensor"
+            />
+            <EntityAutocomplete
+              value={batteryEntity}
+              onChange={setBatteryEntity}
               label="Battery Sensor (optional)"
               placeholder="sensor.h_t_bad_battery"
-              value={batteryEntity}
-              onChange={(e) => setBatteryEntity(e.target.value)}
               helperText="Include battery level from a separate sensor entity"
+              domain="sensor"
             />
           </>
+        )}
+
+        {showEnergyFields && (
+          <>
+            <EntityAutocomplete
+              value={powerEntity}
+              onChange={setPowerEntity}
+              label="Power Sensor (optional)"
+              placeholder="sensor.smart_plug_power"
+              helperText="Sensor with device_class: power (W) — adds real-time power measurement to this device"
+              domain="sensor"
+            />
+            <EntityAutocomplete
+              value={energyEntity}
+              onChange={setEnergyEntity}
+              label="Energy Sensor (optional)"
+              placeholder="sensor.smart_plug_energy"
+              helperText="Sensor with device_class: energy (kWh) — adds cumulative energy measurement to this device"
+              domain="sensor"
+            />
+          </>
+        )}
+
+        {showRoomEntitiesField && (
+          <Box sx={{ mt: 2, mb: 1 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Custom Service Areas
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mb: 1, display: "block" }}
+            >
+              Define custom zones mapped to HA service calls. Works for lawn
+              mowers, pool cleaners, or any zone-based robot. When configured,
+              these replace auto-detected rooms.
+            </Typography>
+            {customServiceAreas.map((area, index) => (
+              <Box
+                key={`area-${area.name || index}`}
+                sx={{
+                  display: "flex",
+                  gap: 1,
+                  mb: 1,
+                  alignItems: "flex-start",
+                }}
+              >
+                <TextField
+                  size="small"
+                  label="Name"
+                  value={area.name}
+                  onChange={(e) => {
+                    const updated = [...customServiceAreas];
+                    updated[index] = { ...area, name: e.target.value };
+                    setCustomServiceAreas(updated);
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  size="small"
+                  label="Service"
+                  placeholder="script.start_zone"
+                  value={area.service}
+                  onChange={(e) => {
+                    const updated = [...customServiceAreas];
+                    updated[index] = { ...area, service: e.target.value };
+                    setCustomServiceAreas(updated);
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  size="small"
+                  label="Target (optional)"
+                  placeholder="button.zone_1"
+                  value={area.target || ""}
+                  onChange={(e) => {
+                    const updated = [...customServiceAreas];
+                    updated[index] = {
+                      ...area,
+                      target: e.target.value || undefined,
+                    };
+                    setCustomServiceAreas(updated);
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() => {
+                    setCustomServiceAreas(
+                      customServiceAreas.filter((_, i) => i !== index),
+                    );
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            ))}
+            <Button
+              size="small"
+              startIcon={<AddCircleOutlineIcon />}
+              onClick={() =>
+                setCustomServiceAreas([
+                  ...customServiceAreas,
+                  { name: "", service: "" },
+                ])
+              }
+            >
+              Add Area
+            </Button>
+          </Box>
         )}
 
         {showLockPinField && (

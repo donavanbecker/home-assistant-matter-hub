@@ -1,9 +1,11 @@
 import type {
   HomeAssistantDeviceRegistry,
   HomeAssistantEntityRegistry,
+  HomeAssistantEntityState,
   HomeAssistantFilterMode,
   HomeAssistantMatcher,
 } from "@home-assistant-matter-hub/common";
+import type { HomeAssistantLabel } from "../../home-assistant/api/get-registry.js";
 
 /**
  * Test if an entity matches any or all of the matchers based on mode.
@@ -17,26 +19,38 @@ export function testMatchers(
   device: HomeAssistantDeviceRegistry | undefined,
   entity: HomeAssistantEntityRegistry,
   mode: HomeAssistantFilterMode = "any",
+  entityState?: HomeAssistantEntityState,
+  labels?: HomeAssistantLabel[],
 ) {
   if (mode === "all") {
-    return matchers.every((matcher) => testMatcher(matcher, device, entity));
+    return matchers.every((matcher) =>
+      testMatcher(matcher, device, entity, entityState, labels),
+    );
   }
-  return matchers.some((matcher) => testMatcher(matcher, device, entity));
+  return matchers.some((matcher) =>
+    testMatcher(matcher, device, entity, entityState, labels),
+  );
 }
 
 export function testMatcher(
   matcher: HomeAssistantMatcher,
   device: HomeAssistantDeviceRegistry | undefined,
   entity: HomeAssistantEntityRegistry,
+  entityState?: HomeAssistantEntityState,
+  labels?: HomeAssistantLabel[],
 ): boolean {
   switch (matcher.type) {
     case "domain":
       return entity.entity_id.split(".")[0] === matcher.value;
     case "label":
-      return (
-        (!!entity?.labels && entity.labels.includes(matcher.value)) ||
-        (!!device?.labels && device.labels.includes(matcher.value))
-      );
+    case "entity_label": {
+      const slug = resolveLabelValue(matcher.value, labels);
+      return !!entity?.labels && entity.labels.includes(slug);
+    }
+    case "device_label": {
+      const slug = resolveLabelValue(matcher.value, labels);
+      return !!device?.labels && device.labels.includes(slug);
+    }
     case "entity_category":
       return entity?.entity_category === matcher.value;
     case "platform":
@@ -51,6 +65,8 @@ export function testMatcher(
       return testDeviceName(matcher.value, device);
     case "product_name":
       return testProductName(matcher.value, device);
+    case "device_class":
+      return entityState?.attributes?.device_class === matcher.value;
   }
   return false;
 }
@@ -112,4 +128,22 @@ function testProductName(
     return patternToRegex(lowerPattern).test(lowerProductName);
   }
   return lowerProductName.includes(lowerPattern);
+}
+
+function resolveLabelValue(
+  value: string,
+  labels?: HomeAssistantLabel[],
+): string {
+  if (labels) {
+    const match = labels.find(
+      (l) => l.name.toLowerCase() === value.toLowerCase(),
+    );
+    if (match) return match.label_id;
+  }
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }

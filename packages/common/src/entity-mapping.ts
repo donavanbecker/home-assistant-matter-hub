@@ -19,6 +19,7 @@ export type MatterDeviceType =
   | "humidifier_dehumidifier"
   | "humidity_sensor"
   | "light_sensor"
+  | "mode_select"
   | "occupancy_sensor"
   | "on_off_light"
   | "on_off_plugin_unit"
@@ -32,6 +33,7 @@ export type MatterDeviceType =
   | "thermostat"
   | "tvoc_sensor"
   | "water_heater"
+  | "water_freeze_detector"
   | "water_leak_detector"
   | "water_valve"
   | "window_covering";
@@ -61,6 +63,12 @@ export interface EntityMappingConfig {
    */
   readonly humidityEntity?: string;
   /**
+   * Optional: Entity ID of a pressure sensor to combine with a temperature sensor.
+   * Creates a combined Temperature+Pressure sensor in Matter instead of separate devices.
+   * Example: "sensor.h_t_bad_pressure"
+   */
+  readonly pressureEntity?: string;
+  /**
    * Optional: Entity ID of a battery sensor to include with any sensor.
    * Adds PowerSource cluster to show battery level in Matter controllers.
    * Example: "sensor.h_t_bad_battery"
@@ -80,6 +88,60 @@ export interface EntityMappingConfig {
    * Default: false (PIN is required if configured)
    */
   readonly disableLockPin?: boolean;
+  /**
+   * Optional: Entity ID of a power sensor (device_class: power, unit: W).
+   * Adds ElectricalPowerMeasurement cluster to show real-time power consumption.
+   * Example: "sensor.smart_plug_power"
+   */
+  readonly powerEntity?: string;
+  /**
+   * Optional: Entity ID of an energy sensor (device_class: energy, unit: kWh).
+   * Adds ElectricalEnergyMeasurement cluster to show cumulative energy consumption.
+   * Example: "sensor.smart_plug_energy"
+   */
+  readonly energyEntity?: string;
+  /**
+   * Optional: Entity ID of a select entity that controls the vacuum suction level.
+   * Used for Dreame/Roborock vacuums where suction level is a separate select entity.
+   * When configured, intensity variants (Quiet/Max) are added to each cleaning mode,
+   * enabling Apple Home's "extra features" panel for all cleaning modes.
+   * Example: "select.r2_d2_suction_level"
+   */
+  readonly suctionLevelEntity?: string;
+  /**
+   * Optional: Entity ID of a select entity that controls the vacuum mop intensity / water level.
+   * Used for Dreame/Ecovacs vacuums where mop intensity is a separate select entity.
+   * When configured, intensity variants are added to the Mop cleaning mode,
+   * enabling Apple Home's "extra features" panel when mopping.
+   * Example: "select.r2_d2_mop_pad_humidity"
+   */
+  readonly mopIntensityEntity?: string;
+  /**
+   * Optional: Array of custom service area definitions for zone-based robots.
+   * Each entry defines a named area mapped to a Home Assistant service call.
+   * When the area is selected via Matter ServiceArea and cleaning starts,
+   * the configured service is called with the provided data.
+   * Works for any zone-based robot (vacuums, lawn mowers, pool cleaners, etc.).
+   * Example: [{ name: "Front Yard", service: "script.mow_front_yard", data: { zone: 1 } }]
+   */
+  readonly customServiceAreas?: CustomServiceArea[];
+  /**
+   * Optional: Map custom fan speed / suction level options to Matter intensity tags.
+   * Key is the Home Assistant option string ("low", "medium" etc.).
+   * Value is the Matter ModeTag.
+   */
+  readonly customFanSpeedTags?: Record<string, number>;
+}
+
+export interface CustomServiceArea {
+  /** Display name shown in Apple Home / Matter controllers */
+  readonly name: string;
+  /** Home Assistant service to call (e.g., "script.start_zone", "button.press") */
+  readonly service: string;
+  /** Optional: Target entity for the service call (defaults to the vacuum entity) */
+  readonly target?: string;
+  /** Optional: Additional data to pass to the service call */
+  readonly data?: Record<string, unknown>;
 }
 
 export interface EntityMappingRequest {
@@ -91,9 +153,16 @@ export interface EntityMappingRequest {
   readonly filterLifeEntity?: string;
   readonly cleaningModeEntity?: string;
   readonly humidityEntity?: string;
+  readonly pressureEntity?: string;
   readonly batteryEntity?: string;
   readonly roomEntities?: string[];
   readonly disableLockPin?: boolean;
+  readonly powerEntity?: string;
+  readonly energyEntity?: string;
+  readonly suctionLevelEntity?: string;
+  readonly mopIntensityEntity?: string;
+  readonly customServiceAreas?: CustomServiceArea[];
+  readonly customFanSpeedTags?: Record<string, number>;
 }
 
 export interface EntityMappingResponse {
@@ -120,6 +189,7 @@ export const matterDeviceTypeLabels: Record<MatterDeviceType, string> = {
   humidifier_dehumidifier: "Humidifier/Dehumidifier",
   humidity_sensor: "Humidity Sensor",
   light_sensor: "Light Sensor",
+  mode_select: "Mode Select",
   occupancy_sensor: "Occupancy Sensor",
   on_off_light: "On/Off Light",
   on_off_plugin_unit: "On/Off Plug-in Unit",
@@ -133,22 +203,54 @@ export const matterDeviceTypeLabels: Record<MatterDeviceType, string> = {
   thermostat: "Thermostat",
   tvoc_sensor: "TVOC / VOC Index Sensor",
   water_heater: "Water Heater",
+  water_freeze_detector: "Water Freeze Detector",
   water_leak_detector: "Water Leak Detector",
   water_valve: "Water Valve",
   window_covering: "Window Covering",
 };
 
+/**
+ * RVC Clean Mode ModeTag values from the Matter spec (v1.4.2 § 7.3.7.2).
+ * Mirrors @matter/types RvcCleanMode.ModeTag so the frontend doesn't need
+ * the full Matter.js dependency.
+ */
+export const RvcCleanModeModeTag = {
+  Auto: 0,
+  Quick: 1,
+  Quiet: 2,
+  LowNoise: 3,
+  LowEnergy: 4,
+  Vacation: 5,
+  Min: 6,
+  Max: 7,
+  Night: 8,
+  Day: 9,
+  DeepClean: 16384,
+  Vacuum: 16385,
+  Mop: 16386,
+  VacuumThenMop: 16387,
+} as const;
+
 export const domainToDefaultMatterTypes: Partial<
   Record<HomeAssistantDomain, MatterDeviceType[]>
 > = {
+  alarm_control_panel: ["mode_select", "on_off_plugin_unit"],
   automation: ["on_off_switch"],
-  binary_sensor: ["contact_sensor", "occupancy_sensor"],
+  binary_sensor: [
+    "contact_sensor",
+    "occupancy_sensor",
+    "smoke_co_alarm",
+    "water_freeze_detector",
+    "water_leak_detector",
+  ],
   button: ["generic_switch"],
   climate: ["thermostat"],
   cover: ["window_covering"],
+  event: ["generic_switch"],
   fan: ["air_purifier", "fan"],
   humidifier: ["humidifier_dehumidifier"],
   input_boolean: ["on_off_plugin_unit", "on_off_switch"],
+  input_select: ["mode_select"],
   input_button: ["generic_switch"],
   light: [
     "color_temperature_light",
@@ -169,6 +271,7 @@ export const domainToDefaultMatterTypes: Partial<
     "temperature_sensor",
     "tvoc_sensor",
   ],
+  select: ["mode_select"],
   switch: ["on_off_plugin_unit", "on_off_switch", "pump", "water_valve"],
   vacuum: ["robot_vacuum_cleaner"],
   valve: ["water_valve", "on_off_plugin_unit"],

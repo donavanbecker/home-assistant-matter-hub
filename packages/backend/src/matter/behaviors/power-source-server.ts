@@ -93,7 +93,7 @@ class PowerSourceServerBase extends FeaturedBase {
     let batChargeState = PowerSource.BatChargeState.Unknown;
     if (isCharging === true) {
       batChargeState =
-        batteryPercent === 100
+        batteryPercent != null && batteryPercent >= 100
           ? PowerSource.BatChargeState.IsAtFullCharge
           : PowerSource.BatChargeState.IsCharging;
     } else if (isCharging === false) {

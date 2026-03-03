@@ -2,6 +2,7 @@ import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import BugReportIcon from "@mui/icons-material/BugReport";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import DevicesIcon from "@mui/icons-material/Devices";
+import HomeIcon from "@mui/icons-material/Home";
 import HubIcon from "@mui/icons-material/Hub";
 import LabelIcon from "@mui/icons-material/Label";
 import LightModeIcon from "@mui/icons-material/LightMode";
@@ -9,6 +10,7 @@ import LockIcon from "@mui/icons-material/Lock";
 import MenuIcon from "@mui/icons-material/Menu";
 import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
+import SettingsIcon from "@mui/icons-material/Settings";
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
 import Container from "@mui/material/Container";
@@ -48,6 +50,7 @@ export const AppTopBar = () => {
   };
 
   const navItems: NavItem[] = [
+    { label: "Dashboard", icon: <HomeIcon />, to: navigation.dashboard },
     { label: "Bridges", icon: <HubIcon />, to: navigation.bridges },
     { label: "All Devices", icon: <DevicesIcon />, to: navigation.devices },
     {
@@ -65,7 +68,8 @@ export const AppTopBar = () => {
       icon: <LockIcon />,
       to: navigation.lockCredentials,
     },
-    { label: "Labels & Areas", icon: <LabelIcon />, to: navigation.labels },
+    { label: "Filter Reference", icon: <LabelIcon />, to: navigation.labels },
+    { label: "Settings", icon: <SettingsIcon />, to: navigation.settings },
     {
       label: mode === "dark" ? "Light Mode" : "Dark Mode",
       icon: mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />,

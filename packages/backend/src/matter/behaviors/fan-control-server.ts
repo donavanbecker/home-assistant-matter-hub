@@ -15,7 +15,7 @@ import Wind = FanControl.Wind;
 
 const defaultStepSize = 33.33;
 const minSpeedMax = 3;
-const maxSpeedMax = 10;
+const maxSpeedMax = 100;
 
 const FeaturedBase = Base.with(
   "Step",
@@ -180,9 +180,18 @@ export class FanControlServerBase extends FeaturedBase {
       ? FanMode.create(FanControl.FanMode.Auto, fanModeSequence)
       : FanMode.fromSpeedPercent(percentage, fanModeSequence);
 
+    // When the fan is off, retain percentSetting and speedSetting at their
+    // last non-zero values. Per Matter spec §4.4.6.3, when OnOff changes
+    // FALSE→TRUE and percentSetting is 0, the server should restore the
+    // last non-zero value. By keeping the last value, we avoid the brief
+    // inconsistent state (onOff=true, percentSetting=0) that causes Apple
+    // Home to default to 100% on turn-on (#225).
+    // percentCurrent=0 + fanMode=Off correctly indicate the fan is off.
+    const isOff = percentage === 0;
+
     try {
       applyPatchState(this.state, {
-        percentSetting: percentage,
+        ...(isOff ? {} : { percentSetting: percentage }),
         percentCurrent: percentage,
         fanMode: fanMode.mode,
         fanModeSequence: fanModeSequence,
@@ -190,7 +199,7 @@ export class FanControlServerBase extends FeaturedBase {
         ...(this.features.multiSpeed
           ? {
               speedMax: speedMax,
-              speedSetting: speed,
+              ...(isOff ? {} : { speedSetting: speed }),
               speedCurrent: speed,
             }
           : {}),

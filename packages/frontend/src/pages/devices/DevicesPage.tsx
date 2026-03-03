@@ -25,6 +25,8 @@ import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { DeviceImageInfo } from "../../api/device-images";
+import { resolveDeviceImages } from "../../api/device-images";
 import {
   fetchEntityMappings,
   updateEntityMapping,
@@ -145,6 +147,38 @@ export const DevicesPage = () => {
 
     return allDevices;
   }, [bridges, allDeviceStates, collectDeviceEndpoints]);
+
+  // Device image state
+  const [imageInfoMap, setImageInfoMap] = useState<
+    Record<string, DeviceImageInfo>
+  >({});
+
+  const allEntityIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const d of devices) {
+      const state = d.endpoint.state as {
+        homeAssistantEntity?: { entity?: { entity_id?: string } };
+      };
+      const eid = state.homeAssistantEntity?.entity?.entity_id;
+      if (eid) ids.push(eid);
+    }
+    return ids;
+  }, [devices]);
+
+  const refreshImages = useCallback(() => {
+    if (allEntityIds.length === 0) return;
+    resolveDeviceImages(allEntityIds)
+      .then(setImageInfoMap)
+      .catch(() => {});
+  }, [allEntityIds]);
+
+  useEffect(() => {
+    refreshImages();
+  }, [refreshImages]);
+
+  const handleImageChanged = useCallback(() => {
+    refreshImages();
+  }, [refreshImages]);
 
   const isLoading =
     bridgesLoading || (bridges && bridges.length > 0 && devices.length === 0);
@@ -392,6 +426,16 @@ export const DevicesPage = () => {
               bridgeName={device.bridgeName}
               bridgeId={device.bridgeId}
               onEditMapping={handleEditMapping}
+              imageInfo={
+                imageInfoMap[
+                  (
+                    device.endpoint.state as {
+                      homeAssistantEntity?: { entity?: { entity_id?: string } };
+                    }
+                  ).homeAssistantEntity?.entity?.entity_id ?? ""
+                ]
+              }
+              onImageChanged={handleImageChanged}
             />
           </Grid>
         ))}

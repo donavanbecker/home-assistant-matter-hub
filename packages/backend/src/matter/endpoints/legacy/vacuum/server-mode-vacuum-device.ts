@@ -1,20 +1,23 @@
-import {
-  type VacuumDeviceAttributes,
-  VacuumDeviceFeature,
-} from "@home-assistant-matter-hub/common";
+import type { VacuumDeviceAttributes } from "@home-assistant-matter-hub/common";
 import type { EndpointType } from "@matter/main";
 import { RoboticVacuumCleanerDevice } from "@matter/main/devices";
-import { testBit } from "../../../../utils/test-bit.js";
 import { HomeAssistantEntityBehavior } from "../../../behaviors/home-assistant-entity-behavior.js";
-import { IdentifyServer } from "../../../behaviors/identify-server.js";
+import { VacuumIdentifyServer } from "./behaviors/vacuum-identify-server.js";
+import { VacuumOnOffServer } from "./behaviors/vacuum-on-off-server.js";
 import { VacuumPowerSourceServer } from "./behaviors/vacuum-power-source-server.js";
 import {
+  createDefaultRvcCleanModeServer,
   createVacuumRvcCleanModeServer,
-  supportsCleaningModes,
+  resolveFanSpeedList,
+  resolveMopIntensityList,
 } from "./behaviors/vacuum-rvc-clean-mode-server.js";
 import { VacuumRvcOperationalStateServer } from "./behaviors/vacuum-rvc-operational-state-server.js";
 import { createVacuumRvcRunModeServer } from "./behaviors/vacuum-rvc-run-mode-server.js";
-import { createVacuumServiceAreaServer } from "./behaviors/vacuum-service-area-server.js";
+import {
+  createCustomServiceAreaServer,
+  createDefaultServiceAreaServer,
+  createVacuumServiceAreaServer,
+} from "./behaviors/vacuum-service-area-server.js";
 import { parseVacuumRooms } from "./utils/parse-vacuum-rooms.js";
 
 /**
@@ -29,12 +32,12 @@ import { parseVacuumRooms } from "./utils/parse-vacuum-rooms.js";
  * Only clusters from the Matter RoboticVacuumCleaner device type (0x74) are included:
  * Required: Identify, RvcRunMode, RvcOperationalState
  * Optional: RvcCleanMode, ServiceArea
- * Additional: PowerSource (for battery info, commonly used)
+ * Additional: PowerSource (for battery info)
  *
  * The BasicInformation comes from the ServerNode itself, not the endpoint.
  */
 const ServerModeVacuumEndpointType = RoboticVacuumCleanerDevice.with(
-  IdentifyServer,
+  VacuumIdentifyServer,
   HomeAssistantEntityBehavior,
   VacuumRvcOperationalStateServer,
 );
@@ -48,6 +51,9 @@ const ServerModeVacuumEndpointType = RoboticVacuumCleanerDevice.with(
  */
 export function ServerModeVacuumDevice(
   homeAssistantEntity: HomeAssistantEntityBehavior.State,
+  includeOnOff = false,
+  minimalClusters = false,
+  cleaningModeOptions?: string[],
 ): EndpointType | undefined {
   if (homeAssistantEntity.entity.state === undefined) {
     return undefined;
@@ -55,34 +61,62 @@ export function ServerModeVacuumDevice(
 
   const attributes = homeAssistantEntity.entity.state
     .attributes as VacuumDeviceAttributes;
-  const supportedFeatures = attributes.supported_features ?? 0;
 
   // Add RvcRunModeServer with initial supportedModes (including room modes if available)
   let device = ServerModeVacuumEndpointType.with(
     createVacuumRvcRunModeServer(attributes),
   ).set({ homeAssistantEntity });
 
-  // NOTE: OnOff is intentionally NOT included in server mode.
-  // It is not part of the RoboticVacuumCleaner device type spec and
-  // non-standard clusters can confuse Apple Home's UI rendering.
-  // Start/stop is handled via RvcRunMode.changeToMode(Cleaning/Idle).
+  // OnOff is NOT part of the RoboticVacuumCleaner device type spec.
+  // Adding it makes the device non-conformant and causes Amazon Alexa to
+  // reject it entirely (#185, #183). Only enable via feature flag if a
+  // specific controller requires it.
+  if (includeOnOff) {
+    device = device.with(VacuumOnOffServer);
+  }
 
-  // Add PowerSource if BATTERY feature is set OR if battery attribute exists
-  const batteryValue = attributes.battery_level ?? attributes.battery;
-  const hasBattery = batteryValue != null && typeof batteryValue === "number";
-  if (testBit(supportedFeatures, VacuumDeviceFeature.BATTERY) || hasBattery) {
+  // PowerSource — adds device type 0x0011 to the descriptor alongside 0x0074.
+  // When minimalClusters is enabled, skip it to match working Alexa RVC setups.
+  if (!minimalClusters) {
     device = device.with(VacuumPowerSourceServer);
   }
 
-  // ServiceArea cluster for native room selection
+  // ServiceArea — included when rooms/custom areas are configured.
+  // When minimalClusters is enabled, skip the default placeholder area.
+  const customAreas = homeAssistantEntity.mapping?.customServiceAreas;
+  const roomEntities = homeAssistantEntity.mapping?.roomEntities;
   const rooms = parseVacuumRooms(attributes);
-  if (rooms.length > 0) {
-    device = device.with(createVacuumServiceAreaServer(attributes));
+  if (customAreas && customAreas.length > 0) {
+    device = device.with(createCustomServiceAreaServer(customAreas));
+  } else if (rooms.length > 0 || (roomEntities && roomEntities.length > 0)) {
+    device = device.with(
+      createVacuumServiceAreaServer(attributes, roomEntities),
+    );
+  } else if (!minimalClusters) {
+    device = device.with(createDefaultServiceAreaServer());
   }
 
-  // RvcCleanMode for Dreame vacuum cleaning modes
-  if (supportsCleaningModes(attributes)) {
-    device = device.with(createVacuumRvcCleanModeServer(attributes));
+  // RvcCleanMode — always included.
+  // Alexa probes for cluster 0x55 during discovery and may refuse the device without it.
+  const fanSpeedList = resolveFanSpeedList(
+    attributes,
+    homeAssistantEntity.mapping?.suctionLevelEntity,
+  );
+  const mopIntensityList = resolveMopIntensityList(
+    homeAssistantEntity.mapping?.mopIntensityEntity,
+  );
+  if (cleaningModeOptions || fanSpeedList || mopIntensityList) {
+    device = device.with(
+      createVacuumRvcCleanModeServer(
+        attributes,
+        fanSpeedList,
+        mopIntensityList,
+        cleaningModeOptions,
+        homeAssistantEntity.mapping?.customFanSpeedTags,
+      ),
+    );
+  } else {
+    device = device.with(createDefaultRvcCleanModeServer());
   }
 
   return device;

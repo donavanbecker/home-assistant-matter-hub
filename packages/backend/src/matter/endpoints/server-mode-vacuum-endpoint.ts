@@ -1,6 +1,7 @@
 import type {
   EntityMappingConfig,
   HomeAssistantEntityState,
+  VacuumDeviceAttributes,
 } from "@home-assistant-matter-hub/common";
 import {
   DestroyedDependencyError,
@@ -13,6 +14,7 @@ import type { BridgeRegistry } from "../../services/bridges/bridge-registry.js";
 import type { HomeAssistantStates } from "../../services/home-assistant/home-assistant-registry.js";
 import { HomeAssistantEntityBehavior } from "../behaviors/home-assistant-entity-behavior.js";
 import { EntityEndpoint } from "./entity-endpoint.js";
+import { supportsCleaningModes } from "./legacy/vacuum/behaviors/vacuum-rvc-clean-mode-server.js";
 import { ServerModeVacuumDevice } from "./legacy/vacuum/server-mode-vacuum-device.js";
 
 const logger = Logger.get("ServerModeVacuumEndpoint");
@@ -31,11 +33,127 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
     mapping?: EntityMappingConfig,
   ): Promise<ServerModeVacuumEndpoint | undefined> {
     const deviceRegistry = registry.deviceOf(entityId);
-    const state = registry.initialState(entityId);
+    let state = registry.initialState(entityId);
     const entity = registry.entity(entityId);
 
     if (!state) {
       return undefined;
+    }
+
+    // Auto-assign battery entity if not manually set
+    let effectiveMapping = mapping;
+    logger.info(
+      `${entityId}: device_id=${entity.device_id}, manualBattery=${mapping?.batteryEntity ?? "none"}`,
+    );
+    if (entity.device_id) {
+      if (!mapping?.batteryEntity) {
+        const batteryEntityId = registry.findBatteryEntityForDevice(
+          entity.device_id,
+        );
+        if (batteryEntityId && batteryEntityId !== entityId) {
+          effectiveMapping = {
+            ...effectiveMapping,
+            entityId: effectiveMapping?.entityId ?? entityId,
+            batteryEntity: batteryEntityId,
+          };
+          registry.markBatteryEntityUsed(batteryEntityId);
+          logger.info(`${entityId}: Auto-assigned battery ${batteryEntityId}`);
+        } else {
+          logger.warn(
+            `${entityId}: No battery entity found for device ${entity.device_id}`,
+          );
+        }
+      }
+
+      // Auto-detect vacuum select entities (cleaning mode, suction, mop intensity)
+      const vacuumEntities = registry.findVacuumSelectEntities(
+        entity.device_id,
+      );
+      if (
+        !effectiveMapping?.cleaningModeEntity &&
+        vacuumEntities.cleaningModeEntity
+      ) {
+        effectiveMapping = {
+          ...effectiveMapping,
+          entityId: effectiveMapping?.entityId ?? entityId,
+          cleaningModeEntity: vacuumEntities.cleaningModeEntity,
+        };
+        logger.info(
+          `${entityId}: Auto-assigned cleaningMode ${vacuumEntities.cleaningModeEntity}`,
+        );
+      }
+      if (
+        !effectiveMapping?.suctionLevelEntity &&
+        vacuumEntities.suctionLevelEntity
+      ) {
+        effectiveMapping = {
+          ...effectiveMapping,
+          entityId: effectiveMapping?.entityId ?? entityId,
+          suctionLevelEntity: vacuumEntities.suctionLevelEntity,
+        };
+        logger.info(
+          `${entityId}: Auto-assigned suctionLevel ${vacuumEntities.suctionLevelEntity}`,
+        );
+      }
+      if (
+        !effectiveMapping?.mopIntensityEntity &&
+        vacuumEntities.mopIntensityEntity
+      ) {
+        effectiveMapping = {
+          ...effectiveMapping,
+          entityId: effectiveMapping?.entityId ?? entityId,
+          mopIntensityEntity: vacuumEntities.mopIntensityEntity,
+        };
+        logger.info(
+          `${entityId}: Auto-assigned mopIntensity ${vacuumEntities.mopIntensityEntity}`,
+        );
+      }
+
+      // Auto-detect rooms when no rooms in attributes
+      const vacAttrs = state.attributes as VacuumDeviceAttributes;
+      if (!vacAttrs.rooms && !vacAttrs.segments && !vacAttrs.room_mapping) {
+        // Try Valetudo map segments sensor (sensor.*_map_segments on same device)
+        const valetudoRooms = registry.findValetudoMapSegments(
+          entity.device_id,
+        );
+        if (valetudoRooms.length > 0) {
+          const roomsObj: Record<string, string> = {};
+          for (const r of valetudoRooms) {
+            roomsObj[String(r.id)] = r.name;
+          }
+          state = {
+            ...state,
+            attributes: {
+              ...state.attributes,
+              rooms: roomsObj,
+            } as typeof state.attributes,
+          };
+          logger.info(
+            `${entityId}: Auto-detected ${valetudoRooms.length} Valetudo segments`,
+          );
+        } else {
+          // Try Roborock integration service call
+          const roborockRooms = await registry.resolveRoborockRooms(entityId);
+          if (roborockRooms.length > 0) {
+            const roomsObj: Record<string, string> = {};
+            for (const r of roborockRooms) {
+              roomsObj[String(r.id)] = r.name;
+            }
+            state = {
+              ...state,
+              attributes: {
+                ...state.attributes,
+                rooms: roomsObj,
+              } as typeof state.attributes,
+            };
+            logger.info(
+              `${entityId}: Auto-detected ${roborockRooms.length} Roborock rooms`,
+            );
+          }
+        }
+      }
+    } else {
+      logger.warn(`${entityId}: No device_id — cannot auto-assign battery`);
     }
 
     const payload = {
@@ -45,12 +163,45 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
       deviceRegistry,
     };
 
-    const customName = mapping?.customName;
-    const endpointType = ServerModeVacuumDevice({
-      entity: payload,
-      customName,
-      mapping,
-    });
+    // Resolve cleaning mode options for accurate RvcCleanMode generation.
+    // Reads actual entity options so only supported types get modes.
+    const vacAttrsForClean = state.attributes as VacuumDeviceAttributes;
+    let cleaningModeOptions: string[] | undefined;
+    if (effectiveMapping?.cleaningModeEntity) {
+      const cmState = registry.initialState(
+        effectiveMapping.cleaningModeEntity,
+      );
+      cleaningModeOptions = (
+        cmState?.attributes as { options?: string[] } | undefined
+      )?.options;
+    }
+    // Fallback: if no options from entity (unavailable / not loaded),
+    // use hardcoded defaults so mop modes are still generated.
+    // The runtime getCurrentMode/setCleanMode reads the entity live.
+    if (
+      !cleaningModeOptions &&
+      (effectiveMapping?.cleaningModeEntity ||
+        supportsCleaningModes(vacAttrsForClean))
+    ) {
+      cleaningModeOptions = [
+        "vacuum",
+        "mop",
+        "vacuum_and_mop",
+        "vacuum_then_mop",
+      ];
+    }
+
+    const customName = effectiveMapping?.customName;
+    const endpointType = ServerModeVacuumDevice(
+      {
+        entity: payload,
+        customName,
+        mapping: effectiveMapping,
+      },
+      registry.isServerModeVacuumOnOffEnabled(),
+      registry.isVacuumMinimalClustersEnabled(),
+      cleaningModeOptions,
+    );
 
     if (!endpointType) {
       return undefined;
@@ -81,7 +232,16 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
 
   async updateStates(states: HomeAssistantStates): Promise<void> {
     const state = states[this.entityId] ?? {};
-    if (JSON.stringify(state) === JSON.stringify(this.lastState ?? {})) {
+    // Compare only meaningful fields — ignore volatile HA metadata
+    // (last_changed, last_updated, context) that changes on every event
+    // even when the actual device state/attributes are identical.
+    // Skipping these prevents unnecessary Matter subscription reports
+    // and reduces MRP traffic that can cause session loss.
+    if (
+      state.state === this.lastState?.state &&
+      JSON.stringify(state.attributes) ===
+        JSON.stringify(this.lastState?.attributes)
+    ) {
       return;
     }
 

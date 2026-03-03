@@ -7,6 +7,8 @@ Air Purifiers from Home Assistant's `fan` domain can be exposed to Matter contro
 - **On/Off Control** - Turn the air purifier on or off
 - **Speed Control** - Adjust fan speed (if supported)
 - **Preset Modes** - Auto mode and other presets (if supported)
+- **Oscillation (Rocking)** - Maps `oscillating` attribute to Matter Rocking feature (v2.0.27+)
+- **Wind Modes** - Natural Wind and Sleep Wind preset modes (v2.0.27+)
 - **HEPA Filter Life Monitoring** - Show filter life remaining in Matter controllers
 
 ## HEPA Filter Life Monitoring
@@ -85,6 +87,26 @@ fan.living_room_air_purifier:
 | Apple Home | ✅ Shows filter status |
 | Google Home | ✅ Shows filter status |
 | Amazon Alexa | ⚠️ Limited support |
+
+## Composed Air Purifier
+
+Since v2.0.27, air purifiers that share a Home Assistant device with thermostat or humidity sensors can be exposed as a **Matter Composed Device** (per Matter spec section 9.4.4). This creates a parent Air Purifier endpoint with sub-endpoints for temperature and humidity, allowing controllers to display all readings in one unified device.
+
+Composed air purifiers are automatically created when `autoComposedDevices` is enabled in Bridge Settings and the air purifier entity shares a device with temperature/humidity sensors.
+
+---
+
+## Oscillation & Wind Modes
+
+Since v2.0.27, air purifiers properly support:
+
+- **Oscillation (Rocking)** — If your fan entity has the `oscillating` attribute, it is exposed as the Matter Rocking feature
+- **Natural Wind** — Maps the "Natural" preset mode to Matter's naturalWind feature
+- **Sleep Wind** — Maps the "Sleep" preset mode to Matter's sleepWind feature
+
+These features were previously missing from the air purifier device type.
+
+---
 
 ## Troubleshooting
 

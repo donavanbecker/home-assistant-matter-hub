@@ -10,10 +10,25 @@ import { EntityIsolationService } from "../../services/bridges/entity-isolation-
 import { HomeAssistantRegistry } from "../../services/home-assistant/home-assistant-registry.js";
 import type { StartOptions } from "./start-options.js";
 
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null) {
+    const obj = error as Record<string, unknown>;
+    // HA WebSocket error: { type: 'result', success: false, error: { code: N, message: '...' } }
+    if (typeof obj.error === "object" && obj.error !== null) {
+      const inner = obj.error as Record<string, unknown>;
+      if (typeof inner.message === "string") return inner.message;
+    }
+    if (typeof obj.message === "string") return obj.message;
+  }
+  return String(error);
+}
+
 // Check if an error should be suppressed (not crash the process)
 function shouldSuppressError(error: unknown): boolean {
-  const msg = error instanceof Error ? error.message : String(error);
+  const msg = extractErrorMessage(error);
   return (
+    msg.includes("Connection lost") ||
     msg.includes("Endpoint storage inaccessible") ||
     msg.includes("Invalid intervalMs") ||
     msg.includes("generalDiagnostics") ||
@@ -112,12 +127,20 @@ export async function startHandler(
   const webApi$ = appEnvironment.load(WebApi);
   const registry$ = appEnvironment.load(HomeAssistantRegistry);
 
-  const initBridges = bridgeService$.then((b) => b.startAll());
-  const initApi = webApi$.then((w) => w.start());
+  // Wire up WebSocket broadcasts for bridge status changes.
+  // This ensures the frontend receives live updates as each bridge
+  // transitions through Starting → Running during startup.
+  const [bridgeService, webApi] = await Promise.all([bridgeService$, webApi$]);
+  bridgeService.onBridgeChanged = (bridgeId) => {
+    webApi.websocket.broadcastBridgeUpdate(bridgeId);
+  };
+
+  const initBridges = bridgeService.startAll();
+  const initApi = webApi.start();
 
   const enableAutoRefresh = initBridges
-    .then(() => Promise.all([registry$, bridgeService$]))
-    .then(([r, b]) => r.enableAutoRefresh(() => b.refreshAll()));
+    .then(() => registry$)
+    .then((r) => r.enableAutoRefresh(() => bridgeService.refreshAll()));
 
   await Promise.all([initBridges, initApi, enableAutoRefresh]);
 }

@@ -27,7 +27,11 @@ export class OccupancySensingServer extends OccupancySensingServerBase {
     }
   }
 
-  public update({ state }: HomeAssistantEntityInformation) {
+  public update(entity: HomeAssistantEntityInformation) {
+    if (!entity.state) {
+      return;
+    }
+    const { state } = entity;
     applyPatchState(this.state, {
       occupancy: { occupied: this.isOccupied(state) },
       occupancySensorType: OccupancySensing.OccupancySensorType.PhysicalContact,

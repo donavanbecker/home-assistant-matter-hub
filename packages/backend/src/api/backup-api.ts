@@ -215,8 +215,14 @@ export function backupApi(
                     filterLifeEntity: config.filterLifeEntity,
                     cleaningModeEntity: config.cleaningModeEntity,
                     humidityEntity: config.humidityEntity,
+                    pressureEntity: config.pressureEntity,
                     batteryEntity: config.batteryEntity,
                     roomEntities: config.roomEntities,
+                    disableLockPin: config.disableLockPin,
+                    powerEntity: config.powerEntity,
+                    energyEntity: config.energyEntity,
+                    suctionLevelEntity: config.suctionLevelEntity,
+                    mopIntensityEntity: config.mopIntensityEntity,
                   });
                   mappingsRestored++;
                 }

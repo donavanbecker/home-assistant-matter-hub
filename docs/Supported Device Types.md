@@ -19,6 +19,11 @@ This document provides comprehensive information about all device types supporte
 | `media_player` | Speaker | | | |
 | `valve` | Water Valve | | | |
 | `vacuum` | Robotic Vacuum | | | |
+| `water_heater` | Thermostat (Heating) | | | |
+| `select`, `input_select` | Mode Select | | | |
+| `alarm_control_panel` | Mode Select | | | |
+| `event` | Generic Switch | | | |
+| `humidifier` | On/Off Plug-in Unit | | | |
 
 **Legend:** | Full Support | | Partial/Limited | | Not Supported
 
@@ -50,6 +55,11 @@ Home Assistant lights are mapped to the appropriate Matter light type based on s
 - `color_temp` (mireds) → Matter Color Temperature (Kelvin)
 - `rgb_color` / `hs_color` / `xy_color` → Matter Hue/Saturation or XY
 
+**Power & Energy Measurement:**
+- Lights can optionally report electrical power and energy consumption via Matter clusters
+- Auto-mapped from HA power/energy sensor entities on the same device
+- Manual mapping via Entity Mapping: `powerEntity`, `energyEntity`
+
 **Controller Notes:**
 - All major controllers support all light types
 - Color temperature range may differ between HA and Matter specifications
@@ -64,6 +74,11 @@ Mapped to **OnOffPlugInUnit** - a simple on/off controllable outlet.
 - Turn on
 - Turn off
 - Toggle
+
+**Power & Energy Measurement:**
+- Switches can optionally report electrical power and energy consumption via Matter clusters
+- Auto-mapped from HA power/energy sensor entities on the same device
+- Manual mapping via Entity Mapping: `powerEntity`, `energyEntity`
 
 **Use Cases:**
 - Smart plugs
@@ -80,18 +95,23 @@ Mapped to **DoorLock** with PIN code support where available.
 **Supported Actions:**
 - Lock (no PIN required)
 - Unlock (PIN required if configured)
+- Unlatch / Unbolt (when HA entity supports `OPEN` feature)
 
-**Supported Attributes:**
-- `is_locked` → Matter Lock State
+**Supported States:**
+- `locked` / `locking` → Matter Locked
+- `unlocked` / `unlocking` → Matter Unlocked
+- `open` / `opening` → Matter Unlatched
 
 **Feature Flags:**
 - **PIN Credentials** - Configure PIN codes via Entity Mapping UI
 - **Lock without PIN** - Locking is always allowed, only unlock requires PIN (Alpha)
+- **Unlatch (Unbolting)** - Automatically enabled when HA lock supports `OPEN` feature. Maps to `lock.open` action. Apple Home shows an "Unlatch" button.
 
 **Controller Notes:**
 - PIN code entry may not be supported by all controllers
 - Some controllers may require additional confirmation for unlock
 - Google Home has disabled voice unlock for Matter locks (Google policy)
+- Apple Home shows an "Unlatch" button when the lock supports the Unbolting feature
 
 ---
 
@@ -142,14 +162,26 @@ Mapped to **Thermostat** with heating, cooling, and auto modes.
 > **Important:** Matter's "Auto" mode means automatic switching between heat/cool based on temperature. This matches HA's `heat_cool` mode, NOT the `auto` mode which typically means "device decides".
 
 **Supported Attributes:**
-- `current_temperature` → Local Temperature
+- `current_temperature` → Local Temperature (falls back to setpoint if unavailable)
 - `target_temp_high` / `target_temp_low` → Setpoints
-- `hvac_action` → Running State
+- `hvac_action` → Running State (active heating/cooling display)
+- `min_temp` / `max_temp` → Thermostat limits
 
-**Features by Mode:**
-- **Heating Only**: Single setpoint, heat mode only
-- **Cooling Only**: Single setpoint, cool mode only  
-- **Heat + Cool**: Dual setpoints, auto mode available
+**Feature Variants (auto-detected from HA hvac_modes):**
+- **Heating Only**: Heat-only TRVs, water heaters — exposes only `Heating` feature
+- **Cooling Only**: Cool-only ACs — exposes only `Cooling` feature
+- **Heating + Cooling**: Devices with `heat` and `cool` but no `heat_cool` — exposes `Heating` + `Cooling` without AutoMode. Apple Home won't show Auto button, preventing mode flipping.
+- **Full HVAC (AutoMode)**: Devices with `heat_cool` in hvac_modes — exposes `Heating` + `Cooling` + `AutoMode` with dual setpoints
+- **heat_cool-only zones** *(new in v2.0.27)*: Devices with `heat_cool` but no explicit `heat` or `cool` mode (e.g. zoned ACs) — exposes `Heating` + `Cooling` without AutoMode. The `controlSequenceOfOperation` dynamically switches between `CoolingOnly` and `HeatingOnly` based on `hvac_action`. ([#207](https://github.com/RiDDiX/home-assistant-matter-hub/issues/207))
+
+> **New in v2.0.20:** AutoMode is now only exposed when the device supports `heat_cool` (dual setpoint) in Home Assistant. Devices with only `auto` mode (single setpoint, device decides) no longer get AutoMode, which previously caused Apple Home to send conflicting commands and mode flipping.
+
+> **New in v2.0.27:** Devices with `auto` + `cool` but no explicit `heat` mode (e.g. SmartIR ACs) no longer crash with a Matter conformance error. The `controlSequenceOfOperation` is now dynamically set to `CoolingOnly` or `HeatingOnly` instead of `CoolingAndHeating` for devices without AutoMode capability. ([#28](https://github.com/RiDDiX/home-assistant-matter-hub/issues/28))
+
+This prevents Alexa from rejecting commands on single-capability thermostats ([#136](https://github.com/RiDDiX/home-assistant-matter-hub/issues/136)).
+
+**Temperature Display Unit:**
+The `ThermostatUserInterfaceConfiguration` cluster exposes your HA temperature unit preference (°C or °F) to Matter controllers.
 
 ---
 
@@ -164,9 +196,9 @@ Mapped to **Fan** device with speed and direction control.
 | Speed percentage | FanControl SpeedPercent |
 | Preset modes | FanControl FanMode |
 | Direction | FanControl AirflowDirection |
-| Oscillation | FanControl Rocking (Alpha) |
+| Oscillation | FanControl Rocking |
 
-**Alpha Features:**
+**Wind Modes:**
 | Feature | Description |
 |---------|-------------|
 | **Oscillation** | Maps `oscillating` attribute to Matter Rocking |
@@ -221,21 +253,43 @@ Various sensor types mapped based on `device_class` and `unit_of_measurement`.
 | `co2` | CO2 Concentration |
 | `volatile_organic_compounds` | TVOC Concentration |
 
+#### Auto Sensor Grouping
+
+HAMH can automatically combine related sensors from the same HA device into a single Matter endpoint:
+
+| Feature Flag | Description |
+|--------------|-------------|
+| `autoBatteryMapping` | Combines battery sensor with the primary sensor (default: enabled) |
+| `autoHumidityMapping` | Combines humidity sensor with temperature sensor (default: enabled) |
+| `autoPressureMapping` | Combines pressure sensor with temperature sensor (default: enabled) |
+
+You can also manually assign sensors via **Entity Mapping**:
+- `batteryEntity` — Battery sensor entity ID
+- `humidityEntity` — Humidity sensor entity ID
+- `pressureEntity` — Pressure sensor entity ID
+
+See [Temperature & Humidity Sensor](./Devices/Temperature%20Humidity%20Sensor.md) for detailed setup instructions.
+
 ---
 
 ### Binary Sensors (`binary_sensor`)
 
 Mapped based on `device_class` attribute.
 
-| Device Class | Matter Device Type | Controller Support |
-|--------------|-------------------|-------------------|
-| `door`, `window`, `garage_door` | ContactSensor | | All |
-| `motion`, `occupancy`, `presence` | OccupancySensor | | All |
-| `moisture`, `water` | WaterLeakDetector | | Limited |
-| `smoke` | SmokeCoAlarm (Smoke) | | Limited |
-| `carbon_monoxide` | SmokeCoAlarm (CO) | | Limited |
-| `gas` | SmokeCoAlarm (Gas) | | Limited |
-| Other | OnOffSensor | | All |
+| Device Class | Matter Device Type | Controller Display |
+|--------------|-------------------|--------------------|
+| `running`, `plug`, `power`, `battery_charging`, `light` | OnOffSensor | On/Off |
+| `door`, `window`, `garage_door`, `opening`, `lock` | ContactSensor | Open/Closed |
+| `cold` | **WaterFreezeDetector** | Freeze/Normal |
+| `battery`, `heat`, `connectivity`, `problem`, `safety`, `sound`, `tamper`, `update`, `vibration` | ContactSensor | Open/Closed |
+| `motion`, `moving`, `occupancy`, `presence` | OccupancySensor | Occupied/Clear |
+| `moisture` | WaterLeakDetector | Leak/Dry |
+| `smoke` | SmokeCoAlarm (Smoke) | Alarm |
+| `carbon_monoxide`, `gas` | SmokeCoAlarm (CO) | Alarm |
+| Other / unset | OnOffSensor | On/Off |
+
+> [!NOTE]
+> **WaterFreezeDetector** (device class `cold`) is supported since v2.0.24. Shows freeze detection status in controllers.
 
 ---
 
@@ -251,10 +305,28 @@ Mapped to **Speaker** device with volume and playback control.
 - Stop
 - Next/Previous track
 
+**Device Type Override:**
+Media players can be overridden to other device types via Entity Mapping. For example, mapping a media player to **OnOffPlugInUnit** (switch) makes it appear as a simple on/off switch in controllers like Alexa — useful when you only need power control.
+
 **Controller Notes:**
 - Media player support in Matter is limited
 - Not all controllers support all features
 - Best support in Apple Home
+
+---
+
+### Events (`event`)
+
+Mapped to **GenericSwitch** device.
+
+**Supported Use Cases:**
+- Doorbells
+- Button events
+- Remote control button presses
+
+**Behavior:**
+- Events from HA `event.*` entities are forwarded as Matter GenericSwitch position changes
+- Controllers can react to button press events
 
 ---
 
@@ -327,6 +399,7 @@ Mapped to **RoboticVacuumCleaner**.
 - Return to dock
 - Operating mode (Idle, Cleaning)
 - Room selection (if supported by vacuum)
+- Cleaning mode selection (Sweeping, Mopping, Sweeping and mopping, Mopping after sweeping)
 - Battery level (if available)
 
 **Entity Mapping Options:**
@@ -334,21 +407,67 @@ Mapped to **RoboticVacuumCleaner**.
 |--------|-------------|
 | `roomEntities` | Array of button entity IDs for room selection (Roborock) |
 | `batteryEntity` | External battery sensor entity (Roomba, Deebot) |
-| `cleaningModeEntity` | Select entity for cleaning mode (Dreame) |
+| `cleaningModeEntity` | Select entity for cleaning mode (Dreame, Ecovacs, etc.) |
+| `suctionLevelEntity` | Select entity for suction level — adds Quiet/Max intensity toggles to Apple Home's extra features panel |
+| `mopIntensityEntity` | Select entity for mop intensity / water level — adds mop intensity modes to Apple Home's extra features panel |
 
 **Feature Flags (Bridge Settings):**
 | Flag | Description |
 |------|-------------|
 | `serverMode` | Expose as standalone device (required for Apple Home/Alexa) |
 | `vacuumIncludeUnnamedRooms` | Include rooms without names in room selection |
+| `vacuumMinimalClusters` | Strip non-essential clusters for Alexa compatibility ([#183](https://github.com/RiDDiX/home-assistant-matter-hub/issues/183)) |
 
 **Important Limitations:**
 - **Server Mode recommended** - For full voice command support (Siri, Alexa)
 - **Server Mode = one device per bridge** - The vacuum must be the only device
 - **Apple Home** requires iOS/tvOS/AudioOS 18.4+ on all Home hubs
-- **Google Home** does not support RVC device types yet
+- **Google Home** has limited RVC support — basic start/stop works, room selection and cleaning modes may vary
 
 See [Robot Vacuum Guide](./Devices/Robot%20Vacuum.md) for detailed setup instructions.
+
+---
+
+### Alarm Control Panel (`alarm_control_panel`)
+
+Mapped to **ModeSelectDevice** (0x0027). Each alarm state becomes a selectable mode.
+
+**Supported Modes:**
+- Disarmed
+- Armed Home
+- Armed Away
+- Armed Night
+- Armed Vacation
+- Armed Custom Bypass
+
+**Behavior:**
+- Changing mode from a controller calls the corresponding `alarm_control_panel.alarm_*` action in HA
+- Current mode reflects the entity's current alarm state
+- For Apple Home compatibility, an OnOff fallback is included: turning "on" arms the alarm, turning "off" disarms it
+
+**Controller Notes:**
+- Matter does not have a native alarm panel device type, so ModeSelect is used as the closest match
+- Voice commands like "Hey Siri, set alarm to Armed Away" may not work — use the controller app to switch modes
+
+---
+
+### Select / Input Select (`select`, `input_select`)
+
+Mapped to **ModeSelectDevice** (0x0027). Each option in the select entity becomes a selectable mode.
+
+**Behavior:**
+- Each option is exposed as a numbered mode
+- Changing mode from a controller calls `select.select_option` in HA
+- Current mode reflects the entity's current state
+
+**Use Cases:**
+- Washing machine programs
+- HVAC operation modes
+- Irrigation zones
+- Scene selectors
+- Any entity with a fixed list of options
+
+**Configuration:** No special setup needed. `select` and `input_select` entities matching your bridge filter are automatically exposed. You can also manually assign the `Mode Select` device type via Entity Mapping.
 
 ---
 
@@ -365,7 +484,7 @@ Mapped to **OnOffPlugInUnit**.
 
 ## Entity Mapping Customization
 
-In the Alpha/Testing versions, you can override the default device type mapping per entity.
+You can override the default device type mapping per entity using the Entity Mapping UI.
 
 **Available Override Types:**
 - OnOffLight
@@ -373,14 +492,30 @@ In the Alpha/Testing versions, you can override the default device type mapping 
 - ColorTemperatureLight
 - ExtendedColorLight
 - OnOffPlugInUnit
+- OnOffSwitch
+- DoorLock
+- WindowCovering
+- Thermostat
+- Fan
 - AirPurifier
-- Pump
-- (more in future versions)
+- RobotVacuumCleaner
+- Humidifier/Dehumidifier
+- Speaker
+- BasicVideoPlayer
+- HumiditySensor, TemperatureSensor, PressureSensor, LightSensor, FlowSensor
+- AirQualitySensor, BatteryStorage, TVOCSensor
+- WaterValve, Pump
+- WaterHeater
+- GenericSwitch
+- SmokeCO Alarm, Water Leak Detector, Water Freeze Detector
 
 **Use Cases:**
-- Map a fan to Air Purifier type
-- Map a switch to Pump type
+- Map a `media_player` to OnOffPlugInUnit for simple on/off switch in Alexa
+- Map a `fan` to Air Purifier type for HEPA filter monitoring
+- Map a `switch` to Pump type
 - Force a specific light type
+
+> **Note:** Since v2.0.25, entity mapping changes take effect automatically within ~30 seconds. No bridge restart is required.
 
 ---
 

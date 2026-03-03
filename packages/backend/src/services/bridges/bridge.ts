@@ -3,22 +3,25 @@ import {
   type UpdateBridgeRequest,
 } from "@home-assistant-matter-hub/common";
 import type { Environment, Logger } from "@matter/general";
+import type { Endpoint } from "@matter/main";
+import { CommissioningServer } from "@matter/main/node";
 import { SessionManager } from "@matter/main/protocol";
 import type { LoggerService } from "../../core/app/logger.js";
 import { BridgeServerNode } from "../../matter/endpoints/bridge-server-node.js";
+import { ensureCommissioningConfig } from "../../utils/ensure-commissioning-config.js";
+import { logMemoryUsage } from "../../utils/log-memory.js";
+import { diagnosticEventBus } from "../diagnostics/diagnostic-event-bus.js";
 import type {
   BridgeDataProvider,
   BridgeServerStatus,
 } from "./bridge-data-provider.js";
 import type { BridgeEndpointManager } from "./bridge-endpoint-manager.js";
 
-// Auto Force Sync interval in milliseconds (60 seconds)
-const AUTO_FORCE_SYNC_INTERVAL_MS = 60_000;
-
-// Number of consecutive force sync cycles with 0 subscriptions before
-// closing a dead session to force the controller to reconnect.
-// With 60s intervals, 3 checks = ~3 minutes grace period.
-const DEAD_SESSION_THRESHOLD = 3;
+// Auto Force Sync interval in milliseconds (90 seconds).
+// When autoForceSync is enabled, this pushes changed entity states to
+// Matter controllers. matter.js handles subscription keepalive internally
+// via empty DataReports every ~sendInterval.
+const AUTO_FORCE_SYNC_INTERVAL_MS = 90_000;
 
 export class Bridge {
   private readonly log: Logger;
@@ -29,11 +32,24 @@ export class Bridge {
     reason: undefined,
   };
 
+  // Called whenever the bridge status changes. Set by BridgeService to
+  // broadcast updates via WebSocket so the frontend sees every transition
+  // (e.g. Stopped → Starting → Running).
+  public onStatusChange?: () => void;
+
   private autoForceSyncTimer: ReturnType<typeof setInterval> | null = null;
 
-  // Tracks sessions with 0 active subscriptions across consecutive force sync cycles.
-  // Key: session ID (number), Value: consecutive checks with 0 subscriptions.
-  private deadSessionCounts = new Map<number, number>();
+  // Tracks the last synced state JSON per entity to avoid pushing unchanged states.
+  // Key: entity_id, Value: JSON.stringify of entity.state
+  private lastSyncedStates = new Map<string, string>();
+
+  // Session lifecycle diagnostic handlers (non-destructive, logging only).
+  // biome-ignore lint/suspicious/noExplicitAny: matter.js internal types
+  private sessionDiagHandler?: (session: any, subscription: any) => void;
+  // biome-ignore lint/suspicious/noExplicitAny: matter.js internal types
+  private sessionAddedHandler?: (session: any) => void;
+  // biome-ignore lint/suspicious/noExplicitAny: matter.js internal types
+  private sessionDeletedHandler?: (session: any) => void;
 
   get id() {
     return this.dataProvider.id;
@@ -46,6 +62,42 @@ export class Bridge {
       this.aggregator.parts.size,
       this.endpointManager.failedEntities,
     );
+  }
+
+  getSessionInfo(): {
+    sessions: Array<{
+      id: number;
+      peerNodeId: string;
+      subscriptionCount: number;
+    }>;
+    totalSessions: number;
+    totalSubscriptions: number;
+  } {
+    try {
+      const sessionManager = this.server.env.get(SessionManager);
+      const sessions = [...sessionManager.sessions];
+      let totalSubscriptions = 0;
+      const sessionList = sessions.map((s) => {
+        const subCount = s.subscriptions.size;
+        totalSubscriptions += subCount;
+        return {
+          id: s.id,
+          peerNodeId: String(s.peerNodeId),
+          subscriptionCount: subCount,
+        };
+      });
+      return {
+        sessions: sessionList,
+        totalSessions: sessions.length,
+        totalSubscriptions,
+      };
+    } catch {
+      return {
+        sessions: [],
+        totalSessions: 0,
+        totalSubscriptions: 0,
+      };
+    }
   }
 
   get aggregator() {
@@ -76,22 +128,51 @@ export class Bridge {
 
   async refreshDevices() {
     await this.endpointManager.refreshDevices();
+    // Prune stale entries from lastSyncedStates for entities that were removed
+    const currentEntityIds = new Set(
+      [...this.aggregator.parts].map(
+        (p) => (p as { entityId?: string }).entityId,
+      ),
+    );
+    for (const entityId of this.lastSyncedStates.keys()) {
+      if (!currentEntityIds.has(entityId)) {
+        this.lastSyncedStates.delete(entityId);
+      }
+    }
+  }
+
+  private setStatus(status: BridgeServerStatus) {
+    this.status = status;
+    this.onStatusChange?.();
   }
 
   async start() {
     if (this.status.code === BridgeStatus.Running) {
       return;
     }
+    this.lastSyncedStates.clear();
     try {
-      this.status = {
+      this.setStatus({
         code: BridgeStatus.Starting,
         reason: "The bridge is starting... Please wait.",
-      };
+      });
       await this.refreshDevices();
+      logMemoryUsage(
+        this.log,
+        `after refreshDevices (${this.aggregator.parts.size} endpoints)`,
+      );
       this.endpointManager.startObserving();
+      ensureCommissioningConfig(this.server);
       await this.server.start();
-      this.status = { code: BridgeStatus.Running };
+      this.setStatus({ code: BridgeStatus.Running });
       this.startAutoForceSyncIfEnabled();
+      this.wireSessionDiagnostics();
+      logMemoryUsage(this.log, "bridge running");
+      diagnosticEventBus.emit("bridge_started", `Bridge started`, {
+        bridgeId: this.id,
+        bridgeName: this.dataProvider.name,
+        details: { deviceCount: this.aggregator.parts.size },
+      });
     } catch (e) {
       const reason = "Failed to start bridge due to error:";
       this.log.error(reason, e);
@@ -103,6 +184,7 @@ export class Bridge {
     code: BridgeStatus = BridgeStatus.Stopped,
     reason = "Manually stopped",
   ) {
+    this.unwireSessionDiagnostics();
     this.stopAutoForceSync();
     this.endpointManager.stopObserving();
     try {
@@ -115,23 +197,101 @@ export class Bridge {
         this.log.warn("Error stopping bridge server:", e);
       }
     }
-    this.status = { code, reason };
+    this.setStatus({ code, reason });
+    diagnosticEventBus.emit("bridge_stopped", `Bridge stopped: ${reason}`, {
+      bridgeId: this.id,
+      bridgeName: this.dataProvider.name,
+    });
   }
 
   private startAutoForceSyncIfEnabled() {
     // Stop any existing timer first
     this.stopAutoForceSync();
 
-    if (this.dataProvider.featureFlags?.autoForceSync) {
-      this.log.info(
-        `Auto Force Sync enabled - syncing every ${AUTO_FORCE_SYNC_INTERVAL_MS / 1000}s`,
-      );
-      this.autoForceSyncTimer = setInterval(() => {
-        this.forceSync().catch((e) => {
-          this.log.warn("Auto force sync failed:", e);
-        });
-      }, AUTO_FORCE_SYNC_INTERVAL_MS);
+    const forceSyncEnabled =
+      this.dataProvider.featureFlags?.autoForceSync ?? false;
+
+    if (!forceSyncEnabled) {
+      return;
     }
+
+    // Force sync pushes changed entity states to Matter controllers.
+    // matter.js handles subscription keepalive internally via empty DataReports.
+    this.autoForceSyncTimer = setInterval(() => {
+      this.forceSync().catch((e) => {
+        this.log.warn("Auto force sync failed:", e);
+      });
+    }, AUTO_FORCE_SYNC_INTERVAL_MS);
+
+    this.log.info(`Force sync: every ${AUTO_FORCE_SYNC_INTERVAL_MS / 1000}s`);
+  }
+
+  private wireSessionDiagnostics() {
+    try {
+      const sessionManager = this.server.env.get(SessionManager);
+      this.sessionDiagHandler = (session: {
+        id: number;
+        peerNodeId: unknown;
+        subscriptions: { size: number };
+      }) => {
+        const sessions = [...sessionManager.sessions];
+        let totalSubs = 0;
+        for (const s of sessions) {
+          totalSubs += s.subscriptions.size;
+        }
+        this.log.info(
+          `Session ${session.id} (peer ${session.peerNodeId}): subscriptions=${session.subscriptions.size} | total: sessions=${sessions.length} subscriptions=${totalSubs}`,
+        );
+        if (totalSubs === 0 && sessions.length > 0) {
+          this.log.warn(
+            `All subscriptions lost — ${sessions.length} session(s) still active, waiting for controller to re-subscribe`,
+          );
+        }
+      };
+      sessionManager.subscriptionsChanged.on(this.sessionDiagHandler);
+
+      this.sessionAddedHandler = (session: {
+        id: number;
+        peerNodeId: unknown;
+      }) => {
+        this.log.info(
+          `Session opened: id=${session.id} peer=${session.peerNodeId}`,
+        );
+      };
+      this.sessionDeletedHandler = (session: {
+        id: number;
+        peerNodeId: unknown;
+      }) => {
+        const sessions = [...sessionManager.sessions];
+        this.log.warn(
+          `Session closed: id=${session.id} peer=${session.peerNodeId} | remaining sessions=${sessions.length}`,
+        );
+      };
+      sessionManager.sessions.added.on(this.sessionAddedHandler);
+      sessionManager.sessions.deleted.on(this.sessionDeletedHandler);
+    } catch {
+      // SessionManager not yet available
+    }
+  }
+
+  private unwireSessionDiagnostics() {
+    try {
+      const sessionManager = this.server.env.get(SessionManager);
+      if (this.sessionDiagHandler) {
+        sessionManager.subscriptionsChanged.off(this.sessionDiagHandler);
+      }
+      if (this.sessionAddedHandler) {
+        sessionManager.sessions.added.off(this.sessionAddedHandler);
+      }
+      if (this.sessionDeletedHandler) {
+        sessionManager.sessions.deleted.off(this.sessionDeletedHandler);
+      }
+    } catch {
+      // Already disposed
+    }
+    this.sessionDiagHandler = undefined;
+    this.sessionAddedHandler = undefined;
+    this.sessionDeletedHandler = undefined;
   }
 
   private stopAutoForceSync() {
@@ -161,140 +321,111 @@ export class Bridge {
       return;
     }
     await this.server.factoryReset();
-    this.status = { code: BridgeStatus.Stopped };
+    this.setStatus({ code: BridgeStatus.Stopped });
     await this.start();
   }
 
   /**
+   * Open a basic commissioning window so additional controllers can pair.
+   * After first commissioning the bridge stops advertising; this re-enables
+   * mDNS commissionable advertising with the original passcode/discriminator
+   * for the standard 15-minute window.
+   */
+  async openCommissioningWindow(): Promise<void> {
+    if (this.status.code !== BridgeStatus.Running) {
+      throw new Error("Bridge is not running");
+    }
+    const commissioning = this.server.state.commissioning;
+    if (!commissioning.commissioned) {
+      throw new Error("Bridge is not yet commissioned");
+    }
+    await this.server.act((agent) =>
+      agent.get(CommissioningServer).enterCommissionableMode(),
+    );
+    this.log.info("Opened basic commissioning window for multi-fabric pairing");
+  }
+
+  /**
    * Force sync all device states to connected controllers.
-   * This triggers a state refresh for all endpoints, pushing current values
-   * to all subscribed Matter controllers without requiring re-pairing.
-   *
-   * This works by re-emitting the current entity state, which causes all
-   * behavior servers to re-apply their state patches. Matter.js then sends
-   * subscription updates to all controllers for any changed attributes.
+   * Only pushes state for endpoints whose entity state has actually changed
+   * since the last sync. This avoids unnecessary MRP traffic that could
+   * trigger session loss during brief network interruptions.
    */
   async forceSync(): Promise<number> {
     if (this.status.code !== BridgeStatus.Running) {
-      this.log.warn("Cannot force sync - bridge is not running");
       return 0;
     }
 
-    this.log.info("Force sync: Pushing all device states to controllers...");
+    if (!this.dataProvider.featureFlags?.autoForceSync) {
+      return 0;
+    }
 
     // Import dynamically to avoid circular dependencies
     const { HomeAssistantEntityBehavior } = await import(
       "../../matter/behaviors/home-assistant-entity-behavior.js"
     );
 
-    const endpoints = this.aggregator.parts;
-    let syncedCount = 0;
+    // Collect all endpoints recursively to include sub-endpoints
+    // of composed devices (e.g., ComposedSensorEndpoint has T/H/P sub-endpoints)
+    const allEndpoints: Endpoint[] = [];
+    const collect = (ep: Endpoint) => {
+      allEndpoints.push(ep);
+      for (const child of ep.parts) {
+        collect(child);
+      }
+    };
+    for (const ep of this.aggregator.parts) {
+      collect(ep);
+    }
 
-    for (const endpoint of endpoints) {
+    let syncedCount = 0;
+    let skippedCount = 0;
+
+    for (const endpoint of allEndpoints) {
       try {
-        // Check if this endpoint has the HomeAssistantEntityBehavior
         if (!endpoint.behaviors.has(HomeAssistantEntityBehavior)) {
           continue;
         }
 
-        // Get the current entity state and re-emit it
-        // This triggers all behaviors listening to onChange to re-apply their state
         const behavior = endpoint.stateOf(HomeAssistantEntityBehavior);
         const currentEntity = behavior.entity;
 
         if (currentEntity?.state) {
-          // Re-set the state to trigger the entity$Changed event
-          // Even setting to the same value will cause behaviors to re-evaluate
-          await endpoint.setStateOf(HomeAssistantEntityBehavior, {
-            entity: {
-              ...currentEntity,
-              // Add a timestamp to force Matter.js to consider this a change
-              state: { ...currentEntity.state },
-            },
+          const entityId = currentEntity.entity_id;
+          // Compare only meaningful fields — ignore volatile HA metadata
+          // (last_changed, last_updated, context) to avoid unnecessary MRP traffic.
+          const stateJson = JSON.stringify({
+            s: currentEntity.state.state,
+            a: currentEntity.state.attributes,
           });
-          syncedCount++;
+          const lastJson = this.lastSyncedStates.get(entityId);
+
+          if (stateJson !== lastJson) {
+            // State has changed since last sync — push update
+            await endpoint.setStateOf(HomeAssistantEntityBehavior, {
+              entity: {
+                ...currentEntity,
+                state: { ...currentEntity.state },
+              },
+            });
+            this.lastSyncedStates.set(entityId, stateJson);
+            syncedCount++;
+          } else {
+            skippedCount++;
+          }
         }
       } catch (e) {
         this.log.debug(`Force sync: Skipped endpoint due to error:`, e);
       }
     }
 
-    this.log.info(`Force sync: Completed for ${syncedCount} devices`);
-
-    // Check subscription health and recover dead sessions.
-    // When a controller (e.g. Alexa) loses connectivity, Matter.js cancels the
-    // subscription after 3 consecutive timeouts. But the CASE session remains
-    // alive, so the controller can resume the session without re-subscribing.
-    // This leaves the connection in a zombie state where force sync pushes
-    // state internally but no subscription exists to deliver updates.
-    // Fix: detect sessions with 0 subscriptions and close them after a grace
-    // period, forcing the controller to re-establish CASE with new subscriptions.
-    await this.checkSubscriptionHealth();
+    if (syncedCount > 0) {
+      this.log.info(
+        `Force sync: Pushed ${syncedCount} changed device(s), skipped ${skippedCount} unchanged`,
+      );
+    }
 
     return syncedCount;
-  }
-
-  private async checkSubscriptionHealth(): Promise<void> {
-    try {
-      const sessionManager = this.server.env.get(SessionManager);
-      const seenSessionIds = new Set<number>();
-
-      for (const session of sessionManager.sessions) {
-        const sessionId = session.id;
-        seenSessionIds.add(sessionId);
-
-        const subscriptionCount = session.subscriptions.size;
-
-        if (subscriptionCount === 0) {
-          const count = (this.deadSessionCounts.get(sessionId) ?? 0) + 1;
-          this.deadSessionCounts.set(sessionId, count);
-
-          if (count === 1) {
-            this.log.info(
-              `Subscription health: Session ${sessionId} (peer ${session.peerNodeId}) has no active subscriptions (${count}/${DEAD_SESSION_THRESHOLD})`,
-            );
-          }
-
-          if (count >= DEAD_SESSION_THRESHOLD) {
-            this.log.warn(
-              `Subscription health: Session ${sessionId} (peer ${session.peerNodeId}) has had no subscriptions for ${count} consecutive checks. ` +
-                `Force-closing session to allow controller reconnection.`,
-            );
-            try {
-              // Use initiateForceClose instead of initiateClose.
-              // initiateClose attempts a graceful close that waits for a peer response -
-              // when the peer is unreachable (e.g. Alexa went offline), the session stays
-              // as a zombie. initiateForceClose marks the peer as lost and immediately
-              // removes the session, forcing the controller to do a full CASE re-establishment.
-              await session.initiateForceClose();
-            } catch (e) {
-              this.log.debug(
-                `Subscription health: Failed to force-close session ${sessionId}:`,
-                e,
-              );
-            }
-            this.deadSessionCounts.delete(sessionId);
-          }
-        } else {
-          // Session has active subscriptions - reset counter if tracked
-          if (this.deadSessionCounts.has(sessionId)) {
-            this.log.info(
-              `Subscription health: Session ${sessionId} recovered with ${subscriptionCount} subscription(s)`,
-            );
-            this.deadSessionCounts.delete(sessionId);
-          }
-        }
-      }
-
-      // Clean up tracking for sessions that no longer exist
-      for (const sessionId of this.deadSessionCounts.keys()) {
-        if (!seenSessionIds.has(sessionId)) {
-          this.deadSessionCounts.delete(sessionId);
-        }
-      }
-    } catch (e) {
-      this.log.debug("Subscription health check failed:", e);
-    }
   }
 
   async delete() {

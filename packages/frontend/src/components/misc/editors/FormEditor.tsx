@@ -3,7 +3,9 @@ import { Theme } from "@rjsf/mui";
 import type {
   CustomValidator,
   FormValidation,
+  RegistryFieldsType,
   RJSFValidationError,
+  TemplatesType,
   UiSchema,
 } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
@@ -19,6 +21,8 @@ export interface FormEditorProps {
   value: object;
   onChange: (value: object, isValid: boolean) => void;
   customValidate?: (value: object | undefined) => ValidationError[];
+  templates?: Partial<TemplatesType>;
+  fields?: RegistryFieldsType;
 }
 
 export const FormEditor = (props: FormEditorProps) => {
@@ -57,6 +61,8 @@ export const FormEditor = (props: FormEditorProps) => {
       customValidate={customValidator}
       showErrorList={false}
       onChange={(data) => onChange(data.formData, data.errors)}
+      templates={props.templates}
+      fields={props.fields}
     />
   );
 };

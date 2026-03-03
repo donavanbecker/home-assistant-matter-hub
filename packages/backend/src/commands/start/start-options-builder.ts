@@ -67,7 +67,7 @@ export function startOptionsBuilder(yargs: Argv): Argv<StartOptions> {
       type: "number",
       description:
         "The refresh rate (in seconds) to detect new devices & entities or their configurations",
-      default: 30,
+      default: 60,
     })
     .option("http-auth-username", {
       type: "string",
@@ -76,6 +76,11 @@ export function startOptionsBuilder(yargs: Argv): Argv<StartOptions> {
     .option("http-auth-password", {
       type: "string",
       description: "Password for HTTP basic authentication (optional)",
+    })
+    .option("http-base-path", {
+      type: "string",
+      description:
+        "Base path for the web interface and API when served behind a reverse proxy under a subfolder (e.g. /matter). Defaults to /",
     })
     .demandOption(["home-assistant-url", "home-assistant-access-token"]);
 }

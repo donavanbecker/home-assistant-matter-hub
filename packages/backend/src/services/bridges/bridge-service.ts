@@ -22,6 +22,10 @@ export class BridgeService extends Service {
   public lastRecoveryAttempt?: Date;
   public recoveryCount = 0;
 
+  // Called whenever a bridge's status changes (start, stop, update, delete, recovery).
+  // Set by the caller (e.g. start-handler) to broadcast updates via WebSocket.
+  public onBridgeChanged?: (bridgeId: string) => void;
+
   private recoveryInterval?: ReturnType<typeof setInterval>;
 
   constructor(
@@ -106,6 +110,41 @@ export class BridgeService extends Service {
     }
   }
 
+  async stopAll() {
+    for (const bridge of this.bridges) {
+      try {
+        await bridge.stop();
+        this.onBridgeChanged?.(bridge.id);
+      } catch (e) {
+        console.error(`Failed to stop bridge ${bridge.id}:`, e);
+      }
+    }
+  }
+
+  async restartAll() {
+    for (const bridge of this.bridges) {
+      try {
+        await bridge.stop();
+      } catch (e) {
+        console.error(`Failed to stop bridge ${bridge.id} during restart:`, e);
+      }
+    }
+    // Sort by priority for startup
+    const sortedBridges = [...this.bridges].sort((a, b) => {
+      const priorityA = a.data.priority ?? 100;
+      const priorityB = b.data.priority ?? 100;
+      return priorityA - priorityB;
+    });
+    for (const bridge of sortedBridges) {
+      try {
+        await bridge.start();
+        this.onBridgeChanged?.(bridge.id);
+      } catch (e) {
+        console.error(`Failed to start bridge ${bridge.id} during restart:`, e);
+      }
+    }
+  }
+
   async refreshAll() {
     for (const bridge of this.bridges) {
       try {
@@ -132,6 +171,7 @@ export class BridgeService extends Service {
     });
     await this.bridgeStorage.add(bridge.data);
     await bridge.start();
+    this.onBridgeChanged?.(bridge.id);
     return bridge;
   }
 
@@ -145,6 +185,7 @@ export class BridgeService extends Service {
     }
     await bridge.update(request);
     await this.bridgeStorage.add(bridge.data);
+    this.onBridgeChanged?.(bridge.id);
     return bridge;
   }
 
@@ -171,6 +212,7 @@ export class BridgeService extends Service {
     }
     this.bridges.splice(this.bridges.indexOf(bridge), 1);
     await this.bridgeStorage.remove(bridgeId);
+    this.onBridgeChanged?.(bridgeId);
   }
 
   async updatePriorities(
@@ -197,6 +239,9 @@ export class BridgeService extends Service {
 
   private async addBridge(bridgeData: BridgeData): Promise<Bridge> {
     const bridge = await this.bridgeFactory.create(bridgeData);
+    // Wire up status change notifications so every transition
+    // (Stopped → Starting → Running / Failed) is broadcast via WebSocket.
+    bridge.onStatusChange = () => this.onBridgeChanged?.(bridge.id);
     this.bridges.push(bridge);
     return bridge;
   }

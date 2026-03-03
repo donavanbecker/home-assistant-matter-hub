@@ -29,6 +29,7 @@ const FeaturedBase = Base.with("OnOff", "Lighting");
 
 export class LevelControlServerBase extends FeaturedBase {
   declare state: LevelControlServerBase.State;
+  private pendingTransitionTime: number | undefined;
 
   override async initialize() {
     // Set default values BEFORE super.initialize() to prevent validation errors.
@@ -43,6 +44,10 @@ export class LevelControlServerBase extends FeaturedBase {
     if (this.state.maxLevel == null) {
       this.state.maxLevel = 0xfe; // 254
     }
+    // Force onLevel to null so the base class's handleOnOffChange never
+    // overwrites currentLevel when the device turns on. Without this,
+    // Apple Home lights jump to 100% on every turn-on (#225).
+    this.state.onLevel = null;
 
     logger.debug(`initialize: calling super.initialize()`);
     try {
@@ -61,7 +66,11 @@ export class LevelControlServerBase extends FeaturedBase {
     }
   }
 
-  public update({ state }: HomeAssistantEntityInformation) {
+  public update(entity: HomeAssistantEntityInformation) {
+    if (!entity.state) {
+      return;
+    }
+    const { state } = entity;
     const config = this.state.config;
 
     const minLevel = 1;
@@ -99,6 +108,7 @@ export class LevelControlServerBase extends FeaturedBase {
     if (request.transitionTime == null) {
       request.transitionTime = 0;
     }
+    this.pendingTransitionTime = request.transitionTime;
     return super.moveToLevel(request);
   }
 
@@ -108,6 +118,7 @@ export class LevelControlServerBase extends FeaturedBase {
     if (request.transitionTime == null) {
       request.transitionTime = 0;
     }
+    this.pendingTransitionTime = request.transitionTime;
     return super.moveToLevelWithOnOff(request);
   }
 
@@ -156,9 +167,21 @@ export class LevelControlServerBase extends FeaturedBase {
     if (levelPercent === current) {
       return;
     }
-    homeAssistant.callAction(
-      config.moveToLevelPercent(levelPercent, this.agent),
-    );
+    const action = config.moveToLevelPercent(levelPercent, this.agent);
+    const transitionTimeTenths = this.pendingTransitionTime;
+    this.pendingTransitionTime = undefined;
+    if (transitionTimeTenths && transitionTimeTenths > 0) {
+      action.data = {
+        ...action.data,
+        transition: transitionTimeTenths / 10,
+      };
+    }
+    // Update currentLevel immediately so controllers get instant feedback
+    // in the command response. Without this, Apple Home reads the stale
+    // currentLevel before the HA state update arrives and reverts the UI.
+    // Matches the optimistic update pattern already used in OnOffServer.
+    this.state.currentLevel = level;
+    homeAssistant.callAction(action);
   }
 }
 

@@ -15,6 +15,7 @@ import { BasicInformationServer } from "../../../behaviors/basic-information-ser
 import { HomeAssistantEntityBehavior } from "../../../behaviors/home-assistant-entity-behavior.js";
 import { IdentifyServer } from "../../../behaviors/identify-server.js";
 import { PowerSourceServer } from "../../../behaviors/power-source-server.js";
+import { ThermostatUiConfigServer } from "../../../behaviors/thermostat-ui-config-server.js";
 import { ClimateFanControlServer } from "./behaviors/climate-fan-control-server.js";
 import { ClimateHumidityMeasurementServer } from "./behaviors/climate-humidity-measurement-server.js";
 import { ClimateOnOffServer } from "./behaviors/climate-on-off-server.js";
@@ -65,7 +66,7 @@ const ClimateDeviceType = (
   supportsHumidity: boolean,
   supportsFanMode: boolean,
   hasBattery: boolean,
-  features: { heating: boolean; cooling: boolean },
+  features: { heating: boolean; cooling: boolean; autoMode?: boolean },
   initialState: InitialThermostatState = {},
 ) => {
   const additionalClusters: ClusterBehavior.Type[] = [];
@@ -92,6 +93,7 @@ const ClimateDeviceType = (
       IdentifyServer,
       HomeAssistantEntityBehavior,
       thermostatServer,
+      ThermostatUiConfigServer,
       ClimateFanControlServer,
       ...additionalClusters,
     );
@@ -102,6 +104,7 @@ const ClimateDeviceType = (
     IdentifyServer,
     HomeAssistantEntityBehavior,
     thermostatServer,
+    ThermostatUiConfigServer,
     ...additionalClusters,
   );
 };
@@ -149,6 +152,10 @@ export function ClimateDevice(
   const hasBatteryEntity = !!homeAssistantEntity.mapping?.batteryEntity;
   const hasBattery = hasBatteryAttr || hasBatteryEntity;
 
+  // heat_cool-only zones (e.g. HVAC zones that follow the main system) get
+  // both Heating and Cooling features (without AutoMode). The thermostat
+  // server dynamically sets controlSequenceOfOperation to HeatingOnly or
+  // CoolingOnly based on hvac_action to reflect the main system's mode (#207).
   const supportsCooling = coolingModes.some((mode) =>
     attributes.hvac_modes.includes(mode),
   );
@@ -196,10 +203,9 @@ export function ClimateDevice(
   // These values are passed to Matter.js during registration to prevent
   // NaN validation errors (Matter.js validates BEFORE our initialize() runs).
   const initialState: InitialThermostatState = {
-    // Pass actual current_temperature only. Don't fall back to setpoint —
-    // null is valid per Matter spec. Falling back to the setpoint makes
-    // Apple Home think the target is reached (localTemp == setpoint →
-    // shows "Heat" instead of "Heating to...").
+    // Pass actual current_temperature for initial state.
+    // If unavailable (null/undefined), update() will fall back to the
+    // target setpoint so controllers don't display 0°C.
     localTemperature: toMatterTemp(attributes.current_temperature),
     occupiedHeatingSetpoint:
       toMatterTemp(attributes.target_temp_low) ??
@@ -216,6 +222,18 @@ export function ClimateDevice(
     maxCoolSetpointLimit: toMatterTemp(attributes.max_temp) ?? 5000,
   };
 
+  // AutoMode only when device supports heat_cool (dual setpoint) AND has
+  // explicit heat or cool modes. Devices with only 'auto' (single-setpoint)
+  // must NOT get AutoMode — Apple Home would show Auto and expect dual
+  // setpoints, causing mode flipping. heat_cool-only zones are also excluded
+  // since they lack explicit heat/cool modes (#207).
+  const autoMode =
+    supportsHeating &&
+    supportsCooling &&
+    attributes.hvac_modes.includes(ClimateHvacMode.heat_cool) &&
+    (attributes.hvac_modes.includes(ClimateHvacMode.heat) ||
+      attributes.hvac_modes.includes(ClimateHvacMode.cool));
+
   // Pass thermostat state at the endpoint type level using the behavior ID.
   // This ensures Matter.js's internal validation sees the values.
   // Only include attributes for the features the device actually supports.
@@ -224,7 +242,11 @@ export function ClimateDevice(
     supportsHumidity,
     supportsFanMode,
     hasBattery,
-    { heating: supportsHeating, cooling: supportsCooling },
+    {
+      heating: supportsHeating,
+      cooling: supportsCooling,
+      autoMode,
+    },
     initialState,
   ).set({
     homeAssistantEntity,
@@ -252,7 +274,8 @@ export function ClimateDevice(
           }
         : {}),
       localTemperature: initialState.localTemperature ?? null,
-      ...(supportsHeating && supportsCooling ? { minSetpointDeadBand: 0 } : {}),
+      // minSetpointDeadBand only valid with AutoMode (dual setpoint) feature
+      ...(autoMode ? { minSetpointDeadBand: 0 } : {}),
     },
   });
 }

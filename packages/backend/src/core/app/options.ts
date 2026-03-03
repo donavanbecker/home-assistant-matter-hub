@@ -83,6 +83,7 @@ export class Options {
       webUiDist: this.startOptions.webUiDist,
       version: resolveAppVersion(),
       storageLocation: this.resolveStorageLocation(),
+      basePath: normalizeBasePath(this.startOptions.httpBasePath),
       auth,
     };
   }
@@ -108,6 +109,17 @@ export class Options {
       },
     };
   }
+}
+
+function normalizeBasePath(val: string | undefined): string {
+  let p = val?.trim() ?? "/";
+  if (!p.startsWith("/")) {
+    p = `/${p}`;
+  }
+  if (p.length > 1 && p.endsWith("/")) {
+    p = p.slice(0, -1);
+  }
+  return p;
 }
 
 function notEmpty(val: string | undefined | null): string | undefined {

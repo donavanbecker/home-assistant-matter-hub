@@ -6,9 +6,12 @@ import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import UndoIcon from "@mui/icons-material/Undo";
 import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import IconButton from "@mui/material/IconButton";
+import { useColorScheme } from "@mui/material/styles";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import {
@@ -23,7 +26,7 @@ import {
   useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getEndpointName } from "../../components/endpoints/EndpointName.tsx";
 import { BridgeNode } from "../../components/network-map/nodes/BridgeNode.tsx";
 import { DeviceNode } from "../../components/network-map/nodes/DeviceNode.tsx";
@@ -55,9 +58,10 @@ function collectLeafEndpoints(endpoint: EndpointData): EndpointData[] {
 
 interface LayoutConfig {
   hubX: number;
-  hubY: number;
-  bridgeSpacingY: number;
+  minBridgeSpacingY: number;
   deviceSpacingY: number;
+  devicesPerColumn: number;
+  deviceColumnSpacingX: number;
   fabricOffsetX: number;
   bridgeOffsetX: number;
   deviceOffsetX: number;
@@ -73,11 +77,34 @@ function buildGraph(
 
   const totalDevices = bridges.reduce((sum, b) => sum + b.deviceCount, 0);
 
-  // Hub node (center)
+  // Track unique fabrics across bridges (deduplicate by vendorId)
+  const fabricMap = new Map<
+    number,
+    { vendorId: number; label: string; bridgeIds: string[] }
+  >();
+
+  // Pre-calculate per-bridge section heights for dynamic vertical positioning
+  const bridgeSections = bridges.map((bridge) => {
+    const rootEndpoint = devicesByBridge[bridge.id];
+    const devices = rootEndpoint ? collectLeafEndpoints(rootEndpoint) : [];
+    const failedCount = bridge.failedEntities?.length ?? 0;
+    const totalItems = devices.length + failedCount;
+    const rows = Math.min(totalItems, layout.devicesPerColumn);
+    const height = Math.max(
+      layout.minBridgeSpacingY,
+      rows * layout.deviceSpacingY + 80,
+    );
+    return { bridge, devices, height };
+  });
+
+  const totalHeight = bridgeSections.reduce((sum, s) => sum + s.height, 0);
+  const hubY = totalHeight / 2;
+
+  // Hub node (centered vertically across all bridge sections)
   nodes.push({
     id: "hub",
     type: "hub",
-    position: { x: layout.hubX, y: layout.hubY },
+    position: { x: layout.hubX, y: hubY - 60 },
     data: {
       label: "HAMH",
       bridgeCount: bridges.length,
@@ -85,19 +112,11 @@ function buildGraph(
     },
   });
 
-  // Track unique fabrics across bridges (deduplicate by vendorId)
-  const fabricMap = new Map<
-    number,
-    { vendorId: number; label: string; bridgeIds: string[] }
-  >();
+  let currentY = 0;
 
-  // Layout bridges vertically, centered around the hub
-  const totalBridgeHeight = (bridges.length - 1) * layout.bridgeSpacingY;
-  const bridgeStartY = layout.hubY - totalBridgeHeight / 2;
-
-  bridges.forEach((bridge, bridgeIndex) => {
+  bridgeSections.forEach(({ bridge, devices, height }) => {
     const bridgeId = `bridge-${bridge.id}`;
-    const bridgeY = bridgeStartY + bridgeIndex * layout.bridgeSpacingY;
+    const bridgeCenterY = currentY + height / 2;
     const bridgeX = layout.hubX + layout.bridgeOffsetX;
 
     const fabricCount = bridge.commissioning?.fabrics?.length ?? 0;
@@ -106,7 +125,7 @@ function buildGraph(
     nodes.push({
       id: bridgeId,
       type: "bridge",
-      position: { x: bridgeX, y: bridgeY },
+      position: { x: bridgeX, y: bridgeCenterY - 30 },
       data: {
         label: bridge.name,
         status: bridge.status,
@@ -147,15 +166,17 @@ function buildGraph(
       }
     }
 
-    // Devices for this bridge
-    const rootEndpoint = devicesByBridge[bridge.id];
-    const devices = rootEndpoint ? collectLeafEndpoints(rootEndpoint) : [];
-
-    const totalDeviceHeight = (devices.length - 1) * layout.deviceSpacingY;
-    const deviceStartY = bridgeY - totalDeviceHeight / 2 + 10;
+    // Devices + failed entities in grid layout (multiple columns)
+    const failedEntities = bridge.failedEntities ?? [];
+    const totalItems = devices.length + failedEntities.length;
+    const rows = Math.min(totalItems, layout.devicesPerColumn);
+    const gridHeight = rows * layout.deviceSpacingY;
+    const deviceStartY = bridgeCenterY - gridHeight / 2;
     const deviceX = bridgeX + layout.deviceOffsetX;
 
-    devices.forEach((device, deviceIndex) => {
+    devices.forEach((device, i) => {
+      const col = Math.floor(i / layout.devicesPerColumn);
+      const row = i % layout.devicesPerColumn;
       const deviceId = `device-${bridge.id}-${device.id.global}`;
       const name = getEndpointName(device.state) ?? device.id.local;
 
@@ -163,8 +184,8 @@ function buildGraph(
         id: deviceId,
         type: "device",
         position: {
-          x: deviceX,
-          y: deviceStartY + deviceIndex * layout.deviceSpacingY,
+          x: deviceX + col * layout.deviceColumnSpacingX,
+          y: deviceStartY + row * layout.deviceSpacingY,
         },
         data: {
           label: name,
@@ -182,45 +203,47 @@ function buildGraph(
       });
     });
 
-    // Failed entities for this bridge
-    if (bridge.failedEntities) {
-      bridge.failedEntities.forEach((failed, failedIndex) => {
-        const failedId = `failed-${bridge.id}-${failed.entityId}`;
+    // Failed entities continue in the same grid after devices
+    failedEntities.forEach((failed, fi) => {
+      const overallIndex = devices.length + fi;
+      const col = Math.floor(overallIndex / layout.devicesPerColumn);
+      const row = overallIndex % layout.devicesPerColumn;
+      const failedId = `failed-${bridge.id}-${failed.entityId}`;
 
-        nodes.push({
-          id: failedId,
-          type: "failed",
-          position: {
-            x: deviceX,
-            y:
-              deviceStartY +
-              (devices.length + failedIndex) * layout.deviceSpacingY,
-          },
-          data: {
-            label: failed.entityId,
-            reason: failed.reason,
-          },
-        });
-
-        edges.push({
-          id: `${bridgeId}-${failedId}`,
-          source: bridgeId,
-          target: failedId,
-          type: "smoothstep",
-          style: {
-            stroke: "#f44336",
-            strokeWidth: 1,
-            strokeDasharray: "5,5",
-          },
-        });
+      nodes.push({
+        id: failedId,
+        type: "failed",
+        position: {
+          x: deviceX + col * layout.deviceColumnSpacingX,
+          y: deviceStartY + row * layout.deviceSpacingY,
+        },
+        data: {
+          label: failed.entityId,
+          reason: failed.reason,
+        },
       });
-    }
+
+      edges.push({
+        id: `${bridgeId}-${failedId}`,
+        source: bridgeId,
+        target: failedId,
+        type: "smoothstep",
+        style: {
+          stroke: "#f44336",
+          strokeWidth: 1,
+          strokeDasharray: "5,5",
+        },
+      });
+    });
+
+    currentY += height;
   });
 
   // Fabric / controller nodes (left side)
   const fabricEntries = Array.from(fabricMap.values());
-  const totalFabricHeight = (fabricEntries.length - 1) * layout.bridgeSpacingY;
-  const fabricStartY = layout.hubY - totalFabricHeight / 2;
+  const fabricSpacingY = 120;
+  const totalFabricHeight = (fabricEntries.length - 1) * fabricSpacingY;
+  const fabricStartY = hubY - totalFabricHeight / 2;
 
   fabricEntries.forEach((fabric, fabricIndex) => {
     const fabricId = `fabric-${fabric.vendorId}`;
@@ -230,7 +253,7 @@ function buildGraph(
       type: "fabric",
       position: {
         x: layout.hubX + layout.fabricOffsetX,
-        y: fabricStartY + fabricIndex * layout.bridgeSpacingY,
+        y: fabricStartY + fabricIndex * fabricSpacingY,
       },
       data: {
         label: fabric.label,
@@ -261,6 +284,12 @@ export const NetworkMapPage = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const { mode } = useColorScheme();
+  const isDark = mode === "dark";
+  const undoStackRef = useRef<
+    { nodeId: string; position: { x: number; y: number } }[]
+  >([]);
+  const [canUndo, setCanUndo] = useState(false);
 
   useEffect(() => {
     dispatch(loadBridges());
@@ -294,15 +323,36 @@ export const NetworkMapPage = () => {
 
     const layout: LayoutConfig = {
       hubX: 400,
-      hubY: 300,
-      bridgeSpacingY: 200,
-      deviceSpacingY: 50,
+      minBridgeSpacingY: 200,
+      deviceSpacingY: 55,
+      devicesPerColumn: 10,
+      deviceColumnSpacingX: 220,
       fabricOffsetX: -350,
       bridgeOffsetX: 250,
       deviceOffsetX: 280,
     };
 
     const graph = buildGraph(bridges, devicesByBridge, layout);
+
+    // Restore saved positions from localStorage
+    const STORAGE_KEY = "hamh-network-map-positions";
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const positions = JSON.parse(saved) as Record<
+          string,
+          { x: number; y: number }
+        >;
+        for (const node of graph.nodes) {
+          if (positions[node.id]) {
+            node.position = positions[node.id];
+          }
+        }
+      }
+    } catch {
+      /* ignore corrupt data */
+    }
+
     setNodes(graph.nodes);
     setEdges(graph.edges);
   }, [bridges, devicesByBridge, devicesLoaded, setNodes, setEdges]);
@@ -310,6 +360,67 @@ export const NetworkMapPage = () => {
   const handleRefresh = useCallback(() => {
     dispatch(loadBridges());
   }, [dispatch]);
+
+  const onNodeDragStop = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      // Save the previous position for undo before persisting
+      const prev = nodes.find((n) => n.id === node.id);
+      if (prev) {
+        undoStackRef.current.push({
+          nodeId: node.id,
+          position: { ...prev.position },
+        });
+        setCanUndo(true);
+      }
+
+      // Persist all current positions to localStorage
+      const STORAGE_KEY = "hamh-network-map-positions";
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        const positions: Record<string, { x: number; y: number }> = saved
+          ? JSON.parse(saved)
+          : {};
+        positions[node.id] = { x: node.position.x, y: node.position.y };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
+      } catch {
+        /* ignore */
+      }
+    },
+    [nodes],
+  );
+
+  const handleResetLayout = useCallback(() => {
+    localStorage.removeItem("hamh-network-map-positions");
+    undoStackRef.current = [];
+    setCanUndo(false);
+    // Re-trigger graph build by reloading bridges
+    dispatch(loadBridges());
+  }, [dispatch]);
+
+  const handleUndo = useCallback(() => {
+    const last = undoStackRef.current.pop();
+    if (!last) return;
+    setCanUndo(undoStackRef.current.length > 0);
+
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === last.nodeId ? { ...n, position: last.position } : n,
+      ),
+    );
+
+    // Update localStorage
+    const STORAGE_KEY = "hamh-network-map-positions";
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      const positions: Record<string, { x: number; y: number }> = saved
+        ? JSON.parse(saved)
+        : {};
+      positions[last.nodeId] = last.position;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
+    } catch {
+      /* ignore */
+    }
+  }, [setNodes]);
 
   const isLoading = bridgesLoading || !devicesLoaded;
 
@@ -330,8 +441,24 @@ export const NetworkMapPage = () => {
           <AccountTreeIcon />
           Network Map
         </Typography>
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <Tooltip title="Refresh">
+        <Box sx={{ display: "flex", gap: 0.5 }}>
+          <Tooltip title="Undo last move">
+            <span>
+              <IconButton
+                onClick={handleUndo}
+                color="primary"
+                disabled={!canUndo}
+              >
+                <UndoIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title="Reset layout">
+            <IconButton onClick={handleResetLayout} color="primary">
+              <RestartAltIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Refresh data">
             <IconButton onClick={handleRefresh} color="primary">
               <RefreshIcon />
             </IconButton>
@@ -368,10 +495,12 @@ export const NetworkMapPage = () => {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onNodeDragStop={onNodeDragStop}
             nodeTypes={nodeTypes}
+            colorMode={isDark ? "dark" : "light"}
             fitView
-            fitViewOptions={{ padding: 0.3 }}
-            minZoom={0.2}
+            fitViewOptions={{ padding: 0.2 }}
+            minZoom={0.1}
             maxZoom={2}
             proOptions={{ hideAttribution: true }}
           >
@@ -381,6 +510,20 @@ export const NetworkMapPage = () => {
               nodeStrokeWidth={3}
               zoomable
               pannable
+              nodeColor={(node) => {
+                switch (node.type) {
+                  case "hub":
+                    return "#1976d2";
+                  case "bridge":
+                    return "#4caf50";
+                  case "fabric":
+                    return "#9c27b0";
+                  case "failed":
+                    return "#f44336";
+                  default:
+                    return isDark ? "#90caf9" : "#90a4ae";
+                }
+              }}
               style={{ borderRadius: 8 }}
             />
           </ReactFlow>
@@ -432,7 +575,7 @@ export const NetworkMapPage = () => {
               width: 12,
               height: 12,
               borderRadius: 0.5,
-              background: "#e8f5e9",
+              background: isDark ? "#1b3a1b" : "#e8f5e9",
               border: "1px solid #4caf50",
             }}
           />
@@ -446,8 +589,8 @@ export const NetworkMapPage = () => {
               width: 12,
               height: 12,
               borderRadius: 0.5,
-              background: "#fff",
-              border: "1px solid #bdbdbd",
+              background: isDark ? "#2a2a2a" : "#fff",
+              border: `1px solid ${isDark ? "#616161" : "#bdbdbd"}`,
             }}
           />
           <Typography variant="caption" color="text.secondary">
@@ -460,7 +603,7 @@ export const NetworkMapPage = () => {
               width: 12,
               height: 12,
               borderRadius: 0.5,
-              background: "#ffebee",
+              background: isDark ? "#3a1515" : "#ffebee",
               border: "1px dashed #f44336",
             }}
           />

@@ -25,3 +25,20 @@ export async function fetchAreas(): Promise<HomeAssistantArea[]> {
   }
   return res.json();
 }
+
+export interface FilterValues {
+  domains: string[];
+  platforms: string[];
+  entityCategories: string[];
+  deviceClasses: string[];
+  deviceNames: string[];
+  productNames: string[];
+}
+
+export async function fetchFilterValues(): Promise<FilterValues> {
+  const res = await fetch(`api/matter/filter-values?_s=${Date.now()}`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch filter values");
+  }
+  return res.json();
+}

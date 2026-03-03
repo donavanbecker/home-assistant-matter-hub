@@ -2,6 +2,7 @@ import CastConnectedIcon from "@mui/icons-material/CastConnected";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { Handle, type NodeProps, Position } from "@xyflow/react";
+import { getVendorName } from "../../../components/fabric/vendor-names.ts";
 
 export interface FabricNodeData {
   label: string;
@@ -9,17 +10,12 @@ export interface FabricNodeData {
   [key: string]: unknown;
 }
 
-const vendorNames: Record<number, string> = {
-  24582: "Apple Home",
-  65521: "Apple Home",
-  4996: "Google Home",
-  4937: "Amazon Alexa",
-  4362: "Samsung SmartThings",
-};
-
 export const FabricNode = ({ data }: NodeProps) => {
   const { label, vendorId } = data as unknown as FabricNodeData;
-  const vendorName = vendorNames[vendorId] ?? (label || `Vendor ${vendorId}`);
+  const vendorName =
+    getVendorName(vendorId) !== `Vendor ${vendorId}`
+      ? getVendorName(vendorId)
+      : label || `Vendor ${vendorId}`;
 
   return (
     <Box

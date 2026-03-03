@@ -17,6 +17,20 @@ import RunningMode = Thermostat.ThermostatRunningMode;
 import type { ActionContext } from "@matter/main";
 import { transactionIsOffline } from "../../utils/transaction-is-offline.js";
 
+// Tracks entity IDs currently receiving a nudge write from update().
+// Prevents the nudge itself from triggering auto-resume in $Changing handlers.
+const nudgingSetpoints = new Set<string>();
+
+/**
+ * Nudge a setpoint by +1 centidegree (0.01°C) so that any controller write
+ * of the "real" value produces a value change and triggers $Changing.
+ * If already at the max limit, nudge -1 instead to stay within bounds.
+ */
+function nudgeSetpoint(value: number | undefined, maxLimit: number): number {
+  if (value == null) return 2000; // fallback 20°C
+  return value >= maxLimit ? value - 1 : value + 1;
+}
+
 // For dual-mode thermostats (heating + cooling), AutoMode is ENABLED so Apple Home
 // can offer Auto mode and dual setpoints. Without AutoMode, Apple Home loses Auto.
 //
@@ -86,6 +100,16 @@ const HeatingOnlyFeaturedBase = Base.with("Heating").set(heatingOnlyDefaults);
 const CoolingOnlyFeaturedBase = Base.with("Cooling").set(coolingOnlyDefaults);
 const FullFeaturedBase = Base.with("Heating", "Cooling", "AutoMode").set(
   fullDefaults,
+);
+
+// Heating + Cooling WITHOUT AutoMode. For devices that support both heat and cool
+// but not dual setpoints (no heat_cool mode in HA). Apple Home won't show Auto.
+const heatingAndCoolingDefaults = {
+  ...heatingOnlyDefaults,
+  ...coolingOnlyDefaults,
+};
+const HeatingAndCoolingFeaturedBase = Base.with("Heating", "Cooling").set(
+  heatingAndCoolingDefaults,
 );
 
 export interface ThermostatRunningState {
@@ -188,20 +212,22 @@ function thermostatPreInitialize(self: any): void {
   // heating/cooling.
   self.state.thermostatRunningState = runningStateAllOff;
 
-  // For full HVAC devices (AutoMode enabled): ensure minSetpointDeadBand is set.
-  // thermostatRunningMode: updated for Auto mode only in update().
-  if (self.features.heating && self.features.cooling) {
+  // minSetpointDeadBand only exists with AutoMode feature.
+  // For Heating+Cooling without AutoMode, this property must not be set.
+  if (self.features.autoMode) {
     self.state.minSetpointDeadBand = self.state.minSetpointDeadBand ?? 0;
   }
 
   // Set initial controlSequenceOfOperation based on enabled features.
-  // Will be updated from HA entity's actual hvac_modes in update().
+  // CoolingAndHeating is only safe for AutoMode devices (HEAT+COOL+AUTO features).
+  // Non-AutoMode devices with both features use HeatingOnly as safe initial value;
+  // update() will set the correct dynamic value via internal override (#28).
   self.state.controlSequenceOfOperation =
-    self.features.cooling && self.features.heating
+    self.features.cooling && self.features.heating && self.features.autoMode
       ? Thermostat.ControlSequenceOfOperation.CoolingAndHeating
-      : self.features.cooling
-        ? Thermostat.ControlSequenceOfOperation.CoolingOnly
-        : Thermostat.ControlSequenceOfOperation.HeatingOnly;
+      : self.features.heating
+        ? Thermostat.ControlSequenceOfOperation.HeatingOnly
+        : Thermostat.ControlSequenceOfOperation.CoolingOnly;
 }
 
 /**
@@ -277,6 +303,7 @@ export class ThermostatServerBase extends FullFeaturedBase {
       return;
     }
     const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
+    const entityId = homeAssistant.entityId;
     const config = this.state.config;
 
     // When unavailable, keep last known values but report offline via BasicInformation.reachable
@@ -318,16 +345,15 @@ export class ThermostatServerBase extends FullFeaturedBase {
       ? config.getRunningMode(entity.state, this.agent)
       : Thermostat.ThermostatRunningMode.Off;
 
-    // localTemperature: null when current_temperature is unavailable.
-    // Valid per Matter spec (nullable int16). Previously we fell back to the
-    // setpoint, but that made Apple Home think the target was already reached
-    // (localTemp == setpoint → shows "Heat" instead of "Heating to...").
-    // Null tells the controller "temperature unknown".
+    // localTemperature: use actual current_temperature when available.
+    // Fall back to the target setpoint when unavailable so controllers
+    // don't display 0°C. The "Heating to…" vs "Heat to…" distinction
+    // comes from thermostatRunningState (derived from hvac_action).
     const localTemperature =
       typeof currentTemperature === "number" &&
       !Number.isNaN(currentTemperature)
         ? currentTemperature
-        : null;
+        : (targetHeatingTemperature ?? targetCoolingTemperature ?? null);
 
     // Temperature limit handling:
     // Use HA's actual min/max limits for ALL modes (single and dual).
@@ -369,6 +395,16 @@ export class ThermostatServerBase extends FullFeaturedBase {
       `update: limits heat=[${minHeatLimit}, ${maxHeatLimit}], cool=[${minCoolLimit}, ${maxCoolLimit}], systemMode=${systemMode}, runningMode=${runningMode}`,
     );
 
+    // Compute controlSequenceOfOperation and update the internal value BEFORE
+    // writing to state. Matter.js's ThermostatBaseServer stores this in
+    // internal.controlSequenceOfOperation and has a $Changing reactor that
+    // reverts any state write back to the internal value. We must update
+    // internal first so the reactor allows our new value through. The
+    // systemMode $Changing reactor also validates against the internal value.
+    const controlSequence = config.getControlSequence(entity.state, this.agent);
+    // biome-ignore lint/suspicious/noExplicitAny: Access protected internal state from Matter.js base
+    (this as any).internal.controlSequenceOfOperation = controlSequence;
+
     // Property order matters: applyPatchState sets properties sequentially, so if one
     // property write triggers an error, subsequent properties won't be set.
     // Limits are set FIRST to ensure they're applied even if mode changes trigger errors.
@@ -390,10 +426,7 @@ export class ThermostatServerBase extends FullFeaturedBase {
           }
         : {}),
       localTemperature: localTemperature,
-      controlSequenceOfOperation: config.getControlSequence(
-        entity.state,
-        this.agent,
-      ),
+      controlSequenceOfOperation: controlSequence,
       thermostatRunningState: this.getRunningState(systemMode, runningMode),
       systemMode: systemMode,
       // thermostatRunningMode: Only set for Auto mode. Matter.js's reactor handles
@@ -407,13 +440,41 @@ export class ThermostatServerBase extends FullFeaturedBase {
       systemMode === Thermostat.SystemMode.Auto
         ? { thermostatRunningMode: runningMode }
         : {}),
-      ...(this.features.heating
-        ? { occupiedHeatingSetpoint: clampedHeatingSetpoint }
-        : {}),
-      ...(this.features.cooling
-        ? { occupiedCoolingSetpoint: clampedCoolingSetpoint }
-        : {}),
     });
+
+    // Setpoints are applied in a separate patch wrapped with the nudgingSetpoints
+    // guard. When Off, setpoints are nudged by +1 centidegree (0.01°C) so any
+    // controller write — even the "same" temperature — triggers $Changing for
+    // auto-resume (#176). The guard prevents the nudge itself from auto-resuming.
+    nudgingSetpoints.add(entityId);
+    try {
+      applyPatchState(this.state, {
+        ...(this.features.heating
+          ? {
+              occupiedHeatingSetpoint:
+                systemMode === Thermostat.SystemMode.Off
+                  ? nudgeSetpoint(
+                      clampedHeatingSetpoint,
+                      maxHeatLimit ?? WIDE_MAX,
+                    )
+                  : clampedHeatingSetpoint,
+            }
+          : {}),
+        ...(this.features.cooling
+          ? {
+              occupiedCoolingSetpoint:
+                systemMode === Thermostat.SystemMode.Off
+                  ? nudgeSetpoint(
+                      clampedCoolingSetpoint,
+                      maxCoolLimit ?? WIDE_MAX,
+                    )
+                  : clampedCoolingSetpoint,
+            }
+          : {}),
+      });
+    } finally {
+      nudgingSetpoints.delete(entityId);
+    }
   }
 
   override setpointRaiseLower(request: Thermostat.SetpointRaiseLowerRequest) {
@@ -430,13 +491,15 @@ export class ThermostatServerBase extends FullFeaturedBase {
     heat = (heat ?? cool)!;
     cool = (cool ?? heat)!;
 
+    // Matter spec: amount is in 0.1°C steps (tenths of a degree).
+    // Divide by 10 to convert to °C for the Temperature.plus() method.
     const adjustedCool =
       request.mode !== Thermostat.SetpointRaiseLowerMode.Heat
-        ? cool.plus(request.amount / 1000, "°C")
+        ? cool.plus(request.amount / 10, "°C")
         : cool;
     const adjustedHeat =
       request.mode !== Thermostat.SetpointRaiseLowerMode.Cool
-        ? heat.plus(request.amount / 1000, "°C")
+        ? heat.plus(request.amount / 10, "°C")
         : heat;
     this.setTemperature(adjustedHeat, adjustedCool, request.mode);
   }
@@ -486,18 +549,38 @@ export class ThermostatServerBase extends FullFeaturedBase {
         const isHeatingMode =
           currentMode === Thermostat.SystemMode.Heat ||
           currentMode === Thermostat.SystemMode.EmergencyHeat;
+        const isOff = currentMode === Thermostat.SystemMode.Off;
 
-        // In Auto mode: heating setpoint updates temperature (cooling setpoint is ignored)
-        // In Heat mode: heating setpoint updates temperature
-        // In Cool mode: let coolingSetpointChanging handle this
-        if (!isAutoMode && !isHeatingMode) {
+        if (isOff && this.features.heating) {
+          // Auto-resume (#176): controller wrote a heating setpoint while Off.
+          // The nudge in update() ensures $Changing fires even for same-value writes.
+          // Skip if this $Changing was caused by the nudge itself (not a controller write).
+          if (nudgingSetpoints.has(homeAssistant.entityId)) {
+            logger.debug(
+              `heatingSetpointChanging: skipping auto-resume - nudge write in progress`,
+            );
+            return;
+          }
+          logger.info(
+            `heatingSetpointChanging: auto-resume - switching to Heat (was Off)`,
+          );
+          const modeAction = config.setSystemMode(
+            Thermostat.SystemMode.Heat,
+            this.agent,
+          );
+          homeAssistant.callAction(modeAction);
+          // Proceed to forward the temperature to HA below.
+        } else if (!isAutoMode && !isHeatingMode) {
+          // In Auto mode: heating setpoint updates temperature (cooling setpoint is ignored)
+          // In Heat mode: heating setpoint updates temperature
+          // In Cool mode: let coolingSetpointChanging handle this
           logger.debug(
             `heatingSetpointChanging: skipping - not in heating/auto mode (mode=${currentMode}, haMode=${haHvacMode})`,
           );
           return; // Let coolingSetpointChanging handle this
         }
         logger.debug(
-          `heatingSetpointChanging: proceeding - isAutoMode=${isAutoMode}, isHeatingMode=${isHeatingMode}, haMode=${haHvacMode}`,
+          `heatingSetpointChanging: proceeding - isAutoMode=${isAutoMode}, isHeatingMode=${isHeatingMode}, isOff=${isOff}, haMode=${haHvacMode}`,
         );
       }
 
@@ -550,18 +633,38 @@ export class ThermostatServerBase extends FullFeaturedBase {
         const isCoolingMode =
           currentMode === Thermostat.SystemMode.Cool ||
           currentMode === Thermostat.SystemMode.Precooling;
+        const isOff = currentMode === Thermostat.SystemMode.Off;
 
-        // In Auto mode: BOTH heating and cooling setpoint should update temperature (#71)
-        // In Cool mode: cooling setpoint updates temperature
-        // In Heat mode: let heatingSetpointChanging handle this
-        if (!isAutoMode && !isCoolingMode) {
+        if (isOff && !this.features.heating && this.features.cooling) {
+          // Auto-resume (#176): controller wrote a cooling setpoint while Off.
+          // The nudge in update() ensures $Changing fires even for same-value writes.
+          // Skip if this $Changing was caused by the nudge itself (not a controller write).
+          if (nudgingSetpoints.has(homeAssistant.entityId)) {
+            logger.debug(
+              `coolingSetpointChanging: skipping auto-resume - nudge write in progress`,
+            );
+            return;
+          }
+          logger.info(
+            `coolingSetpointChanging: auto-resume - switching to Cool (was Off)`,
+          );
+          const modeAction = config.setSystemMode(
+            Thermostat.SystemMode.Cool,
+            this.agent,
+          );
+          homeAssistant.callAction(modeAction);
+          // Proceed to forward the temperature to HA below.
+        } else if (!isAutoMode && !isCoolingMode) {
+          // In Auto mode: BOTH heating and cooling setpoint should update temperature (#71)
+          // In Cool mode: cooling setpoint updates temperature
+          // In Heat mode: let heatingSetpointChanging handle this
           logger.debug(
             `coolingSetpointChanging: skipping - not in cooling/auto mode (mode=${currentMode}, haMode=${haHvacMode})`,
           );
           return; // Let heatingSetpointChanging handle this
         }
         logger.debug(
-          `coolingSetpointChanging: proceeding - isAutoMode=${isAutoMode}, isCoolingMode=${isCoolingMode}, haMode=${haHvacMode}`,
+          `coolingSetpointChanging: proceeding - isAutoMode=${isAutoMode}, isCoolingMode=${isCoolingMode}, isOff=${isOff}, haMode=${haHvacMode}`,
         );
       }
 
@@ -757,12 +860,43 @@ function copyPrototypeMethods(source: any, target: any) {
     }
   }
 }
+// biome-ignore lint/correctness/noUnusedVariables: Used via copyPrototypeMethods and in ThermostatServer factory
+class HeatingAndCoolingThermostatServerBase extends HeatingAndCoolingFeaturedBase {
+  declare state: HeatingAndCoolingThermostatServerBase.State;
+  static override State = class extends HeatingAndCoolingFeaturedBase.State {
+    config!: ThermostatServerConfig;
+  };
+
+  // Each variant MUST define its own initialize() — see HeatingOnly comment above.
+  override async initialize() {
+    thermostatPreInitialize(this);
+    await super.initialize();
+    await thermostatPostInitialize(this);
+  }
+}
+namespace HeatingAndCoolingThermostatServerBase {
+  export type State = InstanceType<
+    typeof HeatingAndCoolingThermostatServerBase.State
+  >;
+}
+
 copyPrototypeMethods(ThermostatServerBase, HeatingOnlyThermostatServerBase);
 copyPrototypeMethods(ThermostatServerBase, CoolingOnlyThermostatServerBase);
+copyPrototypeMethods(
+  ThermostatServerBase,
+  HeatingAndCoolingThermostatServerBase,
+);
 
 export interface ThermostatServerFeatures {
   heating: boolean;
   cooling: boolean;
+  /**
+   * Enable AutoMode (dual setpoint) feature.
+   * Only set to true if the device supports heat_cool in HA hvac_modes.
+   * Without this, Apple Home won't show the Auto option, preventing
+   * mode flipping on devices that only have single-setpoint 'auto'.
+   */
+  autoMode?: boolean;
 }
 
 /**
@@ -808,10 +942,30 @@ export function ThermostatServer(
   const supportsCooling = features.cooling;
 
   if (supportsHeating && supportsCooling) {
-    // Full features (heating + cooling + auto mode)
-    // IMPORTANT: abs limits → regular limits → setpoints to prevent
-    // validation failures for negative temperatures (e.g. refrigerators).
-    return ThermostatServerBase.set({
+    if (features.autoMode) {
+      // Full features (heating + cooling + auto mode) for heat_cool devices
+      // IMPORTANT: abs limits → regular limits → setpoints to prevent
+      // validation failures for negative temperatures (e.g. refrigerators).
+      return ThermostatServerBase.set({
+        config,
+        absMinHeatSetpointLimit: initialState.minHeatSetpointLimit ?? 0,
+        absMaxHeatSetpointLimit: initialState.maxHeatSetpointLimit ?? 5000,
+        absMinCoolSetpointLimit: initialState.minCoolSetpointLimit ?? 0,
+        absMaxCoolSetpointLimit: initialState.maxCoolSetpointLimit ?? 5000,
+        minHeatSetpointLimit: initialState.minHeatSetpointLimit ?? 0,
+        maxHeatSetpointLimit: initialState.maxHeatSetpointLimit ?? 5000,
+        minCoolSetpointLimit: initialState.minCoolSetpointLimit ?? 0,
+        maxCoolSetpointLimit: initialState.maxCoolSetpointLimit ?? 5000,
+        localTemperature: initialState.localTemperature ?? 2100,
+        occupiedHeatingSetpoint: initialState.occupiedHeatingSetpoint ?? 2000,
+        occupiedCoolingSetpoint: initialState.occupiedCoolingSetpoint ?? 2400,
+        minSetpointDeadBand: 0,
+      });
+    }
+
+    // Heating + Cooling without AutoMode (for ACs with heat+cool but no heat_cool)
+    // Apple Home won't show Auto option, preventing mode flipping issues.
+    return HeatingAndCoolingThermostatServerBase.set({
       config,
       absMinHeatSetpointLimit: initialState.minHeatSetpointLimit ?? 0,
       absMaxHeatSetpointLimit: initialState.maxHeatSetpointLimit ?? 5000,
@@ -824,7 +978,6 @@ export function ThermostatServer(
       localTemperature: initialState.localTemperature ?? 2100,
       occupiedHeatingSetpoint: initialState.occupiedHeatingSetpoint ?? 2000,
       occupiedCoolingSetpoint: initialState.occupiedCoolingSetpoint ?? 2400,
-      minSetpointDeadBand: 0,
     });
   }
 

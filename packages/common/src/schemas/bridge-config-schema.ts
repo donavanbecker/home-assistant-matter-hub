@@ -1,5 +1,4 @@
 import type { JSONSchema7 } from "json-schema";
-import { HomeAssistantMatcherType } from "../home-assistant-filter.js";
 
 const homeAssistantMatcherSchema: JSONSchema7 = {
   type: "object",
@@ -8,12 +7,79 @@ const homeAssistantMatcherSchema: JSONSchema7 = {
     type: {
       title: "Type",
       type: "string",
-      enum: Object.values(HomeAssistantMatcherType),
+      oneOf: [
+        {
+          const: "pattern",
+          title: "pattern",
+          description:
+            "Wildcard pattern matching entity IDs. Use * as wildcard. Example: 'light.living_room_*' matches all lights in the living room.",
+        },
+        {
+          const: "regex",
+          title: "regex",
+          description:
+            "Full regular expression matching entity IDs. Use ^ and $ for anchors. Example: '^(light|switch)\\.kitchen_.*' matches all kitchen lights and switches.",
+        },
+        {
+          const: "domain",
+          title: "domain",
+          description:
+            "Match entities by their domain (the part before the dot). Example: 'light', 'switch', 'sensor'.",
+        },
+        {
+          const: "platform",
+          title: "platform",
+          description:
+            "Match entities by their integration/platform. Example: 'hue', 'zwave', 'mqtt'.",
+        },
+        {
+          const: "entity_label",
+          title: "entity_label",
+          description:
+            "Matches only entities that have this label assigned directly. Other entities of the same device are NOT included.",
+        },
+        {
+          const: "device_label",
+          title: "device_label",
+          description:
+            "Matches ALL entities of a device if the device has this label. Use this to include a complete device with all its entities.",
+        },
+        {
+          const: "area",
+          title: "area",
+          description:
+            "Match entities by their area slug. Example: 'living_room', 'bedroom'.",
+        },
+        {
+          const: "entity_category",
+          title: "entity_category",
+          description:
+            "Match entities by their category. Example: 'config', 'diagnostic' to exclude configuration entities.",
+        },
+        {
+          const: "device_name",
+          title: "device_name",
+          description:
+            "Match entities by their device name. Supports wildcards. Example: '*Philips*' matches all Philips devices.",
+        },
+        {
+          const: "product_name",
+          title: "product_name",
+          description:
+            "Match entities by their product/model name. Supports wildcards. Example: 'Hue*Bulb'.",
+        },
+        {
+          const: "device_class",
+          title: "device_class",
+          description:
+            "Match entities by their device class attribute. Example: 'temperature', 'motion', 'door', 'window'.",
+        },
+      ],
     },
     value: {
       title: "Value",
       description:
-        "For labels, use the label_id (slug), not the display name. You can find the label_id in Home Assistant under Settings > Labels. Example: 'my_smart_lights' instead of 'My Smart Lights'.",
+        "For labels, use the display name or the label_id (slug). You can look up both on the Labels page in the sidebar.",
       type: "string",
       minLength: 1,
     },
@@ -73,10 +139,10 @@ const featureFlagSchema: JSONSchema7 = {
     },
 
     coverSwapOpenClose: {
-      title: "Swap Open/Close Commands for Covers",
+      title: "Swap Open/Close for Covers",
       description:
-        "Swap the open and close commands for covers. Enable this if Alexa voice commands are reversed " +
-        "(saying 'close' opens the blinds and vice versa). This affects open/close commands only, not percentage control.",
+        "Swap open/close commands and invert position reporting for covers. Enable this if Alexa voice commands " +
+        "are reversed (saying 'close' opens the blinds and vice versa).",
       type: "boolean",
       default: false,
     },
@@ -126,12 +192,54 @@ const featureFlagSchema: JSONSchema7 = {
       default: true,
     },
 
-    autoForceSync: {
-      title: "Auto Force Sync (Google Home & Alexa workaround)",
+    autoPressureMapping: {
+      title: "Auto Pressure Mapping",
       description:
-        "Periodically push all device states to connected controllers every 60 seconds. " +
-        "This is a workaround for Google Home and Alexa which sometimes lose subscriptions and show devices as offline/unresponsive. " +
-        "Only enable this if you experience state sync issues or disconnections after a few hours.",
+        "Automatically combine pressure sensors with temperature sensors from the same Home Assistant device. " +
+        "When enabled, pressure sensors will be merged into temperature sensors to create combined sensor devices.",
+      type: "boolean",
+      default: true,
+    },
+
+    autoComposedDevices: {
+      title: "Auto Composed Devices",
+      description:
+        "Master toggle: automatically combine related entities from the same Home Assistant device " +
+        "into single Matter endpoints. Enables battery, humidity, pressure, power, and energy auto-mapping at once. " +
+        "This provides a cleaner device experience in Matter controllers (e.g., a Shelly Plug appears as one device with power monitoring).",
+      type: "boolean",
+      default: false,
+    },
+
+    autoForceSync: {
+      title: "Auto Force Sync",
+      description:
+        "Periodically compare and push all device states to connected controllers every 90 seconds. " +
+        "Enable this if devices get out of sync after extended periods. " +
+        "Health checks for dead sessions always run regardless of this setting.",
+      type: "boolean",
+      default: false,
+    },
+
+    vacuumOnOff: {
+      title: "Vacuum: Include OnOff Cluster (Alexa)",
+      description:
+        "Add an OnOff cluster to robot vacuum endpoints. " +
+        "Alexa REQUIRES this (PowerController) to show robotic vacuums in the app. " +
+        "Without it, Alexa commissions the device but never displays it. " +
+        "In Server Mode this is enabled automatically — only check this for bridge mode. " +
+        "WARNING: OnOff is NOT part of the Matter RVC device type specification. " +
+        "Enabling this may break Apple Home (shows 'Updating') and Google Home.",
+      type: "boolean",
+    },
+
+    vacuumMinimalClusters: {
+      title: "Vacuum: Minimal Clusters (Alexa troubleshooting)",
+      description:
+        "Strip the vacuum endpoint to only the clusters required by the Matter RVC spec. " +
+        "Removes PowerSource (battery) and the default ServiceArea placeholder. " +
+        "Enable this if Alexa commissions the vacuum but the device never appears in the app. " +
+        "Trade-off: battery percentage will not be reported to Matter controllers.",
       type: "boolean",
       default: false,
     },
