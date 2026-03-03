@@ -1,4 +1,7 @@
-import type { EventDeviceAttributes } from "@home-assistant-matter-hub/common";
+import type {
+  EventDeviceAttributes,
+  HomeAssistantEntityInformation,
+} from "@home-assistant-matter-hub/common";
 import { Logger } from "@matter/general";
 import { SwitchServer as Base } from "@matter/main/behaviors";
 import { HomeAssistantEntityBehavior } from "./home-assistant-entity-behavior.js";
@@ -23,12 +26,14 @@ class GenericSwitchServerBase extends FeaturedBase {
 
     logger.debug(`[${entityId}] GenericSwitch initialized`);
 
-    this.reactTo(homeAssistant.onChange, this.handleEventChange);
+    if (homeAssistant.state.managedByEndpoint) {
+      homeAssistant.registerUpdate(this.callback(this.handleEventChange));
+    } else {
+      this.reactTo(homeAssistant.onChange, this.handleEventChange);
+    }
   }
 
-  private handleEventChange() {
-    const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
-    const entity = homeAssistant.entity;
+  public handleEventChange(entity: HomeAssistantEntityInformation) {
     if (!entity?.state) return;
 
     const attrs = entity.state.attributes as EventDeviceAttributes;
@@ -36,7 +41,7 @@ class GenericSwitchServerBase extends FeaturedBase {
 
     if (!eventType) return;
 
-    const entityId = homeAssistant.entityId;
+    const entityId = entity.entity_id;
     logger.debug(`[${entityId}] Event fired: ${eventType}`);
 
     // Map HA event types to Matter Switch actions

@@ -1,3 +1,4 @@
+import type { HomeAssistantEntityInformation } from "@home-assistant-matter-hub/common";
 import { Logger } from "@matter/general";
 import { ElectricalPowerMeasurementServer as Base } from "@matter/main/behaviors";
 import { ElectricalPowerMeasurement } from "@matter/main/clusters";
@@ -24,11 +25,15 @@ class ElectricalPowerMeasurementServerBase extends Base {
       );
     }
 
-    this.update();
-    this.reactTo(homeAssistant.onChange, this.update);
+    this.update(homeAssistant.entity);
+    if (homeAssistant.state.managedByEndpoint) {
+      homeAssistant.registerUpdate(this.callback(this.update));
+    } else {
+      this.reactTo(homeAssistant.onChange, this.update);
+    }
   }
 
-  private update() {
+  public update(_entity: HomeAssistantEntityInformation) {
     const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
     const powerEntity = homeAssistant.state.mapping?.powerEntity;
 

@@ -12,6 +12,7 @@ import { ButtonDevice } from "../legacy/button/index.js";
 import { ClimateDevice } from "../legacy/climate/index.js";
 import { CoverDevice } from "../legacy/cover/index.js";
 import { createLegacyEndpointType } from "../legacy/create-legacy-endpoint-type.js";
+import { EventDevice } from "../legacy/event/index.js";
 import { FanDevice } from "../legacy/fan/index.js";
 import { HumidifierDevice } from "../legacy/humidifier/index.js";
 import { InputButtonDevice } from "../legacy/input-button/index.js";
@@ -21,6 +22,7 @@ import { MediaPlayerDevice } from "../legacy/media-player/index.js";
 import { RemoteDevice } from "../legacy/remote/index.js";
 import { SceneDevice } from "../legacy/scene/index.js";
 import { ScriptDevice } from "../legacy/script/index.js";
+import { InputSelectDevice, SelectDevice } from "../legacy/select/index.js";
 import { SensorDevice } from "../legacy/sensor/index.js";
 import { SwitchDevice } from "../legacy/switch/index.js";
 import { VacuumDevice } from "../legacy/vacuum/index.js";
@@ -61,6 +63,9 @@ const domainFactories: Partial<Record<HomeAssistantDomain, DeviceFactory>> = {
   alarm_control_panel: AlarmControlPanelDevice,
   remote: RemoteDevice,
   water_heater: WaterHeaterDevice,
+  event: EventDevice,
+  select: SelectDevice,
+  input_select: InputSelectDevice,
 };
 
 /**
