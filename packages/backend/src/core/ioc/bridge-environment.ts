@@ -1,6 +1,9 @@
+import path from "node:path";
 import type { BridgeData } from "@home-assistant-matter-hub/common";
 import type { Environment, Logger } from "@matter/general";
+import { StorageService } from "@matter/general";
 import { ServerModeServerNode } from "../../matter/endpoints/server-mode-server-node.js";
+import { PluginManager } from "../../plugins/plugin-manager.js";
 import { Bridge } from "../../services/bridges/bridge.js";
 import { BridgeDataProvider } from "../../services/bridges/bridge-data-provider.js";
 import { BridgeEndpointManager } from "../../services/bridges/bridge-endpoint-manager.js";
@@ -40,20 +43,27 @@ export class BridgeEnvironment extends EnvironmentBase {
   private async init() {
     const haRegistry = await this.load(HomeAssistantRegistry);
     const haClient = await this.load(HomeAssistantClient);
+    const bridgeId = this.get(BridgeDataProvider).id;
 
     this.set(
       BridgeRegistry,
       new BridgeRegistry(haRegistry, this.get(BridgeDataProvider), haClient),
     );
     this.set(EntityStateProvider, new EntityStateProvider(haRegistry));
+
+    const storageLocation = this.get(StorageService).location ?? "";
+    const pluginStorageDir = path.join(storageLocation, "plugins", bridgeId);
+    const pluginManager = new PluginManager(bridgeId, pluginStorageDir);
+
     this.set(
       BridgeEndpointManager,
       new BridgeEndpointManager(
         await this.load(HomeAssistantClient),
         this.get(BridgeRegistry),
         await this.load(EntityMappingStorage),
-        this.get(BridgeDataProvider).id,
+        bridgeId,
         this.endpointManagerLogger,
+        pluginManager,
       ),
     );
   }

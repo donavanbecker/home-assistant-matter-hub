@@ -164,6 +164,7 @@ export class Bridge {
       this.endpointManager.startObserving();
       ensureCommissioningConfig(this.server);
       await this.server.start();
+      await this.endpointManager.startPlugins();
       this.setStatus({ code: BridgeStatus.Running });
       this.startAutoForceSyncIfEnabled();
       this.wireSessionDiagnostics();
@@ -186,6 +187,7 @@ export class Bridge {
   ) {
     this.unwireSessionDiagnostics();
     this.stopAutoForceSync();
+    await this.endpointManager.stopPlugins();
     this.endpointManager.stopObserving();
     try {
       await this.server.cancel();

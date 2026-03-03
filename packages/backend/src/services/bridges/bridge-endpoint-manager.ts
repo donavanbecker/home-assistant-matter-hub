@@ -3,12 +3,15 @@ import type {
   FailedEntity,
 } from "@home-assistant-matter-hub/common";
 import type { Logger } from "@matter/general";
-import type { Endpoint } from "@matter/main";
+import { Endpoint, type EndpointType } from "@matter/main";
 import { Service } from "../../core/ioc/service.js";
 import { AggregatorEndpoint } from "../../matter/endpoints/aggregator-endpoint.js";
 import { createDomainEndpoint } from "../../matter/endpoints/domains/create-domain-endpoint.js";
 import type { EntityEndpoint } from "../../matter/endpoints/entity-endpoint.js";
 import { LegacyEndpoint } from "../../matter/endpoints/legacy/legacy-endpoint.js";
+import { createPluginEndpointType } from "../../plugins/plugin-device-factory.js";
+import type { PluginManager } from "../../plugins/plugin-manager.js";
+import type { PluginDevice } from "../../plugins/types.js";
 import { isHeapUnderPressure } from "../../utils/log-memory.js";
 import { subscribeEntities } from "../home-assistant/api/subscribe-entities.js";
 import type { HomeAssistantClient } from "../home-assistant/home-assistant-client.js";
@@ -25,6 +28,7 @@ export class BridgeEndpointManager extends Service {
   private unsubscribe?: () => void;
   private _failedEntities: FailedEntity[] = [];
   private readonly mappingFingerprints = new Map<string, string>();
+  private readonly pluginEndpoints = new Map<string, Endpoint>();
 
   get failedEntities(): FailedEntity[] {
     // Combine static failed entities with dynamically isolated entities
@@ -38,6 +42,7 @@ export class BridgeEndpointManager extends Service {
     private readonly mappingStorage: EntityMappingStorage,
     private readonly bridgeId: string,
     private readonly log: Logger,
+    private readonly pluginManager?: PluginManager,
   ) {
     super("BridgeEndpointManager");
     this.root = new AggregatorEndpoint("aggregator");
@@ -47,6 +52,10 @@ export class BridgeEndpointManager extends Service {
       bridgeId,
       this.isolateEntity.bind(this),
     );
+
+    if (this.pluginManager) {
+      this.wirePluginCallbacks();
+    }
   }
 
   /**
@@ -263,7 +272,10 @@ export class BridgeEndpointManager extends Service {
   }
 
   async updateStates(states: HomeAssistantStates) {
-    const endpoints = this.root.parts.map((p) => p as EntityEndpoint);
+    // Only update HA entity endpoints, not plugin endpoints
+    const endpoints = [...this.root.parts]
+      .filter((p) => !this.pluginEndpoints.has(p.id))
+      .map((p) => p as EntityEndpoint);
     // Process state updates in parallel for faster response times
     // Use allSettled so one failing endpoint doesn't block all others
     const results = await Promise.allSettled(
@@ -336,5 +348,172 @@ export class BridgeEndpointManager extends Service {
       return error.message;
     }
     return String(error);
+  }
+
+  // --- Plugin integration ---
+
+  private wirePluginCallbacks(): void {
+    if (!this.pluginManager) return;
+
+    this.pluginManager.onDeviceRegistered = async (
+      pluginName: string,
+      device: PluginDevice,
+    ) => {
+      await this.addPluginEndpoint(pluginName, device);
+    };
+
+    this.pluginManager.onDeviceUnregistered = async (
+      _pluginName: string,
+      deviceId: string,
+    ) => {
+      await this.removePluginEndpoint(deviceId);
+    };
+
+    this.pluginManager.onDeviceStateUpdated = (
+      _pluginName: string,
+      deviceId: string,
+      clusterId: string,
+      attributes: Record<string, unknown>,
+    ) => {
+      this.updatePluginEndpointState(deviceId, clusterId, attributes);
+    };
+  }
+
+  async startPlugins(): Promise<void> {
+    if (!this.pluginManager) return;
+    await this.pluginManager.startAll();
+    await this.pluginManager.configureAll();
+  }
+
+  async stopPlugins(): Promise<void> {
+    if (!this.pluginManager) return;
+
+    await this.pluginManager.shutdownAll("bridge stopping");
+
+    for (const [id, endpoint] of this.pluginEndpoints) {
+      try {
+        await endpoint.delete();
+      } catch (e) {
+        this.log.warn(`Failed to delete plugin endpoint ${id}:`, e);
+      }
+    }
+    this.pluginEndpoints.clear();
+  }
+
+  private async addPluginEndpoint(
+    pluginName: string,
+    device: PluginDevice,
+  ): Promise<void> {
+    const endpointType = createPluginEndpointType(device.deviceType);
+    if (!endpointType) {
+      this.log.warn(
+        `Plugin "${pluginName}": unsupported device type "${device.deviceType}" for device "${device.id}"`,
+      );
+      return;
+    }
+
+    const endpointId = `plugin_${pluginName}_${device.id}`.replace(
+      /[^a-zA-Z0-9_-]/g,
+      "_",
+    );
+
+    if (this.pluginEndpoints.has(endpointId)) {
+      this.log.warn(
+        `Plugin "${pluginName}": device "${device.id}" already registered`,
+      );
+      return;
+    }
+
+    try {
+      // createPluginEndpointType returns a MutableEndpoint with .set()
+      const mutable = endpointType as EndpointType & {
+        set(values: Record<string, unknown>): EndpointType;
+      };
+      const configured = mutable.set({
+        pluginDevice: { device, pluginName },
+        basicInformation: {
+          nodeLabel: device.name,
+          productName: device.name,
+          vendorName: pluginName,
+          serialNumber: endpointId,
+        },
+      });
+
+      const endpoint = new Endpoint(configured, { id: endpointId });
+      await this.root.add(endpoint);
+      this.pluginEndpoints.set(endpointId, endpoint);
+      this.log.info(
+        `Plugin "${pluginName}": added device "${device.name}" (${device.deviceType})`,
+      );
+    } catch (e) {
+      this.log.error(
+        `Plugin "${pluginName}": failed to add device "${device.id}":`,
+        e,
+      );
+    }
+  }
+
+  private async removePluginEndpoint(deviceId: string): Promise<void> {
+    // Find endpoint by device ID (could be any plugin)
+    for (const [endpointId, endpoint] of this.pluginEndpoints) {
+      if (endpointId.endsWith(`_${deviceId}`)) {
+        try {
+          await endpoint.delete();
+        } catch (e) {
+          this.log.warn(`Failed to delete plugin endpoint ${endpointId}:`, e);
+        }
+        this.pluginEndpoints.delete(endpointId);
+        return;
+      }
+    }
+  }
+
+  private updatePluginEndpointState(
+    deviceId: string,
+    clusterId: string,
+    attributes: Record<string, unknown>,
+  ): void {
+    // Find endpoint by device ID
+    let targetEndpoint: Endpoint | undefined;
+    for (const [endpointId, endpoint] of this.pluginEndpoints) {
+      if (endpointId.endsWith(`_${deviceId}`)) {
+        targetEndpoint = endpoint;
+        break;
+      }
+    }
+
+    if (!targetEndpoint) {
+      this.log.warn(
+        `Plugin state update: endpoint not found for device "${deviceId}"`,
+      );
+      return;
+    }
+
+    try {
+      // Access cluster state via endpoint.state proxy (keyed by behavior ID)
+      const state = targetEndpoint.state as Record<
+        string,
+        Record<string, unknown>
+      >;
+      const clusterState = state[clusterId];
+      if (!clusterState) {
+        this.log.warn(
+          `Plugin state update: cluster "${clusterId}" not found on endpoint`,
+        );
+        return;
+      }
+      for (const [key, value] of Object.entries(attributes)) {
+        try {
+          clusterState[key] = value;
+        } catch (e) {
+          this.log.debug(
+            `Plugin state update: failed to set ${clusterId}.${key}:`,
+            e,
+          );
+        }
+      }
+    } catch (e) {
+      this.log.warn(`Plugin state update failed for device "${deviceId}":`, e);
+    }
   }
 }
