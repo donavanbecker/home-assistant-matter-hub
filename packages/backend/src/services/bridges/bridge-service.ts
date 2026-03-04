@@ -5,6 +5,7 @@ import type {
   CreateBridgeRequest,
   UpdateBridgeRequest,
 } from "@home-assistant-matter-hub/common";
+import { Logger } from "@matter/general";
 import { Service } from "../../core/ioc/service.js";
 import type { BridgeStorage } from "../storage/bridge-storage.js";
 import type { Bridge } from "./bridge.js";
@@ -17,6 +18,7 @@ export interface BridgeServiceProps {
 }
 
 export class BridgeService extends Service {
+  private readonly log = Logger.get("BridgeService");
   public readonly bridges: Bridge[] = [];
   public autoRecoveryEnabled = false;
   public lastRecoveryAttempt?: Date;
@@ -64,8 +66,8 @@ export class BridgeService extends Service {
       try {
         await bridge.start();
         this.recoveryCount++;
-      } catch {
-        // Recovery attempt failed, will retry on next interval
+      } catch (e) {
+        this.log.warn(`Recovery attempt failed for bridge ${bridge.id}:`, e);
       }
     }
   }
@@ -105,7 +107,7 @@ export class BridgeService extends Service {
         await bridge.start();
       } catch (e) {
         // Isolate per-bridge failures so one failing bridge doesn't prevent others from starting
-        console.error(`Failed to start bridge ${bridge.id}:`, e);
+        this.log.error(`Failed to start bridge ${bridge.id}:`, e);
       }
     }
   }
@@ -116,7 +118,7 @@ export class BridgeService extends Service {
         await bridge.stop();
         this.onBridgeChanged?.(bridge.id);
       } catch (e) {
-        console.error(`Failed to stop bridge ${bridge.id}:`, e);
+        this.log.error(`Failed to stop bridge ${bridge.id}:`, e);
       }
     }
   }
@@ -126,7 +128,7 @@ export class BridgeService extends Service {
       try {
         await bridge.stop();
       } catch (e) {
-        console.error(`Failed to stop bridge ${bridge.id} during restart:`, e);
+        this.log.error(`Failed to stop bridge ${bridge.id} during restart:`, e);
       }
     }
     // Sort by priority for startup
@@ -140,7 +142,10 @@ export class BridgeService extends Service {
         await bridge.start();
         this.onBridgeChanged?.(bridge.id);
       } catch (e) {
-        console.error(`Failed to start bridge ${bridge.id} during restart:`, e);
+        this.log.error(
+          `Failed to start bridge ${bridge.id} during restart:`,
+          e,
+        );
       }
     }
   }
@@ -151,7 +156,7 @@ export class BridgeService extends Service {
         await bridge.refreshDevices();
       } catch (e) {
         // Isolate per-bridge failures so one failing bridge doesn't block others
-        console.error(`Failed to refresh bridge ${bridge.id}:`, e);
+        this.log.error(`Failed to refresh bridge ${bridge.id}:`, e);
       }
     }
   }

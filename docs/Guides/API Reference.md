@@ -1,12 +1,10 @@
 # API Reference
 
-This document describes the REST API endpoints available in the Alpha and Testing versions of Home-Assistant-Matter-Hub.
-
-> **Note:** These APIs are available starting from version **2.0.0-alpha.x**. Stable versions may not include all endpoints.
+All endpoints return JSON unless otherwise noted. Default port: `8482`.
 
 ## Base URL
 
-When using Home Assistant Ingress, all API endpoints are relative to the ingress URL:
+When using Home Assistant Ingress, endpoints are relative to the ingress URL:
 ```
 /api/hassio_ingress/<ingress_token>/api/...
 ```
@@ -16,161 +14,330 @@ For standalone Docker deployments:
 http://localhost:8482/api/...
 ```
 
+## Authentication
+
+If configured, the API uses HTTP Basic Authentication. Set credentials via the Settings page or environment variables.
+
 ---
 
 ## Health API
 
+Base path: `/api/health`
+
 ### GET /api/health
 
-Returns basic health status of the application.
+Returns basic health status.
 
 **Response:**
 ```json
 {
   "status": "healthy",
-  "version": "2.0.0-alpha.65",
-  "uptime": 3600
+  "version": "2.1.0-alpha.1",
+  "uptime": 3600,
+  "timestamp": "2026-01-27T12:00:00.000Z",
+  "services": {
+    "homeAssistant": { "connected": true },
+    "bridges": { "total": 2, "running": 2, "stopped": 0, "failed": 0 }
+  }
 }
 ```
+
+**Status codes:** `200` healthy/degraded, `503` unhealthy.
 
 ### GET /api/health/detailed
 
-Returns detailed health information including bridge status.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "version": "2.0.0-alpha.65",
-  "uptime": 3600,
-  "bridges": [
-    {
-      "id": "bridge-1",
-      "name": "My Bridge",
-      "status": "running",
-      "deviceCount": 25,
-      "fabricCount": 2
-    }
-  ],
-  "homeAssistant": {
-    "connected": true,
-    "url": "http://homeassistant.local:8123"
-  }
-}
-```
+Returns detailed health including per-bridge info, fabric details, and recovery status.
 
 ### GET /api/health/live
 
-Kubernetes liveness probe. Returns 200 if the application is running.
+Kubernetes liveness probe. Returns `200 OK`.
 
 ### GET /api/health/ready
 
-Kubernetes readiness probe. Returns 200 if all bridges are ready.
+Kubernetes readiness probe. Returns `200` if Home Assistant is connected, `503` otherwise.
 
 ---
 
-## System Info API
+## Matter / Bridge API
 
-### GET /api/system/info
+Base path: `/api/matter`
 
-Returns detailed system information.
+### GET /api/matter/bridges
 
-**Response:**
+List all configured bridges.
+
+### POST /api/matter/bridges
+
+Create a new bridge.
+
+**Request:**
 ```json
 {
-  "version": "2.0.0-alpha.65",
-  "nodeVersion": "v24.13.0",
-  "hostname": "homeassistant",
-  "platform": "linux",
-  "arch": "x64",
-  "uptime": 86400,
-  "cpuCount": 4,
-  "loadAvg": [0.5, 0.3, 0.2],
-  "memory": {
-    "total": 8589934592,
-    "used": 4294967296,
-    "free": 4294967296,
-    "usagePercent": 50.0
-  },
-  "network": {
-    "interfaces": [
-      {
-        "name": "eth0",
-        "address": "192.168.1.100",
-        "family": "IPv4",
-        "mac": "aa:bb:cc:dd:ee:ff",
-        "internal": false
-      }
-    ]
-  },
-  "storage": {
-    "total": 107374182400,
-    "used": 53687091200,
-    "free": 53687091200,
-    "usagePercent": 50.0
-  },
-  "process": {
-    "pid": 1234,
-    "uptime": 3600,
-    "memoryUsage": 134217728
+  "name": "New Bridge",
+  "port": 5541,
+  "filter": {
+    "include": [{ "type": "domain", "value": "light" }],
+    "exclude": []
   }
 }
 ```
+
+### GET /api/matter/bridges/:bridgeId
+
+Get a specific bridge. Returns `404` if not found.
+
+### PUT /api/matter/bridges/:bridgeId
+
+Update a bridge configuration.
+
+### DELETE /api/matter/bridges/:bridgeId
+
+Delete a bridge. Returns `204 No Content`.
+
+### Bridge Actions
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/matter/bridges/:bridgeId/actions/start` | POST | Start a stopped bridge |
+| `/api/matter/bridges/:bridgeId/actions/stop` | POST | Stop a running bridge |
+| `/api/matter/bridges/:bridgeId/actions/restart` | POST | Restart a bridge |
+| `/api/matter/bridges/:bridgeId/actions/refresh` | POST | Refresh devices without restart |
+| `/api/matter/bridges/:bridgeId/actions/factory-reset` | POST | Factory reset (removes fabrics) |
+| `/api/matter/bridges/:bridgeId/actions/force-sync` | POST | Push current state to controllers |
+| `/api/matter/bridges/:bridgeId/actions/open-commissioning-window` | POST | Open pairing window for multi-fabric |
+| `/api/matter/bridges/actions/start-all` | POST | Start all bridges |
+| `/api/matter/bridges/actions/stop-all` | POST | Stop all bridges |
+| `/api/matter/bridges/actions/restart-all` | POST | Restart all bridges |
+
+### PUT /api/matter/bridges/priorities
+
+Update bridge startup priorities.
+
+**Request:**
+```json
+{ "updates": [{ "id": "abc123", "priority": 1 }] }
+```
+
+### POST /api/matter/bridges/:bridgeId/clone
+
+Clone a bridge configuration (new port assigned automatically).
+
+### GET /api/matter/bridges/:bridgeId/devices
+
+Get all Matter devices exposed by a bridge.
+
+### GET /api/matter/next-port
+
+Get the next available port for a new bridge.
+
+### POST /api/matter/filter-preview
+
+Preview which entities match a filter.
+
+### GET /api/matter/labels
+
+Get Home Assistant labels.
+
+### GET /api/matter/areas
+
+Get Home Assistant areas.
+
+### GET /api/matter/filter-values
+
+Get available filter values (domains, labels, areas).
+
+---
+
+## Home Assistant API
+
+Base path: `/api/home-assistant`
+
+### GET /api/home-assistant/stats
+
+Get entity/device statistics and connection status.
+
+### GET /api/home-assistant/entities
+
+List entities with pagination and filtering.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `domain` | string | — | Filter by domain (e.g. `light`) |
+| `search` | string | — | Search in entity_id and friendly_name |
+| `limit` | number | 100 | Max results (1–500) |
+| `offset` | number | 0 | Pagination offset |
+
+### GET /api/home-assistant/entities/:entityId
+
+Get a specific entity. Returns `404` if not found.
+
+### GET /api/home-assistant/devices
+
+List devices with pagination and filtering.
+
+### GET /api/home-assistant/devices/:deviceId
+
+Get a device with all its entities.
+
+### GET /api/home-assistant/domains
+
+Get all domains with entity counts.
+
+### POST /api/home-assistant/refresh
+
+Force refresh the HA entity registry.
+
+### GET /api/home-assistant/related-buttons/:entityId
+
+Get button entities belonging to the same HA device (useful for vacuum room cleaning).
+
+---
+
+## Entity Mapping API
+
+Base path: `/api/entity-mappings`
+
+### GET /api/entity-mappings/:bridgeId
+
+Get all entity mappings for a bridge.
+
+### PUT /api/entity-mappings/:bridgeId/:entityId
+
+Create or update a mapping for a specific entity.
+
+**Request:**
+```json
+{
+  "matterDeviceType": "DimmableLight",
+  "customName": "Custom Name",
+  "disabled": false
+}
+```
+
+### DELETE /api/entity-mappings/:bridgeId/:entityId
+
+Delete a specific entity mapping.
+
+### DELETE /api/entity-mappings/:bridgeId
+
+Delete all mappings for a bridge.
+
+---
+
+## Bridge Export / Import API
+
+Base path: `/api/bridges`
+
+### GET /api/bridges/export
+
+Export all bridge configurations as JSON download.
+
+### GET /api/bridges/export/:bridgeId
+
+Export a single bridge.
+
+### POST /api/bridges/import/preview
+
+Preview an import without applying changes.
+
+### POST /api/bridges/import
+
+Import bridge configurations.
+
+**Request:**
+```json
+{
+  "data": { },
+  "options": {
+    "bridgeIds": ["abc123"],
+    "overwriteExisting": true
+  }
+}
+```
+
+---
+
+## Backup API
+
+Base path: `/api/backup`
+
+### GET /api/backup/download
+
+Download a full backup ZIP (bridges + entity mappings).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `includeIdentity` | boolean | `false` | Include Matter identity files |
+
+### POST /api/backup/restore/preview
+
+Preview a backup restore. Upload as `multipart/form-data` with `file` field.
+
+### POST /api/backup/restore
+
+Restore from a backup. Upload as `multipart/form-data` with `file` and `options` fields.
+
+### POST /api/backup/restart
+
+Restart the application after a restore.
+
+---
+
+## Lock Credentials API
+
+Base path: `/api/lock-credentials`
+
+### GET /api/lock-credentials
+
+Get all lock credentials.
+
+### GET /api/lock-credentials/:entityId
+
+Get credential for a specific lock entity.
+
+### PUT /api/lock-credentials/:entityId
+
+Create or update a lock credential (PIN code).
+
+### PATCH /api/lock-credentials/:entityId/enabled
+
+Enable or disable a lock credential.
+
+### DELETE /api/lock-credentials/:entityId
+
+Delete a lock credential.
 
 ---
 
 ## Logs API
 
+Base path: `/api/logs`
+
 ### GET /api/logs
 
-Retrieves application logs with optional filtering.
+Retrieve logs with optional filtering.
 
-**Query Parameters:**
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `level` | string | `error,warn,info` | Comma-separated log levels to include |
-| `limit` | number | `100` | Maximum number of entries to return |
-| `search` | string | - | Search term to filter log messages |
+| `level` | string | — | Comma-separated levels (e.g. `error,warn`) |
+| `search` | string | — | Search in log messages |
+| `limit` | number | 100 | Max entries (1–500) |
 
-**Example:**
-```
-GET /api/logs?level=error,warn&limit=500&search=bridge
-```
+### GET /api/logs/levels
 
-**Response:**
-```json
-{
-  "entries": [
-    {
-      "timestamp": "2026-01-29T00:30:00.000Z",
-      "level": "info",
-      "message": "Bridge started successfully",
-      "context": {
-        "bridgeId": "bridge-1"
-      }
-    }
-  ]
-}
-```
+Get count of logs by level.
 
 ### DELETE /api/logs
 
-Clears all stored log entries.
-
-**Response:**
-```json
-{
-  "success": true
-}
-```
+Clear all stored logs.
 
 ### GET /api/logs/stream
 
 Server-Sent Events (SSE) endpoint for real-time log streaming.
 
-**Example:**
 ```javascript
-const eventSource = new EventSource('/api/logs/stream');
+const eventSource = new EventSource('api/logs/stream');
 eventSource.onmessage = (event) => {
   const log = JSON.parse(event.data);
   console.log(log);
@@ -181,174 +348,98 @@ eventSource.onmessage = (event) => {
 
 ## Metrics API
 
+Base path: `/api/metrics`
+
 ### GET /api/metrics
 
-Returns Prometheus-compatible metrics.
+Returns system metrics in **JSON** format (memory, bridges, HA connection status).
 
-**Response:**
+### GET /api/metrics/prometheus
+
+Returns metrics in **Prometheus** text format for scraping.
+
 ```
-# HELP hamh_bridges_total Total number of bridges
-# TYPE hamh_bridges_total gauge
-hamh_bridges_total 3
-
-# HELP hamh_devices_total Total number of devices
-# TYPE hamh_devices_total gauge
-hamh_devices_total 75
-
 # HELP hamh_uptime_seconds Application uptime in seconds
 # TYPE hamh_uptime_seconds gauge
 hamh_uptime_seconds 3600
+
+# HELP hamh_bridges_total Total number of bridges
+# TYPE hamh_bridges_total gauge
+hamh_bridges_total 2
+
+# HELP hamh_bridge_status Bridge status (1=running, 0=not running)
+# TYPE hamh_bridge_status gauge
+hamh_bridge_status{bridge_id="abc123",bridge_name="My_Bridge"} 1
 ```
 
 ---
 
-## Backup API
+## System API
 
-### GET /api/backup/download
+Base path: `/api/system`
 
-Downloads a backup ZIP file containing bridge configurations and entity mappings.
+### GET /api/system/info
 
-**Query Parameters:**
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `includeIdentity` | boolean | `false` | Include Matter identity files (keypairs, fabric credentials) |
-
-**Example:**
-```
-GET /api/backup/download?includeIdentity=true
-```
-
-**Response:** ZIP file download
-
-### POST /api/backup/restore/preview
-
-Uploads a backup file and returns a preview of what would be restored.
-
-**Request:** `multipart/form-data` with `file` field containing the ZIP file
-
-**Response:**
-```json
-{
-  "version": 1,
-  "createdAt": "2026-01-29T00:00:00.000Z",
-  "includesIdentity": true,
-  "bridges": [
-    {
-      "id": "bridge-1",
-      "name": "My Bridge",
-      "port": 5540,
-      "exists": false,
-      "hasMappings": true,
-      "mappingCount": 15
-    }
-  ]
-}
-```
-
-### POST /api/backup/restore
-
-Restores bridges and entity mappings from an uploaded backup.
-
-**Request:** `multipart/form-data` with:
-- `file`: ZIP file
-- `options`: JSON string with restore options
-
-**Options:**
-```json
-{
-  "bridgeIds": ["bridge-1", "bridge-2"],
-  "overwriteExisting": false,
-  "includeMappings": true,
-  "restoreIdentity": true
-}
-```
-
-**Response:**
-```json
-{
-  "bridgesRestored": 2,
-  "bridgesSkipped": 0,
-  "mappingsRestored": 30,
-  "identitiesRestored": 2,
-  "errors": [],
-  "restartRequired": true
-}
-```
+Returns system information (hostname, platform, memory, network interfaces, storage).
 
 ---
 
 ## WebSocket API
 
-### WS /api/ws
+**Endpoint:** `ws://<host>:<port>/api/ws`
 
-WebSocket endpoint for real-time updates.
+Real-time updates for bridge status and diagnostics.
 
-**Message Types:**
+### Client → Server Messages
 
-#### Bridge Status Update
-```json
-{
-  "type": "bridge:status",
-  "data": {
-    "id": "bridge-1",
-    "status": "running",
-    "deviceCount": 25
+| Type | Description |
+|------|-------------|
+| `ping` | Client ping; server responds with `pong` |
+| `subscribe_diagnostics` | Subscribe to live diagnostic events |
+| `unsubscribe_diagnostics` | Unsubscribe from diagnostics |
+
+### Server → Client Messages
+
+| Type | Description |
+|------|-------------|
+| `bridges_update` | All bridges have been updated (sent on connect + on change) |
+| `bridge_update` | Single bridge updated; includes `bridgeId` field |
+| `diagnostic_event` | Live diagnostic event (requires subscription) |
+| `diagnostic_snapshot` | Initial snapshot sent after subscribing to diagnostics |
+| `ping` | Server keepalive (every 30s) |
+| `pong` | Response to client ping |
+
+### Example
+
+```javascript
+const ws = new WebSocket('ws://localhost:8482/api/ws');
+
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  switch (message.type) {
+    case 'bridges_update':
+      console.log('All bridges:', message.data);
+      break;
+    case 'bridge_update':
+      console.log(`Bridge ${message.bridgeId}:`, message.data);
+      break;
+    case 'ping':
+      ws.send(JSON.stringify({ type: 'pong' }));
+      break;
   }
-}
-```
+};
 
-#### Health Update
-```json
-{
-  "type": "health:update",
-  "data": {
-    "status": "healthy",
-    "uptime": 3600
-  }
-}
+// Subscribe to live diagnostics
+ws.send(JSON.stringify({ type: 'subscribe_diagnostics' }));
 ```
 
 ---
 
-## Entity Mappings API
+## Error Responses
 
-### GET /api/entity-mappings
-
-Returns all entity mapping customizations.
-
-### GET /api/entity-mappings/:entityId
-
-Returns mapping for a specific entity.
-
-### PUT /api/entity-mappings/:entityId
-
-Updates mapping for a specific entity.
-
-**Request:**
+All endpoints return errors as:
 ```json
-{
-  "deviceType": "AirPurifier",
-  "name": "Custom Name",
-  "disabled": false
-}
+{ "error": "Error message description" }
 ```
 
-### DELETE /api/entity-mappings/:entityId
-
-Removes custom mapping for an entity.
-
----
-
-## Home Assistant API
-
-### GET /api/home-assistant/entities
-
-Returns all entities from Home Assistant.
-
-### GET /api/home-assistant/devices
-
-Returns all devices from Home Assistant.
-
-### GET /api/home-assistant/areas
-
-Returns all areas from Home Assistant.
+Common status codes: `400` Bad Request, `404` Not Found, `500` Internal Server Error, `503` Service Unavailable.

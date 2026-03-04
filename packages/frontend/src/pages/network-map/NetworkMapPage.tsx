@@ -67,10 +67,19 @@ interface LayoutConfig {
   deviceOffsetX: number;
 }
 
+interface EdgeColors {
+  running: string;
+  inactive: string;
+  device: string;
+  failed: string;
+  fabric: string;
+}
+
 function buildGraph(
   bridges: BridgeDataWithMetadata[],
   devicesByBridge: Record<string, EndpointData | undefined>,
   layout: LayoutConfig,
+  colors: EdgeColors,
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
@@ -143,7 +152,7 @@ function buildGraph(
       type: "smoothstep",
       animated: bridge.status === "running",
       style: {
-        stroke: bridge.status === "running" ? "#4caf50" : "#bdbdbd",
+        stroke: bridge.status === "running" ? colors.running : colors.inactive,
         strokeWidth: 2,
       },
     });
@@ -199,7 +208,7 @@ function buildGraph(
         source: bridgeId,
         target: deviceId,
         type: "smoothstep",
-        style: { stroke: "#90caf9", strokeWidth: 1 },
+        style: { stroke: colors.device, strokeWidth: 1 },
       });
     });
 
@@ -229,7 +238,7 @@ function buildGraph(
         target: failedId,
         type: "smoothstep",
         style: {
-          stroke: "#f44336",
+          stroke: colors.failed,
           strokeWidth: 1,
           strokeDasharray: "5,5",
         },
@@ -269,7 +278,7 @@ function buildGraph(
         target: `bridge-${bridgeIdRaw}`,
         type: "smoothstep",
         animated: true,
-        style: { stroke: "#ce93d8", strokeWidth: 1.5 },
+        style: { stroke: colors.fabric, strokeWidth: 1.5 },
       });
     }
   });
@@ -332,7 +341,15 @@ export const NetworkMapPage = () => {
       deviceOffsetX: 280,
     };
 
-    const graph = buildGraph(bridges, devicesByBridge, layout);
+    const edgeColors: EdgeColors = {
+      running: isDark ? "#81c784" : "#4caf50",
+      inactive: isDark ? "#616161" : "#bdbdbd",
+      device: isDark ? "#90caf9" : "#64b5f6",
+      failed: isDark ? "#ef5350" : "#f44336",
+      fabric: isDark ? "#ce93d8" : "#ab47bc",
+    };
+
+    const graph = buildGraph(bridges, devicesByBridge, layout, edgeColors);
 
     // Restore saved positions from localStorage
     const STORAGE_KEY = "hamh-network-map-positions";
@@ -355,7 +372,7 @@ export const NetworkMapPage = () => {
 
     setNodes(graph.nodes);
     setEdges(graph.edges);
-  }, [bridges, devicesByBridge, devicesLoaded, setNodes, setEdges]);
+  }, [bridges, devicesByBridge, devicesLoaded, setNodes, setEdges, isDark]);
 
   const handleRefresh = useCallback(() => {
     dispatch(loadBridges());

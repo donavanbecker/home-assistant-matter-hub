@@ -27,6 +27,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
+import { useTheme } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -279,6 +280,7 @@ function NavCard({
 }
 
 export const DashboardPage = () => {
+  const theme = useTheme();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const [health, setHealth] = useState<HealthSummary | null>(null);
@@ -350,7 +352,7 @@ export const DashboardPage = () => {
             title="Bridges"
             value={bridges?.total ?? 0}
             icon={<HubIcon />}
-            color="#4caf50"
+            color={theme.palette.success.main}
             subtitle={
               bridges
                 ? `${bridges.running} running${bridges.failed > 0 ? ` · ${bridges.failed} failed` : ""}`
@@ -364,7 +366,7 @@ export const DashboardPage = () => {
             title="Devices"
             value={totalDevices}
             icon={<DevicesIcon />}
-            color="#2196f3"
+            color={theme.palette.primary.main}
             subtitle={totalFailed > 0 ? `${totalFailed} failed` : undefined}
             onClick={() => navigate(navigation.devices)}
           />
@@ -374,7 +376,7 @@ export const DashboardPage = () => {
             title="Fabrics"
             value={totalFabrics}
             icon={<LinkIcon />}
-            color="#9c27b0"
+            color={theme.palette.secondary.main}
             onClick={() => navigate(navigation.networkMap)}
           />
         </Grid>
@@ -383,7 +385,11 @@ export const DashboardPage = () => {
             title="HA Connection"
             value={haConnected ? "Online" : "Offline"}
             icon={haConnected ? <CheckCircleIcon /> : <ErrorIcon />}
-            color={haConnected ? "#4caf50" : "#f44336"}
+            color={
+              haConnected
+                ? theme.palette.success.main
+                : theme.palette.error.main
+            }
             subtitle={
               health?.uptime != null
                 ? `Uptime ${formatUptime(health.uptime)}`

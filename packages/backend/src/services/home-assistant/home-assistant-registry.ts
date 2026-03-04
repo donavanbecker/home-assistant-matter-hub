@@ -96,7 +96,7 @@ export class HomeAssistantRegistry extends Service {
     this.autoRefresh = undefined;
   }
 
-  private async reload(): Promise<boolean> {
+  async reload(): Promise<boolean> {
     return await withRetry(() => this.fetchRegistries(), {
       maxAttempts: 5,
       baseDelayMs: 2000,
