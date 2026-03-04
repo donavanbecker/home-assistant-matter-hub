@@ -1,8 +1,15 @@
 import express from "express";
+import { PluginInstaller } from "../plugins/plugin-installer.js";
+import { PluginRegistry } from "../plugins/plugin-registry.js";
 import type { BridgeService } from "../services/bridges/bridge-service.js";
 
-export function pluginApi(bridgeService: BridgeService) {
+export function pluginApi(
+  bridgeService: BridgeService,
+  storageLocation: string,
+) {
   const router = express.Router();
+  const installer = new PluginInstaller(storageLocation);
+  const registry = new PluginRegistry(storageLocation);
 
   /**
    * GET /api/plugins
@@ -101,6 +108,107 @@ export function pluginApi(bridgeService: BridgeService) {
     const { pluginName } = req.params;
     bridge.resetPlugin(pluginName);
     res.json({ success: true, pluginName, reset: true });
+  });
+
+  /**
+   * GET /api/plugins/installed
+   * List all installed plugin packages (from registry + npm).
+   */
+  router.get("/installed", (_req, res) => {
+    const registered = registry.getAll();
+    const npmInstalled = installer.listInstalled();
+
+    const result = registered.map((entry) => {
+      const npm = npmInstalled.find((p) => p.name === entry.packageName);
+      return {
+        packageName: entry.packageName,
+        version: npm?.version ?? "unknown",
+        config: entry.config,
+        autoLoad: entry.autoLoad,
+        installedAt: entry.installedAt,
+        path: installer.getPluginPath(entry.packageName),
+      };
+    });
+
+    res.json(result);
+  });
+
+  /**
+   * POST /api/plugins/install
+   * Install a plugin via npm and register it.
+   * Body: { packageName: string, config?: object }
+   */
+  router.post("/install", async (req, res) => {
+    const { packageName, config } = req.body as {
+      packageName?: string;
+      config?: Record<string, unknown>;
+    };
+
+    if (!packageName || typeof packageName !== "string") {
+      res.status(400).json({ error: "packageName is required" });
+      return;
+    }
+
+    try {
+      const result = await installer.install(packageName);
+      if (!result.success) {
+        res.status(500).json({
+          error: `Installation failed: ${result.error}`,
+          details: result,
+        });
+        return;
+      }
+
+      registry.add(packageName, config ?? {});
+
+      res.json({
+        success: true,
+        packageName,
+        version: result.version,
+        message: "Plugin installed. Restart the bridge to load it.",
+      });
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : "Installation failed",
+      });
+    }
+  });
+
+  /**
+   * POST /api/plugins/uninstall
+   * Uninstall a plugin via npm and remove it from registry.
+   * Body: { packageName: string }
+   */
+  router.post("/uninstall", async (req, res) => {
+    const { packageName } = req.body as { packageName?: string };
+
+    if (!packageName || typeof packageName !== "string") {
+      res.status(400).json({ error: "packageName is required" });
+      return;
+    }
+
+    try {
+      const result = await installer.uninstall(packageName);
+      if (!result.success) {
+        res.status(500).json({
+          error: `Uninstall failed: ${result.error}`,
+          details: result,
+        });
+        return;
+      }
+
+      registry.remove(packageName);
+
+      res.json({
+        success: true,
+        packageName,
+        message: "Plugin uninstalled. Restart the bridge to apply changes.",
+      });
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : "Uninstall failed",
+      });
+    }
   });
 
   return router;

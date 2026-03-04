@@ -1,5 +1,8 @@
+import AddIcon from "@mui/icons-material/Add";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import DeleteIcon from "@mui/icons-material/Delete";
 import DevicesIcon from "@mui/icons-material/Devices";
+import DownloadIcon from "@mui/icons-material/Download";
 import ErrorIcon from "@mui/icons-material/Error";
 import ExtensionIcon from "@mui/icons-material/Extension";
 import InfoIcon from "@mui/icons-material/Info";
@@ -15,6 +18,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
+import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useCallback, useEffect, useState } from "react";
@@ -22,21 +26,33 @@ import {
   type BridgePlugins,
   disablePlugin,
   enablePlugin,
+  fetchInstalledPackages,
   fetchPlugins,
+  type InstalledPackage,
+  installPlugin,
   type PluginInfo,
   resetPlugin,
+  uninstallPlugin,
 } from "../../api/plugins.ts";
 
 export const PluginsPage = () => {
   const [bridgePlugins, setBridgePlugins] = useState<BridgePlugins[]>([]);
+  const [installedPkgs, setInstalledPkgs] = useState<InstalledPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [packageName, setPackageName] = useState("");
+  const [installing, setInstalling] = useState(false);
 
-  const loadPlugins = useCallback(async () => {
+  const loadAll = useCallback(async () => {
     try {
-      const data = await fetchPlugins();
-      setBridgePlugins(data);
+      const [plugins, installed] = await Promise.all([
+        fetchPlugins(),
+        fetchInstalledPackages(),
+      ]);
+      setBridgePlugins(plugins);
+      setInstalledPkgs(installed);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load plugins");
@@ -45,9 +61,52 @@ export const PluginsPage = () => {
     }
   }, []);
 
+  // Keep old name for bridge-level actions
+  const loadPlugins = loadAll;
+
   useEffect(() => {
-    loadPlugins();
-  }, [loadPlugins]);
+    loadAll();
+  }, [loadAll]);
+
+  const handleInstall = async () => {
+    const name = packageName.trim();
+    if (!name) return;
+    setInstalling(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await installPlugin(name);
+      setSuccess(
+        `Installed ${result.packageName}${result.version ? `@${result.version}` : ""}. Restart the bridge to load it.`,
+      );
+      setPackageName("");
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Installation failed");
+    } finally {
+      setInstalling(false);
+    }
+  };
+
+  const handleUninstall = async (pkg: string) => {
+    if (
+      !confirm(`Uninstall "${pkg}"? The bridge must be restarted afterwards.`)
+    ) {
+      return;
+    }
+    setActionLoading(`uninstall/${pkg}`);
+    setError(null);
+    setSuccess(null);
+    try {
+      await uninstallPlugin(pkg);
+      setSuccess(`Uninstalled ${pkg}. Restart the bridge to apply.`);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Uninstall failed");
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const handleEnable = async (bridgeId: string, pluginName: string) => {
     const key = `${bridgeId}/${pluginName}/enable`;
@@ -119,6 +178,117 @@ export const PluginsPage = () => {
           {error}
         </Alert>
       )}
+
+      {success && (
+        <Alert
+          severity="success"
+          sx={{ mb: 2 }}
+          onClose={() => setSuccess(null)}
+        >
+          {success}
+        </Alert>
+      )}
+
+      {/* Install Plugin Section */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            <DownloadIcon
+              sx={{ mr: 1, verticalAlign: "middle", fontSize: 20 }}
+            />
+            Install Plugin
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Enter an npm package name to install a plugin directly.
+          </Typography>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+            <TextField
+              label="npm Package Name"
+              placeholder="e.g. hamh-plugin-example"
+              value={packageName}
+              onChange={(e) => setPackageName(e.target.value)}
+              disabled={installing}
+              size="small"
+              sx={{ flexGrow: 1, maxWidth: 400 }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleInstall();
+              }}
+            />
+            <Button
+              variant="contained"
+              onClick={handleInstall}
+              disabled={installing || !packageName.trim()}
+              startIcon={
+                installing ? <CircularProgress size={16} /> : <AddIcon />
+              }
+            >
+              {installing ? "Installing..." : "Install"}
+            </Button>
+          </Box>
+
+          {/* Installed packages list */}
+          {installedPkgs.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Divider sx={{ mb: 1 }} />
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                sx={{ mb: 1 }}
+              >
+                Installed Packages ({installedPkgs.length})
+              </Typography>
+              <Stack spacing={1}>
+                {installedPkgs.map((pkg) => (
+                  <Box
+                    key={pkg.packageName}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      p: 1,
+                      border: 1,
+                      borderColor: "divider",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <ExtensionIcon fontSize="small" color="action" />
+                      <Typography variant="body2" fontWeight="bold">
+                        {pkg.packageName}
+                      </Typography>
+                      <Chip
+                        label={`v${pkg.version}`}
+                        size="small"
+                        variant="outlined"
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        installed{" "}
+                        {new Date(pkg.installedAt).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+                    <Tooltip title="Uninstall">
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleUninstall(pkg.packageName)}
+                        disabled={
+                          actionLoading === `uninstall/${pkg.packageName}`
+                        }
+                      >
+                        {actionLoading === `uninstall/${pkg.packageName}` ? (
+                          <CircularProgress size={16} />
+                        ) : (
+                          <DeleteIcon fontSize="small" />
+                        )}
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
 
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>

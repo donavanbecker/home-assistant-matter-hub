@@ -137,7 +137,10 @@ export class WebApi extends Service {
           this.startTime,
         ),
       )
-      .use("/plugins", pluginApi(this.bridgeService));
+      .use(
+        "/plugins",
+        pluginApi(this.bridgeService, this.props.storageLocation),
+      );
 
     const middlewares: express.Handler[] = [
       this.accessLogger,
