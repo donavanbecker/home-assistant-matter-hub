@@ -232,7 +232,7 @@ export class BridgeEndpointManager extends Service {
           // Vision 1: All known domains use DomainEndpoint.
           // LegacyEndpoint kept as fallback for unknown/future domains only.
           endpoint =
-            createDomainEndpoint(this.registry, entityId, mapping) ??
+            (await createDomainEndpoint(this.registry, entityId, mapping)) ??
             (await LegacyEndpoint.create(this.registry, entityId, mapping));
         } catch (e) {
           // Handle all endpoint creation errors gracefully to prevent boot crashes

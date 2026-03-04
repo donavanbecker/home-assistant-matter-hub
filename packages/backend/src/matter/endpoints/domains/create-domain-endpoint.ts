@@ -25,7 +25,6 @@ import { ScriptDevice } from "../legacy/script/index.js";
 import { InputSelectDevice, SelectDevice } from "../legacy/select/index.js";
 import { SensorDevice } from "../legacy/sensor/index.js";
 import { SwitchDevice } from "../legacy/switch/index.js";
-import { VacuumDevice } from "../legacy/vacuum/index.js";
 import { ValveDevice } from "../legacy/valve/index.js";
 import { WaterHeaterDevice } from "../legacy/water-heater/index.js";
 import { computeAutoMapping, shouldSkipAutoAssigned } from "./auto-mapping.js";
@@ -33,6 +32,7 @@ import {
   type DeviceFactory,
   GenericDomainEndpoint,
 } from "./generic-domain-endpoint.js";
+import { VacuumEndpoint } from "./vacuum-endpoint.js";
 
 const logger = Logger.get("DomainEndpointFactory");
 
@@ -58,7 +58,6 @@ const domainFactories: Partial<Record<HomeAssistantDomain, DeviceFactory>> = {
   scene: SceneDevice,
   media_player: MediaPlayerDevice,
   humidifier: HumidifierDevice,
-  vacuum: VacuumDevice,
   valve: ValveDevice,
   alarm_control_panel: AlarmControlPanelDevice,
   remote: RemoteDevice,
@@ -78,11 +77,11 @@ const domainFactories: Partial<Record<HomeAssistantDomain, DeviceFactory>> = {
  * - The entity should be skipped (auto-assigned to another device)
  * - The factory returns no endpoint type
  */
-export function createDomainEndpoint(
+export async function createDomainEndpoint(
   registry: BridgeRegistry,
   entityId: string,
   mapping?: EntityMappingConfig,
-): DomainEndpoint | undefined {
+): Promise<DomainEndpoint | undefined> {
   // Skip entities that have been auto-assigned to another device
   if (shouldSkipAutoAssigned(registry, entityId)) {
     return undefined;
@@ -109,6 +108,13 @@ export function createDomainEndpoint(
   }
 
   const domain = entityId.split(".")[0] as HomeAssistantDomain;
+
+  // Vacuum: dedicated endpoint with feature flags and auto-mapping
+  if (domain === "vacuum") {
+    logger.debug(`Creating VacuumEndpoint for ${entityId}`);
+    return VacuumEndpoint.create(registry, entityId, effectiveMapping);
+  }
+
   const factory = domainFactories[domain];
   if (!factory) {
     return undefined;
