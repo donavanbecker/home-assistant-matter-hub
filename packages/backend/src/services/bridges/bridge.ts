@@ -104,6 +104,22 @@ export class Bridge {
     return this.endpointManager.root;
   }
 
+  get pluginInfo() {
+    return this.endpointManager.getPluginInfo();
+  }
+
+  enablePlugin(pluginName: string): void {
+    this.endpointManager.enablePlugin(pluginName);
+  }
+
+  disablePlugin(pluginName: string): void {
+    this.endpointManager.disablePlugin(pluginName);
+  }
+
+  resetPlugin(pluginName: string): void {
+    this.endpointManager.resetPlugin(pluginName);
+  }
+
   constructor(
     env: Environment,
     logger: LoggerService,

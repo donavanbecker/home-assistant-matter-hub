@@ -26,6 +26,7 @@ import { lockCredentialApi } from "./lock-credential-api.js";
 import { logsApi } from "./logs-api.js";
 import { matterApi } from "./matter-api.js";
 import { metricsApi } from "./metrics-api.js";
+import { pluginApi } from "./plugin-api.js";
 import { supportIngress, supportProxyLocation } from "./proxy-support.js";
 import { settingsApi } from "./settings-api.js";
 import { systemApi } from "./system-api.js";
@@ -135,7 +136,8 @@ export class WebApi extends Service {
           this.haRegistry,
           this.startTime,
         ),
-      );
+      )
+      .use("/plugins", pluginApi(this.bridgeService));
 
     const middlewares: express.Handler[] = [
       this.accessLogger,

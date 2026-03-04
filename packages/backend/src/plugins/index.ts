@@ -6,6 +6,8 @@ export type {
 export { MatterbridgePluginAdapter } from "./matterbridge-adapter.js";
 export { PluginManager } from "./plugin-manager.js";
 export { FilePluginStorage } from "./plugin-storage.js";
+export type { CircuitBreakerState } from "./safe-plugin-runner.js";
+export { SafePluginRunner } from "./safe-plugin-runner.js";
 export type {
   MatterHubPlugin,
   MatterHubPluginConstructor,

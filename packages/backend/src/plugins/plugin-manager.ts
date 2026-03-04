@@ -1,5 +1,9 @@
 import { Logger } from "@matter/general";
 import { FilePluginStorage } from "./plugin-storage.js";
+import {
+  type CircuitBreakerState,
+  SafePluginRunner,
+} from "./safe-plugin-runner.js";
 import type {
   MatterHubPlugin,
   MatterHubPluginConstructor,
@@ -27,6 +31,7 @@ export class PluginManager {
   private readonly instances = new Map<string, PluginInstance>();
   private readonly storageDir: string;
   private readonly bridgeId: string;
+  private readonly runner = new SafePluginRunner();
 
   /** Callback invoked when a plugin registers a new device */
   onDeviceRegistered?: (
@@ -75,7 +80,17 @@ export class PluginManager {
     config: Record<string, unknown>,
   ): Promise<void> {
     try {
-      const module = await import(packagePath);
+      const module = await this.runner.run(
+        packagePath,
+        "import",
+        () => import(packagePath),
+        15_000,
+      );
+      if (!module) {
+        throw new Error(
+          `Plugin at ${packagePath} failed to load (timeout or error)`,
+        );
+      }
       const PluginClass: MatterHubPluginConstructor =
         module.default ?? module.MatterHubPlugin;
 
@@ -166,45 +181,56 @@ export class PluginManager {
   }
 
   /**
-   * Start all registered plugins.
+   * Start all registered plugins via SafePluginRunner.
    */
   async startAll(): Promise<void> {
     for (const [name, instance] of this.instances) {
       if (!instance.metadata.enabled) continue;
-      try {
-        logger.info(`Starting plugin: ${name}`);
-        await instance.plugin.onStart(instance.context);
-      } catch (e) {
-        logger.error(`Plugin "${name}" failed to start:`, e);
+      if (this.runner.isDisabled(name)) {
+        logger.warn(
+          `Plugin "${name}" is disabled (circuit breaker), skipping start`,
+        );
+        instance.metadata.enabled = false;
+        continue;
+      }
+      logger.info(`Starting plugin: ${name}`);
+      await this.runner.run(name, "onStart", () =>
+        instance.plugin.onStart(instance.context),
+      );
+      if (this.runner.isDisabled(name)) {
+        instance.metadata.enabled = false;
       }
     }
   }
 
   /**
-   * Configure all started plugins (called after bridge is operational).
+   * Configure all started plugins via SafePluginRunner.
    */
   async configureAll(): Promise<void> {
     for (const [name, instance] of this.instances) {
       if (!instance.metadata.enabled) continue;
-      try {
-        await instance.plugin.onConfigure?.();
-      } catch (e) {
-        logger.error(`Plugin "${name}" failed to configure:`, e);
+      if (instance.plugin.onConfigure) {
+        await this.runner.run(name, "onConfigure", () =>
+          instance.plugin.onConfigure!(),
+        );
+        if (this.runner.isDisabled(name)) {
+          instance.metadata.enabled = false;
+        }
       }
     }
   }
 
   /**
-   * Shut down all plugins.
+   * Shut down all plugins via SafePluginRunner.
    */
   async shutdownAll(reason?: string): Promise<void> {
     for (const [name, instance] of this.instances) {
-      try {
-        await instance.plugin.onShutdown?.(reason);
-        logger.info(`Plugin "${name}" shut down`);
-      } catch (e) {
-        logger.error(`Plugin "${name}" failed to shut down:`, e);
+      if (instance.plugin.onShutdown) {
+        await this.runner.run(name, "onShutdown", () =>
+          instance.plugin.onShutdown!(reason),
+        );
       }
+      logger.info(`Plugin "${name}" shut down`);
     }
     this.instances.clear();
   }
@@ -230,5 +256,32 @@ export class PluginManager {
       }
     }
     return result;
+  }
+
+  getCircuitBreakerStates(): Map<string, CircuitBreakerState> {
+    return this.runner.getAllStates();
+  }
+
+  resetPlugin(pluginName: string): void {
+    this.runner.resetCircuitBreaker(pluginName);
+    const instance = this.instances.get(pluginName);
+    if (instance) {
+      instance.metadata.enabled = true;
+    }
+  }
+
+  disablePlugin(pluginName: string): void {
+    const instance = this.instances.get(pluginName);
+    if (instance) {
+      instance.metadata.enabled = false;
+    }
+  }
+
+  enablePlugin(pluginName: string): void {
+    this.runner.resetCircuitBreaker(pluginName);
+    const instance = this.instances.get(pluginName);
+    if (instance) {
+      instance.metadata.enabled = true;
+    }
   }
 }

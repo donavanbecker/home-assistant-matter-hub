@@ -350,6 +350,48 @@ export class BridgeEndpointManager extends Service {
     return String(error);
   }
 
+  // --- Plugin info ---
+
+  getPluginInfo(): {
+    metadata: import("../../plugins/types.js").PluginMetadata[];
+    devices: Array<{
+      pluginName: string;
+      device: import("../../plugins/types.js").PluginDevice;
+    }>;
+    circuitBreakers: Record<
+      string,
+      import("../../plugins/safe-plugin-runner.js").CircuitBreakerState
+    >;
+  } {
+    if (!this.pluginManager) {
+      return { metadata: [], devices: [], circuitBreakers: {} };
+    }
+    const cbStates: Record<
+      string,
+      import("../../plugins/safe-plugin-runner.js").CircuitBreakerState
+    > = {};
+    for (const [name, state] of this.pluginManager.getCircuitBreakerStates()) {
+      cbStates[name] = state;
+    }
+    return {
+      metadata: this.pluginManager.getMetadata(),
+      devices: this.pluginManager.getAllDevices(),
+      circuitBreakers: cbStates,
+    };
+  }
+
+  enablePlugin(pluginName: string): void {
+    this.pluginManager?.enablePlugin(pluginName);
+  }
+
+  disablePlugin(pluginName: string): void {
+    this.pluginManager?.disablePlugin(pluginName);
+  }
+
+  resetPlugin(pluginName: string): void {
+    this.pluginManager?.resetPlugin(pluginName);
+  }
+
   // --- Plugin integration ---
 
   private wirePluginCallbacks(): void {
