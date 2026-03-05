@@ -13,7 +13,7 @@ import debounce from "debounce";
 import type { BridgeRegistry } from "../../services/bridges/bridge-registry.js";
 import type { HomeAssistantStates } from "../../services/home-assistant/home-assistant-registry.js";
 import { HomeAssistantEntityBehavior } from "../behaviors/home-assistant-entity-behavior.js";
-import { EntityEndpoint } from "./entity-endpoint.js";
+import { EntityEndpoint, getMappedEntityIds } from "./entity-endpoint.js";
 import { supportsCleaningModes } from "./legacy/vacuum/behaviors/vacuum-rvc-clean-mode-server.js";
 import { ServerModeVacuumDevice } from "./legacy/vacuum/server-mode-vacuum-device.js";
 
@@ -207,7 +207,13 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
       return undefined;
     }
 
-    return new ServerModeVacuumEndpoint(endpointType, entityId, customName);
+    const mappedIds = getMappedEntityIds(effectiveMapping);
+    return new ServerModeVacuumEndpoint(
+      endpointType,
+      entityId,
+      customName,
+      mappedIds,
+    );
   }
 
   private lastState?: HomeAssistantEntityState;
@@ -217,8 +223,9 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
     type: EndpointType,
     entityId: string,
     customName?: string,
+    mappedEntityIds?: string[],
   ) {
-    super(type, entityId, customName);
+    super(type, entityId, customName, mappedEntityIds);
     // Debounce state updates to batch rapid changes into a single transaction.
     // HA sends vacuum state updates every 5-10s even when unchanged.
     // Without debouncing, each triggers a separate Matter.js transaction.
@@ -232,12 +239,14 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
 
   async updateStates(states: HomeAssistantStates): Promise<void> {
     const state = states[this.entityId] ?? {};
+    const mappedChanged = this.hasMappedEntityChanged(states);
     // Compare only meaningful fields — ignore volatile HA metadata
     // (last_changed, last_updated, context) that changes on every event
     // even when the actual device state/attributes are identical.
     // Skipping these prevents unnecessary Matter subscription reports
     // and reduces MRP traffic that can cause session loss.
     if (
+      !mappedChanged &&
       state.state === this.lastState?.state &&
       JSON.stringify(state.attributes) ===
         JSON.stringify(this.lastState?.attributes)
@@ -245,6 +254,11 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
       return;
     }
 
+    if (mappedChanged) {
+      logger.debug(
+        `Mapped entity change detected for ${this.entityId}, forcing update`,
+      );
+    }
     logger.debug(
       `State update received for ${this.entityId}: state=${state.state}`,
     );

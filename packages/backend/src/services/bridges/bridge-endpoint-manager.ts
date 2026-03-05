@@ -104,11 +104,26 @@ export class BridgeEndpointManager extends Service {
       return;
     }
 
+    const subscriptionIds = this.collectSubscriptionEntityIds();
     this.unsubscribe = subscribeEntities(
       this.client.connection,
       (e) => this.updateStates(e),
-      this.entityIds,
+      subscriptionIds,
     );
+  }
+
+  private collectSubscriptionEntityIds(): string[] {
+    const ids = new Set(this.entityIds);
+    const endpoints = this.root.parts.map((p) => p as EntityEndpoint);
+    for (const endpoint of endpoints) {
+      const mappedIds = endpoint.mappedEntityIds;
+      if (mappedIds) {
+        for (const mappedId of mappedIds) {
+          ids.add(mappedId);
+        }
+      }
+    }
+    return [...ids];
   }
 
   stopObserving() {
@@ -262,6 +277,10 @@ export class BridgeEndpointManager extends Service {
   }
 
   async updateStates(states: HomeAssistantStates) {
+    // Merge subscription states into registry so EntityStateProvider
+    // reads fresh values for mapped entities (battery, humidity, etc.)
+    this.registry.mergeExternalStates(states);
+
     const endpoints = this.root.parts.map((p) => p as EntityEndpoint);
     // Process state updates in parallel for faster response times
     // Use allSettled so one failing endpoint doesn't block all others

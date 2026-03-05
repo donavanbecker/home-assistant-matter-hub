@@ -563,6 +563,13 @@ export class BridgeRegistry {
     this.refresh();
   }
 
+  mergeExternalStates(states: HomeAssistantStates): void {
+    const registryStates = this.registry.states;
+    for (const entityId of Object.keys(states)) {
+      registryStates[entityId] = states[entityId];
+    }
+  }
+
   /**
    * Get the area name for an entity, resolving from HA area registry.
    * Priority: entity area_id > device area_id > undefined
