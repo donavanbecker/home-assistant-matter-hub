@@ -83,11 +83,25 @@ export class ServerModeEndpointManager extends Service {
       return;
     }
 
+    const subscriptionIds = this.collectSubscriptionEntityIds();
     this.unsubscribe = subscribeEntities(
       this.client.connection,
       (e) => this.updateStates(e),
-      this.entityIds,
+      subscriptionIds,
     );
+  }
+
+  private collectSubscriptionEntityIds(): string[] {
+    const ids = new Set(this.entityIds);
+    if (this.deviceEndpoint) {
+      const mappedIds = this.deviceEndpoint.mappedEntityIds;
+      if (mappedIds) {
+        for (const mappedId of mappedIds) {
+          ids.add(mappedId);
+        }
+      }
+    }
+    return [...ids];
   }
 
   stopObserving(): void {
@@ -232,6 +246,10 @@ export class ServerModeEndpointManager extends Service {
   }
 
   async updateStates(states: HomeAssistantStates): Promise<void> {
+    // Merge subscription states into registry so EntityStateProvider
+    // reads fresh values for mapped entities (battery, humidity, etc.)
+    this.registry.mergeExternalStates(states);
+
     if (this.deviceEndpoint) {
       try {
         await this.deviceEndpoint.updateStates(states);

@@ -31,7 +31,11 @@ export function matterApi(
     const body = req.body as CreateBridgeRequest;
     const isValid = ajv.validate(createBridgeRequestSchema, body);
     if (!isValid) {
-      res.status(400).json(ajv.errors);
+      const details =
+        ajv.errors
+          ?.map((e) => `${e.instancePath || "/"}: ${e.message}`)
+          .join("; ") ?? "Unknown";
+      res.status(400).json({ error: `Validation failed: ${details}` });
     } else {
       try {
         const bridge = await bridgeService.create(body);
@@ -80,7 +84,11 @@ export function matterApi(
     const body = req.body as UpdateBridgeRequest;
     const isValid = ajv.validate(updateBridgeRequestSchema, body);
     if (!isValid) {
-      res.status(400).json(ajv.errors);
+      const details =
+        ajv.errors
+          ?.map((e) => `${e.instancePath || "/"}: ${e.message}`)
+          .join("; ") ?? "Unknown";
+      res.status(400).json({ error: `Validation failed: ${details}` });
     } else if (bridgeId !== body.id) {
       res.status(400).send("Path variable `bridgeId` does not match `body.id`");
     } else {

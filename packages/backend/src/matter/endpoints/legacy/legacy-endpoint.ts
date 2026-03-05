@@ -15,7 +15,10 @@ import debounce from "debounce";
 import type { BridgeRegistry } from "../../../services/bridges/bridge-registry.js";
 import type { HomeAssistantStates } from "../../../services/home-assistant/home-assistant-registry.js";
 import { HomeAssistantEntityBehavior } from "../../behaviors/home-assistant-entity-behavior.js";
-import { EntityEndpoint } from "../../endpoints/entity-endpoint.js";
+import {
+  EntityEndpoint,
+  getMappedEntityIds,
+} from "../../endpoints/entity-endpoint.js";
 import { ComposedAirPurifierEndpoint } from "../composed/composed-air-purifier-endpoint.js";
 import { ComposedSensorEndpoint } from "../composed/composed-sensor-endpoint.js";
 import { createLegacyEndpointType } from "./create-legacy-endpoint-type.js";
@@ -392,15 +395,17 @@ export class LegacyEndpoint extends EntityEndpoint {
       return;
     }
     const customName = effectiveMapping?.customName;
-    return new LegacyEndpoint(type, entityId, customName);
+    const mappedIds = getMappedEntityIds(effectiveMapping);
+    return new LegacyEndpoint(type, entityId, customName, mappedIds);
   }
 
   private constructor(
     type: EndpointType,
     entityId: string,
     customName?: string,
+    mappedEntityIds?: string[],
   ) {
-    super(type, entityId, customName);
+    super(type, entityId, customName, mappedEntityIds);
     // Debounce state updates to batch rapid changes into a single transaction.
     // Home Assistant often sends multiple attribute updates in quick succession
     // (e.g., media player: volume + source + play state). Without debouncing,
@@ -421,12 +426,14 @@ export class LegacyEndpoint extends EntityEndpoint {
 
   async updateStates(states: HomeAssistantStates) {
     const state = states[this.entityId] ?? {};
+    const mappedChanged = this.hasMappedEntityChanged(states);
     // Compare only meaningful fields — ignore volatile HA metadata
     // (last_changed, last_updated, context) that changes on every event
     // even when the actual device state/attributes are identical.
     // Skipping these prevents unnecessary Matter subscription reports
     // and reduces MRP traffic that can cause session loss.
     if (
+      !mappedChanged &&
       state.state === this.lastState?.state &&
       JSON.stringify(state.attributes) ===
         JSON.stringify(this.lastState?.attributes)
@@ -434,6 +441,11 @@ export class LegacyEndpoint extends EntityEndpoint {
       return;
     }
 
+    if (mappedChanged) {
+      logger.debug(
+        `Mapped entity change detected for ${this.entityId}, forcing update`,
+      );
+    }
     logger.debug(
       `State update received for ${this.entityId}: state=${state.state}`,
     );

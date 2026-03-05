@@ -6,28 +6,56 @@ import type {
 
 export async function fetchBridges() {
   const res = await fetch(`api/matter/bridges?_s=${Date.now()}`);
-  const json = await res.json();
-  return json as BridgeDataWithMetadata[];
+  if (!res.ok) {
+    const err = await res
+      .json()
+      .catch(() => ({ error: "Failed to fetch bridges" }));
+    throw new Error(
+      (err as { error?: string }).error ??
+        `Failed to fetch bridges (${res.status})`,
+    );
+  }
+  return (await res.json()) as BridgeDataWithMetadata[];
 }
 
 export async function createBridge(req: CreateBridgeRequest) {
-  return fetch("api/matter/bridges", {
+  const res = await fetch("api/matter/bridges", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(req),
-  }).then((res) => res.json() as Promise<BridgeDataWithMetadata>);
+  });
+  if (!res.ok) {
+    const err = await res
+      .json()
+      .catch(() => ({ error: "Failed to create bridge" }));
+    throw new Error(
+      (err as { error?: string }).error ??
+        `Failed to create bridge (${res.status})`,
+    );
+  }
+  return (await res.json()) as BridgeDataWithMetadata;
 }
 
 export async function updateBridge(req: UpdateBridgeRequest) {
-  return fetch(`api/matter/bridges/${req.id}`, {
+  const res = await fetch(`api/matter/bridges/${req.id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(req),
-  }).then((res) => res.json() as Promise<BridgeDataWithMetadata>);
+  });
+  if (!res.ok) {
+    const err = await res
+      .json()
+      .catch(() => ({ error: "Failed to update bridge" }));
+    throw new Error(
+      (err as { error?: string }).error ??
+        `Failed to update bridge (${res.status})`,
+    );
+  }
+  return (await res.json()) as BridgeDataWithMetadata;
 }
 
 export async function deleteBridge(bridgeId: string) {
@@ -37,9 +65,22 @@ export async function deleteBridge(bridgeId: string) {
 }
 
 export async function resetBridge(bridgeId: string) {
-  return await fetch(`api/matter/bridges/${bridgeId}/actions/factory-reset`, {
-    method: "POST",
-  }).then((res) => res.json() as Promise<BridgeDataWithMetadata>);
+  const res = await fetch(
+    `api/matter/bridges/${bridgeId}/actions/factory-reset`,
+    {
+      method: "POST",
+    },
+  );
+  if (!res.ok) {
+    const err = await res
+      .json()
+      .catch(() => ({ error: "Factory reset failed" }));
+    throw new Error(
+      (err as { error?: string }).error ??
+        `Factory reset failed (${res.status})`,
+    );
+  }
+  return (await res.json()) as BridgeDataWithMetadata;
 }
 
 export async function forceSyncBridge(
