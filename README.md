@@ -454,6 +454,7 @@ Thank you to everyone who helps improve this project by reporting issues!
 | [@JRCondat](https://github.com/JRCondat) | 💎 Thank you for your generous support! |
 | Bonjon | 💎 Thank you for your generous support! |
 | TobiR | 💎 Thank you for your generous support! |
+| [@d3rby91](https://github.com/d3rby91) | 💎 Thank you for your generous support! |
 | *Anonymous supporters* | 🙏 Thank you to those who prefer not to be named - your support is equally appreciated! |
 
 ### 🌟 Original Author
