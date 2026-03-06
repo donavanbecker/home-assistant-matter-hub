@@ -16,6 +16,20 @@ const logger = Logger.get("ColorControlServer");
 const optimisticColorTimestamps = new Map<string, number>();
 const OPTIMISTIC_COLOR_COOLDOWN_MS = 2000;
 
+// Pre-staged color data for Adaptive Lighting. When a controller adjusts
+// color while the light is off (executeIfOff), the action is stored here
+// instead of calling HA (which would turn the light on). The OnOff handler
+// merges this into the turn-on action so the light comes on at the correct color.
+const pendingColorStaging = new Map<string, object>();
+
+export function consumePendingColorStaging(
+  entityId: string,
+): object | undefined {
+  const data = pendingColorStaging.get(entityId);
+  pendingColorStaging.delete(entityId);
+  return data;
+}
+
 export type ColorControlMode =
   | ColorControl.ColorMode.CurrentHueAndCurrentSaturation
   | ColorControl.ColorMode.ColorTemperatureMireds;
@@ -228,6 +242,11 @@ export class ColorControlServerBase extends FeaturedBase {
       colorMode: ColorControl.ColorMode.ColorTemperatureMireds,
     });
     optimisticColorTimestamps.set(homeAssistant.entityId, Date.now());
+
+    if (this.isLightOff()) {
+      pendingColorStaging.set(homeAssistant.entityId, action.data ?? {});
+      return;
+    }
     homeAssistant.callAction(action);
   }
 
@@ -270,7 +289,17 @@ export class ColorControlServerBase extends FeaturedBase {
       colorMode: ColorControl.ColorMode.CurrentHueAndCurrentSaturation,
     });
     optimisticColorTimestamps.set(homeAssistant.entityId, Date.now());
+
+    if (this.isLightOff()) {
+      pendingColorStaging.set(homeAssistant.entityId, action.data ?? {});
+      return;
+    }
     homeAssistant.callAction(action);
+  }
+
+  private isLightOff(): boolean {
+    const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
+    return homeAssistant.entity.state.state === "off";
   }
 
   private applyTransition(action: { data?: object }) {
