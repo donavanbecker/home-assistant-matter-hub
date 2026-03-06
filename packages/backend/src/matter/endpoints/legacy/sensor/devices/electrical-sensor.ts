@@ -1,7 +1,7 @@
 import {
+  type HomeAssistantEntityInformation,
   type SensorDeviceAttributes,
   SensorDeviceClass,
-  type HomeAssistantEntityInformation,
 } from "@home-assistant-matter-hub/common";
 import {
   ElectricalEnergyMeasurementServer as EnergyBase,
