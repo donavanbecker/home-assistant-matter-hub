@@ -667,6 +667,13 @@ export const DashboardPage = () => {
                   </Grid>
                   <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                     <NavCard
+                      title="Area Setup"
+                      icon={<MapIcon sx={{ fontSize: 20 }} />}
+                      onClick={() => navigate(navigation.areaSetup)}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                    <NavCard
                       title="All Devices"
                       icon={<DevicesIcon sx={{ fontSize: 20 }} />}
                       onClick={() => navigate(navigation.devices)}
