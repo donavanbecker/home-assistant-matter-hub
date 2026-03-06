@@ -10,7 +10,8 @@ export const AVAILABLE_WIDGETS: readonly DashboardWidgetDef[] = [
   {
     id: "stats",
     label: "Status Overview",
-    description: "Bridge count, device count, fabric count, and HA connection status.",
+    description:
+      "Bridge count, device count, fabric count, and HA connection status.",
   },
   {
     id: "bridges",
@@ -20,7 +21,8 @@ export const AVAILABLE_WIDGETS: readonly DashboardWidgetDef[] = [
   {
     id: "quickNav",
     label: "Quick Navigation",
-    description: "Shortcut cards to other pages (Devices, Network Map, Health, etc.).",
+    description:
+      "Shortcut cards to other pages (Devices, Network Map, Health, etc.).",
   },
 ] as const;
 
@@ -68,7 +70,9 @@ export function useDashboardWidgets() {
     [config.hidden],
   );
 
-  const visibleWidgets = config.order.filter((id) => !config.hidden.includes(id));
+  const visibleWidgets = config.order.filter(
+    (id) => !config.hidden.includes(id),
+  );
 
   const toggleWidget = useCallback((id: string) => {
     setConfig((prev) => {

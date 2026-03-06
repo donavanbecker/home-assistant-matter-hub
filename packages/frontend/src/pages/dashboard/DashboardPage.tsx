@@ -54,9 +54,9 @@ import {
 import { useBridges } from "../../hooks/data/bridges.ts";
 import { useDashboardWidgets } from "../../hooks/use-dashboard-widgets.ts";
 import { navigation } from "../../routes.tsx";
-import { DashboardCustomizeDialog } from "./DashboardCustomizeDialog.tsx";
 import { loadBridges } from "../../state/bridges/bridge-actions.ts";
 import { useAppDispatch } from "../../state/hooks.ts";
+import { DashboardCustomizeDialog } from "./DashboardCustomizeDialog.tsx";
 
 interface HealthSummary {
   status: "healthy" | "degraded" | "unhealthy";
@@ -411,8 +411,8 @@ export const DashboardPage = () => {
               color="text.secondary"
               sx={{ maxWidth: 520, mx: "auto", mb: 4 }}
             >
-              Bridge your Home Assistant devices to Matter controllers like Apple
-              Home, Google Home, and Amazon Alexa.
+              Bridge your Home Assistant devices to Matter controllers like
+              Apple Home, Google Home, and Amazon Alexa.
             </Typography>
             <Stack
               direction={{ xs: "column", sm: "row" }}
@@ -629,10 +629,7 @@ export const DashboardPage = () => {
                         }),
                       )
                       .map((bridge) => (
-                        <Grid
-                          key={bridge.id}
-                          size={{ xs: 12, sm: 6, md: 4 }}
-                        >
+                        <Grid key={bridge.id} size={{ xs: 12, sm: 6, md: 4 }}>
                           <BridgeMiniCard
                             bridge={bridge}
                             onClick={() =>

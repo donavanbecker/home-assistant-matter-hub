@@ -27,7 +27,7 @@ export function useAppInfo(): AppInfo {
   const versionMismatch = useMemo(() => {
     if (!backendVersion || frontendVersion === "0.0.0-dev") return false;
     return frontendVersion !== backendVersion;
-  }, [frontendVersion, backendVersion]);
+  }, [backendVersion]);
 
   return useMemo(
     () => ({
@@ -37,6 +37,6 @@ export function useAppInfo(): AppInfo {
       backendVersion,
       versionMismatch,
     }),
-    [frontendVersion, backendVersion, versionMismatch],
+    [backendVersion, versionMismatch],
   );
 }

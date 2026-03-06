@@ -34,8 +34,8 @@ export const AppLayout: FC = () => {
             </Button>
           }
         >
-          Version mismatch: frontend {frontendVersion}, backend{" "}
-          {backendVersion}. Please reload to get the latest UI.
+          Version mismatch: frontend {frontendVersion}, backend {backendVersion}
+          . Please reload to get the latest UI.
         </Alert>
       )}
       {!isConnected && (

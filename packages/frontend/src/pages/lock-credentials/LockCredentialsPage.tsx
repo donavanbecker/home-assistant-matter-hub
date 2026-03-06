@@ -23,7 +23,6 @@ import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useCallback, useEffect, useState } from "react";
-import { ConfirmDialog } from "../../components/misc/ConfirmDialog.tsx";
 import {
   deleteLockCredential,
   fetchLockCredentials,
@@ -31,6 +30,7 @@ import {
   toggleLockCredentialEnabled,
   updateLockCredential,
 } from "../../api/lock-credentials.ts";
+import { ConfirmDialog } from "../../components/misc/ConfirmDialog.tsx";
 
 interface CredentialDialogProps {
   open: boolean;

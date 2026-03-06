@@ -106,9 +106,7 @@ export function systemApi(version: string): express.Router {
         updateAvailable,
         releaseUrl: data.html_url,
         publishedAt: data.published_at,
-        releaseNotes: data.body
-          ? data.body.substring(0, 500)
-          : undefined,
+        releaseNotes: data.body ? data.body.substring(0, 500) : undefined,
         environment: detectEnvironment(),
       });
     } catch (error) {

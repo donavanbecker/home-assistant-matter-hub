@@ -152,7 +152,9 @@ export const UpdateChecker = () => {
                 </Typography>
               </Alert>
             ) : (
-              <Alert severity="success">You are running the latest version.</Alert>
+              <Alert severity="success">
+                You are running the latest version.
+              </Alert>
             )}
 
             {updateInfo.releaseNotes && updateInfo.updateAvailable && (

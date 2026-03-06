@@ -12,15 +12,15 @@ import Divider from "@mui/material/Divider";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useCallback, useEffect, useState } from "react";
-import { BackupRestore } from "../../components/backup/BackupRestore.tsx";
-import { ConfirmDialog } from "../../components/misc/ConfirmDialog.tsx";
-import { UpdateChecker } from "../../components/system/UpdateChecker.tsx";
 import {
   deleteAuthSettings,
   fetchAuthSettings,
   type SettingsAuthResponse,
   updateAuthSettings,
 } from "../../api/settings.ts";
+import { BackupRestore } from "../../components/backup/BackupRestore.tsx";
+import { ConfirmDialog } from "../../components/misc/ConfirmDialog.tsx";
+import { UpdateChecker } from "../../components/system/UpdateChecker.tsx";
 
 export const SettingsPage = () => {
   const [authState, setAuthState] = useState<SettingsAuthResponse | null>(null);
