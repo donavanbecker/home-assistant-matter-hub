@@ -11,6 +11,18 @@ import type { ValueGetter, ValueSetter } from "./utils/cluster-config.js";
 
 const logger = Logger.get("OnOffServer");
 
+// Track optimistic on/off writes to prevent stale HA state from reverting them.
+// After a controller command, composed/mapped entity updates can re-push the
+// primary entity state before HA processes the command, reverting the optimistic
+// value. Only skip HA updates that report a DIFFERENT (stale) value; accept
+// updates that confirm the expected value immediately.
+interface OptimisticOnOffState {
+  expectedOnOff: boolean;
+  timestamp: number;
+}
+const optimisticOnOffState = new Map<string, OptimisticOnOffState>();
+const OPTIMISTIC_TIMEOUT_MS = 3000;
+
 export interface OnOffConfig {
   isOn?: ValueGetter<boolean>;
   turnOn?: ValueSetter<void> | null;
@@ -29,9 +41,20 @@ class OnOffServerBase extends Base {
   }
 
   protected update({ state }: HomeAssistantEntityInformation) {
-    applyPatchState(this.state, {
-      onOff: this.isOn(state),
-    });
+    const onOff = this.isOn(state);
+    const entityId = this.agent.get(HomeAssistantEntityBehavior).entity
+      .entity_id;
+    const optimistic = optimisticOnOffState.get(entityId);
+    if (optimistic != null) {
+      if (Date.now() - optimistic.timestamp > OPTIMISTIC_TIMEOUT_MS) {
+        optimisticOnOffState.delete(entityId);
+      } else if (onOff === optimistic.expectedOnOff) {
+        optimisticOnOffState.delete(entityId);
+      } else {
+        return;
+      }
+    }
+    applyPatchState(this.state, { onOff });
   }
 
   private isOn(entity: HomeAssistantEntityState): boolean {
@@ -59,6 +82,10 @@ class OnOffServerBase extends Base {
     // command response. Without this, Apple Home shows "Turning on..." until
     // the async HA WebSocket state update arrives.
     applyPatchState(this.state, { onOff: true });
+    optimisticOnOffState.set(homeAssistant.entityId, {
+      expectedOnOff: true,
+      timestamp: Date.now(),
+    });
     homeAssistant.callAction(action);
     // Auto-reset for momentary actions (scenes, automations) so controllers
     // don't show a permanently "on" state after activation.
@@ -82,6 +109,10 @@ class OnOffServerBase extends Base {
     // command response. Without this, Apple Home shows "Turning off..." until
     // the async HA WebSocket state update arrives (#219).
     applyPatchState(this.state, { onOff: false });
+    optimisticOnOffState.set(homeAssistant.entityId, {
+      expectedOnOff: false,
+      timestamp: Date.now(),
+    });
     homeAssistant.callAction(action);
   }
 
