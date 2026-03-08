@@ -33,6 +33,12 @@ const homeAssistantMatcherSchema: JSONSchema7 = {
             "Match entities by their integration/platform. Example: 'hue', 'zwave', 'mqtt'.",
         },
         {
+          const: "label",
+          title: "label (deprecated)",
+          description:
+            "Deprecated: use entity_label or device_label instead. Behaves like entity_label.",
+        },
+        {
           const: "entity_label",
           title: "entity_label",
           description:
