@@ -90,7 +90,6 @@ export interface PluginContext {
 
 /**
  * The interface that all plugins must implement.
- * Lifecycle is inspired by Matterbridge's MatterbridgeDynamicPlatform.
  *
  * A plugin is a "device provider" — it discovers/creates devices and
  * registers them with the bridge via the PluginContext.

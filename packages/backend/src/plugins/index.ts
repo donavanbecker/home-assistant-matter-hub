@@ -1,9 +1,3 @@
-export type {
-  MatterbridgeEndpointLike,
-  MatterbridgePlatformConfig,
-  MatterbridgePluginFactory,
-} from "./matterbridge-adapter.js";
-export { MatterbridgePluginAdapter } from "./matterbridge-adapter.js";
 export { type InstallResult, PluginInstaller } from "./plugin-installer.js";
 export { PluginManager } from "./plugin-manager.js";
 export {
