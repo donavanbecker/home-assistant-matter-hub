@@ -65,6 +65,8 @@ Home Assistant lights are mapped to the appropriate Matter light type based on s
 - All major controllers support all light types
 - Color temperature range may differ between HA and Matter specifications
 
+See [Light Guide](./Devices/Light.md) for detailed setup, color conversion, and troubleshooting.
+
 ---
 
 ### Switches & Booleans (`switch`, `input_boolean`)
@@ -114,6 +116,8 @@ Mapped to **DoorLock** with PIN code support where available.
 - Google Home has disabled voice unlock for Matter locks (Google policy)
 - Apple Home shows an "Unlatch" button when the lock supports the Unbolting feature
 
+See [Lock Guide](./Devices/Lock.md) for PIN credentials, unlatch setup, and troubleshooting.
+
 ---
 
 ### Covers (`cover`)
@@ -142,6 +146,8 @@ Mapped to **WindowCovering** supporting position and tilt control.
 - `shutter`
 - `awning`
 - `garage` (limited support)
+
+See [Cover Guide](./Devices/Cover.md) for percentage mapping, feature flags, and troubleshooting.
 
 ---
 
@@ -183,6 +189,8 @@ This prevents Alexa from rejecting commands on single-capability thermostats ([#
 
 **Temperature Display Unit:**
 The `ThermostatUserInterfaceConfiguration` cluster exposes your HA temperature unit preference (°C or °F) to Matter controllers.
+
+See [Climate Guide](./Devices/Climate.md) for detailed feature variants, mode mapping, and troubleshooting.
 
 ---
 
