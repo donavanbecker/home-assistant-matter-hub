@@ -508,16 +508,22 @@ export class FanControlServerBase extends FeaturedBase {
       return;
     }
     if (onOff && this.lastNonZeroPercent > 0) {
-      try {
-        applyPatchState(this.state, {
-          percentSetting: this.lastNonZeroPercent,
-          ...(this.features.multiSpeed && this.lastNonZeroSpeed > 0
-            ? { speedSetting: this.lastNonZeroSpeed }
-            : {}),
-        });
-      } catch {
-        // Transaction conflict — HA state update will set correct values
-      }
+      // Use asLocalActor so the percentSetting change is treated as offline.
+      // Without this, targetPercentSettingChanged fires and sends a second
+      // fan.turn_on(percentage), overriding the no-param fan.turn_on from
+      // OnOffServer.on() — which causes Auto→Manual mode regression (#219).
+      this.agent.asLocalActor(() => {
+        try {
+          applyPatchState(this.state, {
+            percentSetting: this.lastNonZeroPercent,
+            ...(this.features.multiSpeed && this.lastNonZeroSpeed > 0
+              ? { speedSetting: this.lastNonZeroSpeed }
+              : {}),
+          });
+        } catch {
+          // Transaction conflict — HA state update will set correct values
+        }
+      });
     }
   }
 
