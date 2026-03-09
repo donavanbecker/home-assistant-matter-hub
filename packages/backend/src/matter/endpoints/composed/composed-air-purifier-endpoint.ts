@@ -14,7 +14,11 @@ import {
 import { Endpoint, type EndpointType } from "@matter/main";
 import { FixedLabelServer } from "@matter/main/behaviors";
 import type { FanControl } from "@matter/main/clusters";
-import { AirPurifierDevice } from "@matter/main/devices";
+import {
+  AirPurifierDevice,
+  HumiditySensorDevice,
+  TemperatureSensorDevice,
+} from "@matter/main/devices";
 import debounce from "debounce";
 import type { BridgeRegistry } from "../../../services/bridges/bridge-registry.js";
 import { EntityStateProvider } from "../../../services/bridges/entity-state-provider.js";
@@ -41,43 +45,29 @@ import { FanOnOffServer } from "../legacy/fan/behaviors/fan-on-off-server.js";
 
 const logger = Logger.get("ComposedAirPurifierEndpoint");
 
-// --- Measurement configs (read sensor data from separate HA entities via EntityStateProvider) ---
+// --- Direct configs for sub-endpoints (read from own entity state) ---
 
-function createTemperatureConfig(
-  temperatureEntityId: string,
-): TemperatureMeasurementConfig {
-  return {
-    getValue(_entity, agent) {
-      const stateProvider = agent.env.get(EntityStateProvider);
-      const tempState = stateProvider.getState(temperatureEntityId);
-      if (!tempState) return undefined;
-      const temperature = Number.parseFloat(tempState.state);
-      if (Number.isNaN(temperature)) return undefined;
-      const fallbackUnit =
-        agent.env.get(HomeAssistantConfig).unitSystem.temperature;
-      const attrs = tempState.attributes as SensorDeviceAttributes;
-      return Temperature.withUnit(
-        temperature,
-        attrs.unit_of_measurement ?? fallbackUnit,
-      );
-    },
-  };
-}
+const temperatureConfig: TemperatureMeasurementConfig = {
+  getValue(entity, agent) {
+    const fallbackUnit =
+      agent.env.get(HomeAssistantConfig).unitSystem.temperature;
+    const state = entity.state;
+    const attributes = entity.attributes as SensorDeviceAttributes;
+    const temperature = state == null || Number.isNaN(+state) ? null : +state;
+    if (temperature == null) return undefined;
+    return Temperature.withUnit(
+      temperature,
+      attributes.unit_of_measurement ?? fallbackUnit,
+    );
+  },
+};
 
-function createHumidityConfig(
-  humidityEntityId: string,
-): HumidityMeasurementConfig {
-  return {
-    getValue(_entity, agent) {
-      const stateProvider = agent.env.get(EntityStateProvider);
-      const humState = stateProvider.getState(humidityEntityId);
-      if (!humState) return null;
-      const humidity = Number.parseFloat(humState.state);
-      if (Number.isNaN(humidity)) return null;
-      return humidity;
-    },
-  };
-}
+const humidityConfig: HumidityMeasurementConfig = {
+  getValue({ state }: HomeAssistantEntityState) {
+    if (state == null || Number.isNaN(+state)) return null;
+    return +state;
+  },
+};
 
 const batteryConfig = {
   getBatteryPercent: (
@@ -94,6 +84,20 @@ const batteryConfig = {
     return null;
   },
 };
+
+// --- Sub-endpoint types (without BasicInformationServer) ---
+
+const TemperatureSubType = TemperatureSensorDevice.with(
+  IdentifyServer,
+  HomeAssistantEntityBehavior,
+  TemperatureMeasurementServer(temperatureConfig),
+);
+
+const HumiditySubType = HumiditySensorDevice.with(
+  IdentifyServer,
+  HomeAssistantEntityBehavior,
+  HumidityMeasurementServer(humidityConfig),
+);
 
 // --- Helper ---
 
@@ -142,25 +146,28 @@ export interface ComposedAirPurifierConfig {
 // --- Main class ---
 
 /**
- * An air purifier endpoint with optional temperature and humidity measurement
- * clusters directly on the parent endpoint. Sub-endpoints are NOT used because
- * Apple Home unpredictably picks sub-endpoint device types as the primary tile,
- * causing the air purifier to show as a sensor instead.
- *
- * Sensor data is read from separate HA entities via EntityStateProvider,
- * following the same pattern as battery and filter life.
+ * A composed air purifier endpoint with optional temperature and humidity
+ * sensors as sub-endpoints. Sub-endpoints ensure the parent AirPurifierDevice
+ * only contains air-purifier-specific clusters, preventing Apple Home from
+ * inferring sensor device types on the parent and picking them as the
+ * primary tile instead of the air purifier.
  *
  * Structure:
- *   AirPurifierDevice (flat endpoint: fan control + optional temp/hum + optional battery)
+ *   AirPurifierDevice (parent: fan control + optional battery + optional HEPA filter)
+ *     ├── TemperatureSensorDevice (sub-endpoint, if mapped)
+ *     └── HumiditySensorDevice (sub-endpoint, if mapped)
  */
 export class ComposedAirPurifierEndpoint extends Endpoint {
   readonly entityId: string;
   readonly mappedEntityIds: string[];
-  private trackedEntityIds: string[];
+  private subEndpoints = new Map<string, Endpoint>();
   private lastStates = new Map<string, string>();
-  private debouncedFlush?: ReturnType<
-    typeof debounce<(s: HomeAssistantEntityState) => void>
-  >;
+  private debouncedUpdates = new Map<
+    string,
+    ReturnType<
+      typeof debounce<(ep: Endpoint, s: HomeAssistantEntityState) => void>
+    >
+  >();
 
   static async create(
     config: ComposedAirPurifierConfig,
@@ -200,7 +207,9 @@ export class ComposedAirPurifierEndpoint extends Endpoint {
       features.add("Wind");
     }
 
-    // Build parent type: AirPurifierDevice as a flat endpoint (no sub-endpoints).
+    // Build parent type: AirPurifierDevice with ONLY air-purifier-specific
+    // clusters. Sensor clusters live on sub-endpoints to prevent Apple Home
+    // from inferring sensor device types on the parent.
     let parentType = AirPurifierDevice.with(
       BasicInformationServer,
       IdentifyServer,
@@ -217,24 +226,6 @@ export class ComposedAirPurifierEndpoint extends Endpoint {
       !!config.mapping?.filterLifeEntity;
     if (hasFilterLife) {
       parentType = parentType.with(AirPurifierHepaFilterMonitoringServer);
-    }
-
-    // Add TemperatureMeasurement directly on parent (reads from separate entity)
-    if (config.temperatureEntityId) {
-      parentType = parentType.with(
-        TemperatureMeasurementServer(
-          createTemperatureConfig(config.temperatureEntityId),
-        ),
-      );
-    }
-
-    // Add RelativeHumidityMeasurement directly on parent (reads from separate entity)
-    if (config.humidityEntityId) {
-      parentType = parentType.with(
-        HumidityMeasurementServer(
-          createHumidityConfig(config.humidityEntityId),
-        ),
-      );
     }
 
     const mapping: EntityMappingConfig = {
@@ -263,7 +254,41 @@ export class ComposedAirPurifierEndpoint extends Endpoint {
       );
     }
 
+    // Build sensor sub-endpoints
     const endpointId = createEndpointId(primaryEntityId, config.customName);
+    const parts: Endpoint[] = [];
+    const subEndpointMap = new Map<string, Endpoint>();
+
+    if (config.temperatureEntityId) {
+      const tempPayload = buildEntityPayload(
+        registry,
+        config.temperatureEntityId,
+      );
+      if (tempPayload) {
+        const tempSub = new Endpoint(
+          TemperatureSubType.set({
+            homeAssistantEntity: { entity: tempPayload },
+          }),
+          { id: `${endpointId}_temp` },
+        );
+        parts.push(tempSub);
+        subEndpointMap.set(config.temperatureEntityId, tempSub);
+      }
+    }
+
+    if (config.humidityEntityId) {
+      const humPayload = buildEntityPayload(registry, config.humidityEntityId);
+      if (humPayload) {
+        const humSub = new Endpoint(
+          HumiditySubType.set({
+            homeAssistantEntity: { entity: humPayload },
+          }),
+          { id: `${endpointId}_humidity` },
+        );
+        parts.push(humSub);
+        subEndpointMap.set(config.humidityEntityId, humSub);
+      }
+    }
 
     const parentTypeWithState = parentType.set({
       homeAssistantEntity: {
@@ -273,22 +298,17 @@ export class ComposedAirPurifierEndpoint extends Endpoint {
       },
     });
 
-    // Track all entity IDs for change detection
-    const trackedEntityIds = [primaryEntityId];
-    if (config.temperatureEntityId)
-      trackedEntityIds.push(config.temperatureEntityId);
-    if (config.humidityEntityId) trackedEntityIds.push(config.humidityEntityId);
-
     // Expose non-primary entities so bridge-endpoint-manager subscribes to
-    // their state changes via WebSocket (without this, sensor data goes stale).
-    const mappedIds = trackedEntityIds.filter((id) => id !== primaryEntityId);
+    // their state changes via WebSocket.
+    const mappedIds = [...subEndpointMap.keys()];
 
     const endpoint = new ComposedAirPurifierEndpoint(
       parentTypeWithState,
       primaryEntityId,
       endpointId,
-      trackedEntityIds,
+      parts,
       mappedIds,
+      subEndpointMap,
     );
 
     const clusterLabels = [
@@ -309,56 +329,67 @@ export class ComposedAirPurifierEndpoint extends Endpoint {
     type: EndpointType,
     entityId: string,
     id: string,
-    trackedEntityIds: string[],
+    parts: Endpoint[],
     mappedEntityIds: string[],
+    subEndpoints: Map<string, Endpoint>,
   ) {
-    super(type, { id });
+    super(type, { id, parts });
     this.entityId = entityId;
-    this.trackedEntityIds = trackedEntityIds;
     this.mappedEntityIds = mappedEntityIds;
+    this.subEndpoints = subEndpoints;
   }
 
   async updateStates(states: HomeAssistantStates): Promise<void> {
-    // Check if any tracked entity (fan, temp sensor, hum sensor) changed
-    let anyChanged = false;
-    for (const entityId of this.trackedEntityIds) {
-      const state = states[entityId];
-      if (!state) continue;
-      const stateJson = JSON.stringify({
-        s: state.state,
-        a: state.attributes,
-      });
-      if (this.lastStates.get(entityId) !== stateJson) {
-        this.lastStates.set(entityId, stateJson);
-        anyChanged = true;
-      }
+    // Update parent with fan state
+    this.scheduleUpdate(this, this.entityId, states);
+
+    // Update sub-endpoints with their sensor states
+    for (const [entityId, sub] of this.subEndpoints) {
+      this.scheduleUpdate(sub, entityId, states);
     }
-
-    if (!anyChanged) return;
-
-    // Flush parent with fan state — measurement servers re-read from EntityStateProvider
-    const primaryState = states[this.entityId];
-    if (!primaryState) return;
-
-    if (!this.debouncedFlush) {
-      this.debouncedFlush = debounce(
-        (s: HomeAssistantEntityState) => this.flushUpdate(s),
-        50,
-      );
-    }
-    this.debouncedFlush(primaryState);
   }
 
-  private async flushUpdate(state: HomeAssistantEntityState) {
+  private scheduleUpdate(
+    endpoint: Endpoint,
+    entityId: string,
+    states: HomeAssistantStates,
+  ) {
+    const state = states[entityId];
+    if (!state) return;
+
+    const key = endpoint === this ? `_parent_:${entityId}` : entityId;
+
+    const stateJson = JSON.stringify({
+      s: state.state,
+      a: state.attributes,
+    });
+    if (this.lastStates.get(key) === stateJson) return;
+    this.lastStates.set(key, stateJson);
+
+    let debouncedFn = this.debouncedUpdates.get(key);
+    if (!debouncedFn) {
+      debouncedFn = debounce(
+        (ep: Endpoint, s: HomeAssistantEntityState) => this.flushUpdate(ep, s),
+        50,
+      );
+      this.debouncedUpdates.set(key, debouncedFn);
+    }
+    debouncedFn(endpoint, state);
+  }
+
+  private async flushUpdate(
+    endpoint: Endpoint,
+    state: HomeAssistantEntityState,
+  ) {
     try {
-      await this.construction.ready;
+      await endpoint.construction.ready;
     } catch {
       return;
     }
 
     try {
-      const current = this.stateOf(HomeAssistantEntityBehavior).entity;
-      await this.setStateOf(HomeAssistantEntityBehavior, {
+      const current = endpoint.stateOf(HomeAssistantEntityBehavior).entity;
+      await endpoint.setStateOf(HomeAssistantEntityBehavior, {
         entity: { ...current, state: { ...state } },
       });
     } catch (error) {
@@ -382,7 +413,9 @@ export class ComposedAirPurifierEndpoint extends Endpoint {
   }
 
   override async delete() {
-    this.debouncedFlush?.clear();
+    for (const fn of this.debouncedUpdates.values()) {
+      fn.clear();
+    }
     await super.delete();
   }
 }
