@@ -45,7 +45,15 @@ function shouldSuppressError(error: unknown): boolean {
 // Check if an error is isolatable (can isolate the entity causing it)
 function isIsolatableError(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error);
-  return msg.includes("Invalid intervalMs") || msg.includes("aggregator.");
+  return (
+    msg.includes("Invalid intervalMs") ||
+    msg.includes("Behaviors have errors") ||
+    msg.includes("TransactionDestroyedError") ||
+    msg.includes("DestroyedDependencyError") ||
+    msg.includes("UninitializedDependencyError") ||
+    msg.includes("Endpoint storage inaccessible") ||
+    msg.includes("aggregator.")
+  );
 }
 
 // Register early error handlers to catch errors before Matter.js initializes

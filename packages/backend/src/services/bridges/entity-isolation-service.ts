@@ -48,6 +48,31 @@ class EntityIsolationServiceImpl {
     return null;
   }
 
+  private classifyError(msg: string): string | null {
+    if (msg.includes("Invalid intervalMs")) {
+      return "Subscription timing error (Invalid intervalMs)";
+    }
+    if (msg.includes("Behaviors have errors")) {
+      return "Behavior initialization failure";
+    }
+    if (msg.includes("TransactionDestroyedError")) {
+      return "Transaction destroyed during operation";
+    }
+    if (msg.includes("DestroyedDependencyError")) {
+      return "Dependency destroyed during operation";
+    }
+    if (msg.includes("UninitializedDependencyError")) {
+      return "Uninitialized dependency access";
+    }
+    if (msg.includes("Endpoint storage inaccessible")) {
+      return "Endpoint storage inaccessible";
+    }
+    if (msg.includes("aggregator.")) {
+      return "Runtime error in endpoint";
+    }
+    return null;
+  }
+
   /**
    * Attempt to isolate an entity based on an error.
    * Returns true if the entity was successfully identified and isolation was triggered.
@@ -55,8 +80,8 @@ class EntityIsolationServiceImpl {
   async isolateFromError(error: unknown): Promise<boolean> {
     const msg = error instanceof Error ? error.message : String(error);
 
-    // Only handle specific subscription timing errors
-    if (!msg.includes("Invalid intervalMs")) {
+    const classification = this.classifyError(msg);
+    if (!classification) {
       return false;
     }
 
@@ -83,7 +108,7 @@ class EntityIsolationServiceImpl {
       return true; // Already isolated
     }
 
-    const reason = `Subscription timing error (Invalid intervalMs). Entity isolated to protect bridge stability.`;
+    const reason = `${classification}. Entity isolated to protect bridge stability.`;
     this.isolatedEntities.set(key, { entityId: entityName, reason });
 
     logger.warn(
