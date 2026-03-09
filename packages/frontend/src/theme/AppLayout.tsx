@@ -6,6 +6,7 @@ import Toolbar from "@mui/material/Toolbar";
 import type { FC } from "react";
 import { Outlet } from "react-router";
 import { ErrorBoundary } from "../components/misc/ErrorBoundary.tsx";
+import { FloatingLanguageSwitcher } from "../components/misc/FloatingLanguageSwitcher.tsx";
 import { useWebSocketStatus } from "../contexts/WebSocketContext.tsx";
 import { useAppInfo } from "../hooks/app-info.ts";
 import { AppFooter } from "./AppFooter.tsx";
@@ -49,6 +50,7 @@ export const AppLayout: FC = () => {
         </ErrorBoundary>
       </Container>
       <AppFooter />
+      <FloatingLanguageSwitcher />
     </Box>
   );
 };
