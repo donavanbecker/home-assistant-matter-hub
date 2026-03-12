@@ -1,3 +1,4 @@
+import type { Options as ClientRedirectsOptions } from "@docusaurus/plugin-client-redirects";
 import type * as Preset from "@docusaurus/preset-classic";
 import type { Config } from "@docusaurus/types";
 import { themes as prismThemes } from "prism-react-renderer";
@@ -14,6 +15,7 @@ const config: Config = {
   projectName: "home-assistant-matter-hub",
 
   onBrokenLinks: "throw",
+  trailingSlash: false,
 
   i18n: {
     defaultLocale: "en",
@@ -35,6 +37,41 @@ const config: Config = {
           customCss: "./src/css/custom.css",
         },
       } satisfies Preset.Options,
+    ],
+  ],
+
+  themes: ["docusaurus-lunr-search"],
+
+  plugins: [
+    [
+      "@docusaurus/plugin-client-redirects",
+      {
+        redirects: [
+          { from: "/installation", to: "/getting-started/installation" },
+          { from: "/bridge-configuration", to: "/getting-started/bridge-configuration" },
+          { from: "/alpha-features", to: "/guides/alpha-features" },
+          { from: "/testing-features", to: "/guides/testing-features" },
+          { from: "/api-reference", to: "/guides/api-reference" },
+          { from: "/migration-from-t0bst4r", to: "/getting-started/migration-from-t0bst4r" },
+          { from: "/connectivity-issues", to: "/guides/connectivity-issues" },
+          { from: "/connect-multiple-fabrics", to: "/guides/connect-multiple-fabrics" },
+          { from: "/reverse-proxy", to: "/guides/reverse-proxy" },
+          { from: "/plugin-system", to: "/guides/plugin-system" },
+          { from: "/light", to: "/devices/light" },
+          { from: "/climate", to: "/devices/climate" },
+          { from: "/cover", to: "/devices/cover" },
+          { from: "/lock", to: "/devices/lock" },
+          { from: "/robot-vacuum", to: "/devices/robot-vacuum" },
+          { from: "/air-purifier", to: "/devices/air-purifier" },
+          { from: "/temperature-humidity-sensor", to: "/devices/temperature-humidity-sensor" },
+          { from: "/frequently-asked-questions", to: "/faq" },
+          { from: "/services", to: "/developer/services" },
+          { from: "/endpoints", to: "/developer/endpoints" },
+          { from: "/behaviors", to: "/developer/behaviors" },
+          // Old Docusaurus paths before restructure
+          { from: "/guides/migration-from-t0bst4r", to: "/getting-started/migration-from-t0bst4r" },
+        ],
+      } satisfies ClientRedirectsOptions,
     ],
   ],
 
@@ -67,8 +104,16 @@ const config: Config = {
           title: "Docs",
           items: [
             { label: "Getting Started", to: "/getting-started/installation" },
-            { label: "Guides", to: "/guides/plugin-system" },
-            { label: "Devices", to: "/devices/light" },
+            { label: "Devices", to: "/supported-device-types" },
+            { label: "Plugins", to: "/guides/plugin-system" },
+            { label: "API Reference", to: "/guides/api-reference" },
+          ],
+        },
+        {
+          title: "Help",
+          items: [
+            { label: "Troubleshooting", to: "/guides/connectivity-issues" },
+            { label: "FAQ", to: "/faq" },
           ],
         },
         {

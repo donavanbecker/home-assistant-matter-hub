@@ -9,26 +9,13 @@ const sidebars: SidebarsConfig = {
       items: [
         "getting-started/installation",
         "getting-started/bridge-configuration",
+        "getting-started/migration-from-t0bst4r",
       ],
     },
-    {
-      type: "category",
-      label: "Guides",
-      items: [
-        "guides/alpha-features",
-        "guides/testing-features",
-        "guides/api-reference",
-        "guides/migration-from-t0bst4r",
-        "guides/connectivity-issues",
-        "guides/connect-multiple-fabrics",
-        "guides/reverse-proxy",
-        "guides/plugin-system",
-      ],
-    },
-    "supported-device-types",
     {
       type: "category",
       label: "Devices",
+      link: { type: "doc", id: "supported-device-types" },
       items: [
         "devices/light",
         "devices/climate",
@@ -39,10 +26,34 @@ const sidebars: SidebarsConfig = {
         "devices/temperature-humidity-sensor",
       ],
     },
-    "faq",
     {
       type: "category",
-      label: "Developer Documentation",
+      label: "Guides",
+      items: [
+        "guides/connect-multiple-fabrics",
+        "guides/reverse-proxy",
+        "guides/alpha-features",
+        "guides/testing-features",
+      ],
+    },
+    {
+      type: "category",
+      label: "Plugins",
+      items: ["guides/plugin-system"],
+    },
+    {
+      type: "category",
+      label: "Reference",
+      items: ["guides/api-reference"],
+    },
+    {
+      type: "category",
+      label: "Troubleshooting",
+      items: ["guides/connectivity-issues", "faq"],
+    },
+    {
+      type: "category",
+      label: "Developer",
       items: [
         "developer/index",
         "developer/services",
