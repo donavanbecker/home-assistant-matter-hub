@@ -59,9 +59,16 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
           registry.markBatteryEntityUsed(batteryEntityId);
           logger.info(`${entityId}: Auto-assigned battery ${batteryEntityId}`);
         } else {
-          logger.warn(
-            `${entityId}: No battery entity found for device ${entity.device_id}`,
-          );
+          const attrs = state.attributes as VacuumDeviceAttributes;
+          if (attrs.battery_level != null || attrs.battery != null) {
+            logger.info(
+              `${entityId}: No battery entity found, using battery attribute from vacuum state`,
+            );
+          } else {
+            logger.warn(
+              `${entityId}: No battery entity found for device ${entity.device_id}`,
+            );
+          }
         }
       }
 
