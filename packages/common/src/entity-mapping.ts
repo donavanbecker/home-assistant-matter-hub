@@ -139,6 +139,13 @@ export interface EntityMappingConfig {
    */
   readonly customFanSpeedTags?: Record<string, number>;
   /**
+   * Optional: Valetudo MQTT identifier for segment cleaning.
+   * HA lowercases entity IDs, but the MQTT topic needs the exact identifier
+   * shown in Valetudo under Connectivity → MQTT (e.g., "GentleFinishedSpider").
+   * If not set, the identifier is extracted from the entity ID (all lowercase).
+   */
+  readonly valetudoIdentifier?: string;
+  /**
    * Auto-populated at runtime when the vacuum supports HA 2026.3 CLEAN_AREA.
    * Maps HA areas (from the user's segment-to-area mapping in HA) to Matter
    * ServiceArea area IDs. When set, vacuum.clean_area is used instead of
@@ -177,6 +184,7 @@ export interface EntityMappingRequest {
   readonly mopIntensityEntity?: string;
   readonly customServiceAreas?: CustomServiceArea[];
   readonly customFanSpeedTags?: Record<string, number>;
+  readonly valetudoIdentifier?: string;
 }
 
 export interface EntityMappingResponse {

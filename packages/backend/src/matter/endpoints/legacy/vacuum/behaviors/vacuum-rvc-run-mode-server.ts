@@ -32,17 +32,20 @@ const logger = Logger.get("VacuumRvcRunModeServer");
 /**
  * Build an mqtt.publish action for Valetudo segment cleaning.
  * Valetudo uses MQTT (not vacuum.send_command) for segment-based cleaning.
- * The identifier is extracted from the HA entity ID (vacuum.valetudo_<id>).
  *
- * Note: HA normalizes entity IDs to lowercase, but the Valetudo MQTT topic
- * uses the original identifier case. If segment cleaning silently fails,
- * verify the topic matches the Valetudo MQTT configuration.
+ * If valetudoIdentifier is set in the entity mapping, it is used directly.
+ * Otherwise the identifier is extracted from the HA entity ID (lowercase).
+ * HA normalizes entity IDs to lowercase, but the Valetudo MQTT topic uses
+ * the original identifier case — set valetudoIdentifier in the mapping if
+ * they don't match.
  */
 function buildValetudoSegmentAction(
   vacuumEntityId: string,
   segmentIds: (string | number)[],
+  valetudoIdentifier?: string,
 ) {
-  const identifier = vacuumEntityId.replace(/^vacuum\.valetudo_/, "");
+  const identifier =
+    valetudoIdentifier || vacuumEntityId.replace(/^vacuum\.valetudo_/, "");
   const topic = `valetudo/${identifier}/MapSegmentationCapability/clean/set`;
   logger.info(
     `Valetudo: mqtt.publish to ${topic}, segments: ${segmentIds.join(", ")}`,
@@ -307,7 +310,11 @@ const vacuumRvcRunModeConfig = {
         const vacuumEntityId = homeAssistant.entityId;
         if (vacuumEntityId.startsWith("vacuum.valetudo_")) {
           serviceArea.state.selectedAreas = [];
-          return buildValetudoSegmentAction(vacuumEntityId, selectedAreas);
+          return buildValetudoSegmentAction(
+            vacuumEntityId,
+            selectedAreas,
+            homeAssistant.state.mapping?.valetudoIdentifier,
+          );
         }
 
         // Fallback: Try to find rooms from vacuum attributes (Dreame, Xiaomi Miot)
@@ -484,7 +491,11 @@ const vacuumRvcRunModeConfig = {
     const vacuumEntityId = entity.entity_id;
     if (vacuumEntityId.startsWith("vacuum.valetudo_")) {
       const segmentId = getRoomIdFromMode(roomMode);
-      return buildValetudoSegmentAction(vacuumEntityId, [segmentId]);
+      return buildValetudoSegmentAction(
+        vacuumEntityId,
+        [segmentId],
+        homeAssistant.state.mapping?.valetudoIdentifier,
+      );
     }
 
     // Regular room handling from vacuum attributes (Dreame, Roborock, etc.)
