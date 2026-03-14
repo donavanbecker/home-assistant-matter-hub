@@ -135,6 +135,7 @@ const BUILT_IN_LANGUAGES = [
   { code: "zh", name: "中文" },
   { code: "th", name: "ไทย" },
   { code: "sv", name: "Svenska" },
+  { code: "tr", name: "Türkçe" },
 ];
 
 export function TranslationEditor() {
