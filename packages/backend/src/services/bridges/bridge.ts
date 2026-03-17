@@ -23,6 +23,12 @@ import type { BridgeEndpointManager } from "./bridge-endpoint-manager.js";
 // via empty DataReports every ~sendInterval.
 const AUTO_FORCE_SYNC_INTERVAL_MS = 90_000;
 
+// When all subscriptions are lost but sessions remain active, wait this
+// long before force-closing the dead sessions. This breaks the deadlock
+// where the controller holds a stale CASE session and never re-subscribes
+// because it doesn't know the server canceled its subscriptions (#266).
+const DEAD_SESSION_TIMEOUT_MS = 3 * 60 * 1000;
+
 export class Bridge {
   private readonly log: Logger;
   readonly server: BridgeServerNode;
@@ -38,6 +44,7 @@ export class Bridge {
   public onStatusChange?: () => void;
 
   private autoForceSyncTimer: ReturnType<typeof setInterval> | null = null;
+  private deadSessionTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Tracks the last synced state JSON per entity to avoid pushing unchanged states.
   // Key: entity_id, Value: JSON.stringify of entity.state
@@ -277,6 +284,21 @@ export class Bridge {
           this.log.warn(
             `All subscriptions lost — ${sessions.length} session(s) still active, waiting for controller to re-subscribe`,
           );
+          if (!this.deadSessionTimer) {
+            this.deadSessionTimer = setTimeout(() => {
+              this.deadSessionTimer = null;
+              this.closeDeadSessions();
+            }, DEAD_SESSION_TIMEOUT_MS);
+            this.log.info(
+              `Scheduled dead session cleanup in ${DEAD_SESSION_TIMEOUT_MS / 1000}s`,
+            );
+          }
+        } else if (totalSubs > 0 && this.deadSessionTimer) {
+          clearTimeout(this.deadSessionTimer);
+          this.deadSessionTimer = null;
+          this.log.info(
+            "Subscriptions recovered, canceled dead session cleanup",
+          );
         }
       };
       sessionManager.subscriptionsChanged.on(this.sessionDiagHandler);
@@ -324,6 +346,23 @@ export class Bridge {
     }
   }
 
+  private closeDeadSessions() {
+    try {
+      const sessionManager = this.server.env.get(SessionManager);
+      const sessions = [...sessionManager.sessions];
+      for (const s of sessions) {
+        if (!s.isClosing && s.subscriptions.size === 0) {
+          this.log.warn(
+            `Force-closing dead session ${s.id} (peer ${s.peerNodeId}, no subscriptions for ${DEAD_SESSION_TIMEOUT_MS / 1000}s)`,
+          );
+          s.initiateForceClose().catch(() => {});
+        }
+      }
+    } catch {
+      // SessionManager may be disposed
+    }
+  }
+
   private unwireSessionDiagnostics() {
     try {
       const sessionManager = this.server.env.get(SessionManager);
@@ -342,6 +381,10 @@ export class Bridge {
     this.sessionDiagHandler = undefined;
     this.sessionAddedHandler = undefined;
     this.sessionDeletedHandler = undefined;
+    if (this.deadSessionTimer) {
+      clearTimeout(this.deadSessionTimer);
+      this.deadSessionTimer = null;
+    }
   }
 
   private stopAutoForceSync() {
