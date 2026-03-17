@@ -494,6 +494,9 @@ export class BridgeEndpointManager extends Service {
         this.registry.isAutoComposedDevicesEnabled() &&
         this.registry.isComposedSubEntityUsed(entityId)
       ) {
+        this.log.debug(
+          `Skipping ${entityId} — already part of a composed device`,
+        );
         continue;
       }
 
