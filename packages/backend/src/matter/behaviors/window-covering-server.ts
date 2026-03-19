@@ -158,6 +158,42 @@ export class WindowCoveringServerBase extends FeaturedBase {
     // Without this, Google Home and other controllers may show stale positions.
     const isStopped = movementStatus === MovementStatus.Stopped;
 
+    // When movement is initiated externally (HA / physical button), no Matter
+    // command sets targetPosition. The stale target (equal to the previous
+    // stopped position) misleads Apple Home which derives the displayed
+    // direction from current-vs-target, not only from operationalStatus.
+    // Fix: if the existing target doesn't agree with the movement direction,
+    // override it with the direction limit (#268).
+    const inferTarget = (
+      current100ths: number | null,
+      existing100ths: number | null | undefined,
+    ): number | null => {
+      if (isStopped) return current100ths;
+      if (movementStatus === MovementStatus.Opening) {
+        // Moving towards 0 (open). Keep target only if it is ahead (< current).
+        if (
+          existing100ths != null &&
+          current100ths != null &&
+          existing100ths < current100ths
+        ) {
+          return existing100ths;
+        }
+        return 0;
+      }
+      if (movementStatus === MovementStatus.Closing) {
+        // Moving towards 10000 (closed). Keep target only if it is ahead (> current).
+        if (
+          existing100ths != null &&
+          current100ths != null &&
+          existing100ths > current100ths
+        ) {
+          return existing100ths;
+        }
+        return 10000;
+      }
+      return existing100ths ?? current100ths;
+    };
+
     logger.debug(
       `Cover update for ${entity.entity_id}: state=${state.state}, lift=${currentLift}%, tilt=${currentTilt}%, movement=${MovementStatus[movementStatus]}`,
     );
@@ -200,22 +236,20 @@ export class WindowCoveringServerBase extends FeaturedBase {
           ? {
               currentPositionLiftPercentage: currentLift,
               currentPositionLiftPercent100ths: currentLift100ths,
-              // When stopped, target MUST equal current for controllers to show correct state
-              targetPositionLiftPercent100ths: isStopped
-                ? currentLift100ths
-                : (this.state.targetPositionLiftPercent100ths ??
-                  currentLift100ths),
+              targetPositionLiftPercent100ths: inferTarget(
+                currentLift100ths,
+                this.state.targetPositionLiftPercent100ths,
+              ),
             }
           : {}),
         ...(this.features.positionAwareTilt
           ? {
               currentPositionTiltPercentage: currentTilt,
               currentPositionTiltPercent100ths: currentTilt100ths,
-              // When stopped, target MUST equal current for controllers to show correct state
-              targetPositionTiltPercent100ths: isStopped
-                ? currentTilt100ths
-                : (this.state.targetPositionTiltPercent100ths ??
-                  currentTilt100ths),
+              targetPositionTiltPercent100ths: inferTarget(
+                currentTilt100ths,
+                this.state.targetPositionTiltPercent100ths,
+              ),
             }
           : {}),
       },
