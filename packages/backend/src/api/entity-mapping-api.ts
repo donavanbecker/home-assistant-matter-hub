@@ -49,6 +49,7 @@ export function entityMappingApi(
       customFanSpeedTags: body.customFanSpeedTags,
       valetudoIdentifier: body.valetudoIdentifier,
       coverSwapOpenClose: body.coverSwapOpenClose,
+      composedEntities: body.composedEntities,
     };
 
     const config = await mappingStorage.setMapping(request);
