@@ -103,6 +103,7 @@ The `context` object passed to `onStart` provides:
 - **`registerDevice(device)`** — Register a Matter device on the bridge
 - **`unregisterDevice(deviceId)`** — Remove a previously registered device
 - **`updateDeviceState(deviceId, clusterId, attributes)`** — Push attribute updates to a device
+- **`registerDomainMapping(mapping)`** — Map an HA domain to a Matter device type (see [Domain Mappings](#domain-mappings))
 - **`storage`** — Persistent key-value store (survives restarts)
 - **`log`** — Scoped logger (`info`, `warn`, `error`, `debug`)
 - **`bridgeId`** — ID of the bridge this plugin is attached to
@@ -204,6 +205,36 @@ async onConfigChanged(config) {
 }
 ```
 
+## Domain Mappings
+
+Plugins can register domain mappings to tell HAMH how to handle HA entity domains that are not natively supported. Call `context.registerDomainMapping()` during `onStart`:
+
+```javascript
+async onStart(context) {
+  // Map all "number" entities to dimmable lights
+  context.registerDomainMapping({
+    domain: "number",
+    matterDeviceType: "dimmable_light",
+  });
+}
+```
+
+The `matterDeviceType` must be one of the [Supported Device Types](#supported-device-types). Plugin domain mappings are checked after user-configured overrides but before the built-in domain table — they only apply to domains that HAMH does not already handle.
+
+If multiple plugins register the same domain, the last one wins (a warning is logged).
+
+## Cloud Provider / Device Source Plugins
+
+Plugins can integrate external cloud services by discovering devices, polling for state, and forwarding controller commands. See `examples/hamh-plugin-cloud-mock/` for a full working example that demonstrates:
+
+- Device discovery from an external API
+- Periodic polling for state changes
+- Forwarding Matter controller commands to the cloud API
+- Storing API tokens securely via `context.storage` (never logged)
+- Config schema for polling interval and credentials
+
+Replace the `MockCloudApi` class with your real provider's SDK to build a production plugin.
+
 ## Error Handling
 
 Plugins run in-process with a safety wrapper:
@@ -211,8 +242,9 @@ Plugins run in-process with a safety wrapper:
 - **Timeout**: Each lifecycle call has a 10-second timeout
 - **Circuit breaker**: 3 consecutive failures auto-disable the plugin
 - **Recovery**: Use the **Reset** button in the Plugins UI to re-enable a disabled plugin
+- **Unhandled rejections**: Fire-and-forget promises from plugins are caught at the process level and logged without crashing HAMH
 
-The bridge continues running even if a plugin fails.
+The bridge continues running even if a plugin fails. See `examples/hamh-plugin-broken/` for a test plugin that exercises various failure modes.
 
 ## Troubleshooting
 
