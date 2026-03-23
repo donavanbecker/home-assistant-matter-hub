@@ -70,8 +70,7 @@ process.on("unhandledRejection", (reason) => {
   if (shouldSuppressError(reason)) {
     return; // Suppress this specific error
   }
-  console.error("Unhandled rejection:", reason);
-  process.exit(1);
+  console.error("Unhandled rejection (process continuing):", reason);
 });
 
 // Re-register error handlers after Matter.js initialization to override its handlers
@@ -108,8 +107,9 @@ function registerFinalErrorHandlers() {
       console.warn("Suppressed Matter.js internal error:", reason);
       return;
     }
-    console.error("Unhandled rejection:", reason);
-    process.exit(1);
+    // Log but don't crash — unhandled rejections are non-fatal async failures.
+    // Plugins may emit fire-and-forget promises that escape SafePluginRunner.
+    console.error("Unhandled rejection (process continuing):", reason);
   });
 }
 
