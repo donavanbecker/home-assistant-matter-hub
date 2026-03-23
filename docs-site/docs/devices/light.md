@@ -68,7 +68,7 @@ After a subscription renewal (~5 minutes), Google Home may set brightness to 100
 
 ### Light turns on at 100% brightness (Alexa)
 
-Alexa may send an explicit `moveToLevel(254)` after turning on a light following subscription renewal. The `alexaPreserveBrightnessOnTurnOn` feature flag (Alpha) can mitigate this.
+Alexa may send an explicit `moveToLevel(254)` after turning on a light following subscription renewal. There is currently no bridge-side workaround for this Alexa behavior.
 
 ### Color temperature range differs
 

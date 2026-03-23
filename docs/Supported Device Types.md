@@ -23,7 +23,7 @@ This document provides comprehensive information about all device types supporte
 | `select`, `input_select` | Mode Select |
 | `alarm_control_panel` | Mode Select |
 | `event` | Generic Switch |
-| `humidifier` | On/Off Plug-in Unit |
+| `humidifier` | Fan (with humidity control) |
 
 > [!NOTE]
 > Controller compatibility varies by device type and firmware version. Not all controllers support all Matter device types. Check the official documentation below for current support status.
@@ -367,7 +367,7 @@ Mapped to **OnOffPlugInUnit**.
 
 **Behavior:**
 - Turning "on" executes the script
-- Shows as "on" while running, "off" when complete
+- State always shows as "off" (scripts are momentary actions)
 
 > **Note:** Scripts that are hidden in Home Assistant (`hidden_by: user`) will still be included if explicitly matched by your filter configuration.
 
@@ -390,13 +390,14 @@ Mapped to **WaterValve** device.
 
 ### Humidifiers (`humidifier`)
 
-Mapped to **OnOffPlugInUnit** with level control.
+Mapped to **Fan** device with humidity control.
 
-> Note: Matter does not have a native humidifier device type yet.
+> Note: Matter does not have a native humidifier device type. The Fan device type is used as the closest match, with the FanControl cluster mapped to humidity level.
 
 **Supported Features:**
 - On/Off
-- Target humidity (as level percentage)
+- Target humidity (as fan speed percentage)
+- Auto mode (if available modes include "auto")
 
 ---
 
@@ -426,7 +427,6 @@ Mapped to **RoboticVacuumCleaner**.
 |------|-------------|
 | `serverMode` | Expose as standalone device (required for Apple Home/Alexa) |
 | `vacuumIncludeUnnamedRooms` | Include rooms without names in room selection |
-| `vacuumMinimalClusters` | Strip non-essential clusters for Alexa compatibility ([#183](https://github.com/RiDDiX/home-assistant-matter-hub/issues/183)) |
 
 **Important Limitations:**
 - **Server Mode recommended** - For full voice command support (Siri, Alexa)
@@ -486,9 +486,9 @@ Mapped to **ModeSelectDevice** (0x0027). Each option in the select entity become
 Mapped to **OnOffPlugInUnit**.
 
 **Behavior:**
-- Turning "on" enables the automation
+- Turning "on" triggers the automation (runs it once)
 - Turning "off" disables the automation
-- State reflects enabled/disabled status
+- State reflects the automation's enabled/disabled status
 
 ---
 
@@ -681,7 +681,7 @@ action:
 - Logs show Alexa explicitly sending `level: 254` after `on()` commands
 - This does NOT happen immediately after dimming, only after subscription renewal
 
-**Workaround:** A feature flag `alexaPreserveBrightnessOnTurnOn` is available in Alpha/Testing versions. When enabled, the bridge will ignore brightness commands that set the light to 100% immediately after a turn-on command.
+**Workaround:** There is currently no bridge-side workaround for this Alexa behavior. Use voice commands ("Alexa, dim the lights to 50%") which work reliably.
 
 ---
 

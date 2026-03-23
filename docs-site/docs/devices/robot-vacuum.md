@@ -391,7 +391,7 @@ See [#177](https://github.com/RiDDiX/home-assistant-matter-hub/issues/177) for d
 
 Since v2.0.27, the **Identify** cluster is mapped to `vacuum.locate`. When you use "Play Sound" or "Find My" in Apple Home, the vacuum will play its locate sound.
 
-This works regardless of the `vacuumMinimalClusters` feature flag.
+This works for all vacuum configurations.
 
 ---
 
