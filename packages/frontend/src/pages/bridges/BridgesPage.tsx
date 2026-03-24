@@ -183,14 +183,14 @@ export const BridgesPage = () => {
               )}
               <Button
                 onClick={handleImportClick}
-                startIcon={<Download />}
+                startIcon={<Upload />}
                 variant="outlined"
               >
                 {t("common.import")}
               </Button>
               <Button
                 onClick={handleExport}
-                startIcon={<Upload />}
+                startIcon={<Download />}
                 variant="outlined"
                 disabled={bridges.length === 0}
               >
