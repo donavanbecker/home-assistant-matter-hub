@@ -5,7 +5,7 @@ import {
 import type { Environment, Logger } from "@matter/general";
 import type { Endpoint } from "@matter/main";
 import { CommissioningServer } from "@matter/main/node";
-import { SessionManager } from "@matter/main/protocol";
+import { DeviceAdvertiser, SessionManager } from "@matter/main/protocol";
 import type { LoggerService } from "../../core/app/logger.js";
 import { BridgeServerNode } from "../../matter/endpoints/bridge-server-node.js";
 import { ensureCommissioningConfig } from "../../utils/ensure-commissioning-config.js";
@@ -377,10 +377,13 @@ export class Bridge {
           this.log.warn(
             `Closing stale session ${s.id} (peer ${s.peerNodeId}, no subscriptions for ${DEAD_SESSION_TIMEOUT_MS / 1000}s)`,
           );
-          s.initiateClose().catch(() => {
-            // Graceful close failed (peer unreachable), force-close locally
-            s.initiateForceClose().catch(() => {});
-          });
+          s.initiateClose()
+            .catch(() => {
+              // Graceful close failed (peer unreachable), force-close locally
+              return s.initiateForceClose();
+            })
+            .catch(() => {})
+            .finally(() => this.triggerMdnsReAnnounce());
           break;
         }
       }
@@ -393,19 +396,42 @@ export class Bridge {
     try {
       const sessionManager = this.server.env.get(SessionManager);
       const sessions = [...sessionManager.sessions];
+      const closes: Promise<void>[] = [];
       for (const s of sessions) {
         if (!s.isClosing && s.subscriptions.size === 0) {
           this.log.warn(
             `Closing dead session ${s.id} (peer ${s.peerNodeId}, no subscriptions for ${DEAD_SESSION_TIMEOUT_MS / 1000}s)`,
           );
-          s.initiateClose().catch(() => {
-            // Graceful close failed (peer unreachable), force-close locally
-            s.initiateForceClose().catch(() => {});
-          });
+          closes.push(
+            s.initiateClose().catch(() => {
+              // Graceful close failed (peer unreachable), force-close locally
+              return s.initiateForceClose();
+            }),
+          );
         }
+      }
+      if (closes.length > 0) {
+        Promise.allSettled(closes).then(() => this.triggerMdnsReAnnounce());
       }
     } catch {
       // SessionManager may be disposed
+    }
+  }
+
+  /**
+   * Force a fresh mDNS operational advertisement after session cleanup.
+   * matter.js DeviceAdvertiser only re-announces when a subscription is
+   * canceled BY THE PEER. When the server cancels after 3 delivery
+   * timeouts, no re-announcement happens and the controller may not
+   * realize it should reconnect (#266).
+   */
+  private triggerMdnsReAnnounce() {
+    try {
+      const advertiser = this.server.env.get(DeviceAdvertiser);
+      advertiser.restartAdvertisement();
+      this.log.info("Triggered mDNS re-announcement after session cleanup");
+    } catch {
+      // DeviceAdvertiser may not be available
     }
   }
 
