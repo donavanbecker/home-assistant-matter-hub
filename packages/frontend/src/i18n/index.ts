@@ -6,6 +6,7 @@ import en from "./locales/en.json";
 import es from "./locales/es.json";
 import fr from "./locales/fr.json";
 import it from "./locales/it.json";
+import ru from "./locales/ru.json";
 import sv from "./locales/sv.json";
 import th from "./locales/th.json";
 import tr from "./locales/tr.json";
@@ -100,6 +101,7 @@ i18n
       th: { translation: th },
       sv: { translation: sv },
       tr: { translation: tr },
+      ru: { translation: ru },
     },
     fallbackLng: "en",
     interpolation: {
