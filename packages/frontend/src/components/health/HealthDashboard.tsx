@@ -59,7 +59,13 @@ interface BridgeHealthInfo {
     sessions: Array<{
       id: number;
       peerNodeId: string;
+      fabricIndex: number | null;
       subscriptionCount: number;
+    }>;
+    fabricSummary?: Array<{
+      fabricIndex: number;
+      sessions: number;
+      subscriptions: number;
     }>;
   };
 }
@@ -479,6 +485,9 @@ export function HealthDashboard(props: HealthDashboardProps = {}) {
                         {bridge.connectivity.totalSessions} |{" "}
                         {t("health.subscriptions")}:{" "}
                         {bridge.connectivity.totalSubscriptions}
+                        {bridge.connectivity.fabricSummary &&
+                          bridge.connectivity.fabricSummary.length > 1 &&
+                          ` (${bridge.connectivity.fabricSummary.length} ${t("health.fabrics")})`}
                       </Typography>
                     </Box>
                   )}

@@ -76,34 +76,65 @@ export class Bridge {
     sessions: Array<{
       id: number;
       peerNodeId: string;
+      fabricIndex: number | null;
       subscriptionCount: number;
     }>;
     totalSessions: number;
     totalSubscriptions: number;
+    fabrics: Array<{
+      fabricIndex: number;
+      sessions: number;
+      subscriptions: number;
+    }>;
   } {
     try {
       const sessionManager = this.server.env.get(SessionManager);
       const sessions = [...sessionManager.sessions];
       let totalSubscriptions = 0;
+      const fabricMap = new Map<
+        number,
+        { sessions: number; subscriptions: number }
+      >();
       const sessionList = sessions.map((s) => {
         const subCount = s.subscriptions.size;
         totalSubscriptions += subCount;
+        const fi =
+          typeof s.fabric?.fabricIndex === "number"
+            ? s.fabric.fabricIndex
+            : null;
+        if (fi !== null) {
+          const existing = fabricMap.get(fi) ?? {
+            sessions: 0,
+            subscriptions: 0,
+          };
+          existing.sessions++;
+          existing.subscriptions += subCount;
+          fabricMap.set(fi, existing);
+        }
         return {
           id: s.id,
           peerNodeId: String(s.peerNodeId),
+          fabricIndex: fi,
           subscriptionCount: subCount,
         };
       });
+      const fabrics = [...fabricMap.entries()].map(([fabricIndex, data]) => ({
+        fabricIndex,
+        sessions: data.sessions,
+        subscriptions: data.subscriptions,
+      }));
       return {
         sessions: sessionList,
         totalSessions: sessions.length,
         totalSubscriptions,
+        fabrics,
       };
     } catch {
       return {
         sessions: [],
         totalSessions: 0,
         totalSubscriptions: 0,
+        fabrics: [],
       };
     }
   }

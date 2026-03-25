@@ -5,7 +5,14 @@ import type { HomeAssistantClient } from "../services/home-assistant/home-assist
 export interface SessionInfo {
   id: number;
   peerNodeId: string;
+  fabricIndex: number | null;
   subscriptionCount: number;
+}
+
+export interface FabricSessionSummary {
+  fabricIndex: number;
+  sessions: number;
+  subscriptions: number;
 }
 
 export interface BridgeHealthInfo {
@@ -30,6 +37,7 @@ export interface BridgeHealthInfo {
     totalSessions: number;
     totalSubscriptions: number;
     sessions: SessionInfo[];
+    fabricSummary: FabricSessionSummary[];
   };
 }
 
@@ -137,6 +145,7 @@ export function healthApi(
           totalSessions: sessionInfo.totalSessions,
           totalSubscriptions: sessionInfo.totalSubscriptions,
           sessions: sessionInfo.sessions,
+          fabricSummary: sessionInfo.fabrics,
         },
       };
     });
