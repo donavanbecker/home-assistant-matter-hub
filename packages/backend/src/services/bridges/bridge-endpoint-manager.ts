@@ -577,6 +577,8 @@ export class BridgeEndpointManager extends Service {
   }
 
   async updateStates(states: HomeAssistantStates) {
+    const startMs = performance.now();
+
     // Merge subscription states into registry so EntityStateProvider
     // reads fresh values for mapped entities (battery, humidity, etc.)
     this.registry.mergeExternalStates(states);
@@ -587,10 +589,20 @@ export class BridgeEndpointManager extends Service {
     const results = await Promise.allSettled(
       endpoints.map((endpoint) => endpoint.updateStates(states)),
     );
+    let failedCount = 0;
     for (const result of results) {
       if (result.status === "rejected") {
+        failedCount++;
         this.log.warn("State update failed for endpoint:", result.reason);
       }
+    }
+
+    const latencyMs = Math.round((performance.now() - startMs) * 100) / 100;
+    if (latencyMs > 200) {
+      this.log.warn(
+        `Slow state update: ${endpoints.length} endpoints in ${latencyMs}ms` +
+          (failedCount > 0 ? ` (${failedCount} failed)` : ""),
+      );
     }
   }
 
