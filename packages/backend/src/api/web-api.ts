@@ -32,6 +32,7 @@ import { pluginApi } from "./plugin-api.js";
 import { supportIngress, supportProxyLocation } from "./proxy-support.js";
 import { settingsApi } from "./settings-api.js";
 import { systemApi } from "./system-api.js";
+import { networkDiagnosticApi } from "./network-diagnostic-api.js";
 import { webUi } from "./web-ui.js";
 import { WebSocketApi } from "./websocket-api.js";
 
@@ -46,6 +47,8 @@ export interface WebApiProps {
     username: string;
     password: string;
   };
+  readonly mdnsInterface?: string;
+  readonly mdnsIpv4?: boolean;
 }
 
 export class WebApi extends Service {
@@ -146,6 +149,13 @@ export class WebApi extends Service {
       .use(
         "/plugins",
         pluginApi(this.bridgeService, this.props.storageLocation),
+      )
+      .use(
+        "/network",
+        networkDiagnosticApi(
+          this.props.mdnsInterface,
+          this.props.mdnsIpv4 ?? true,
+        ),
       );
 
     const middlewares: express.Handler[] = [
