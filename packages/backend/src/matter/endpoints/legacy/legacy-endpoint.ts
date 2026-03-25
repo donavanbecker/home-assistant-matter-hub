@@ -366,6 +366,8 @@ export class LegacyEndpoint extends EntityEndpoint {
           humidityEntityId: effectiveMapping?.humidityEntity,
           pressureEntityId: effectiveMapping?.pressureEntity,
           batteryEntityId: effectiveMapping?.batteryEntity,
+          powerEntityId: effectiveMapping?.powerEntity,
+          energyEntityId: effectiveMapping?.energyEntity,
           customName: effectiveMapping?.customName,
           areaName: composedAreaName,
         });
@@ -402,6 +404,8 @@ export class LegacyEndpoint extends EntityEndpoint {
             temperatureEntityId,
             humidityEntityId,
             batteryEntityId: effectiveMapping?.batteryEntity,
+            powerEntityId: effectiveMapping?.powerEntity,
+            energyEntityId: effectiveMapping?.energyEntity,
             mapping: effectiveMapping,
             customName: effectiveMapping?.customName,
             areaName: composedAreaName,

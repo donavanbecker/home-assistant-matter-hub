@@ -29,6 +29,8 @@ import { Temperature } from "../../../utils/converters/temperature.js";
 import type { FeatureSelection } from "../../../utils/feature-selection.js";
 import { testBit } from "../../../utils/test-bit.js";
 import { BasicInformationServer } from "../../behaviors/basic-information-server.js";
+import { HaElectricalEnergyMeasurementServer } from "../../behaviors/electrical-energy-measurement-server.js";
+import { HaElectricalPowerMeasurementServer } from "../../behaviors/electrical-power-measurement-server.js";
 import { HomeAssistantEntityBehavior } from "../../behaviors/home-assistant-entity-behavior.js";
 import {
   type HumidityMeasurementConfig,
@@ -139,6 +141,8 @@ export interface ComposedAirPurifierConfig {
   temperatureEntityId?: string;
   humidityEntityId?: string;
   batteryEntityId?: string;
+  powerEntityId?: string;
+  energyEntityId?: string;
   mapping?: EntityMappingConfig;
   customName?: string;
   areaName?: string;
@@ -249,10 +253,23 @@ export class ComposedAirPurifierEndpoint extends Endpoint {
       ...(config.batteryEntityId
         ? { batteryEntity: config.batteryEntityId }
         : {}),
+      ...(config.powerEntityId
+        ? { powerEntity: config.powerEntityId }
+        : {}),
+      ...(config.energyEntityId
+        ? { energyEntity: config.energyEntityId }
+        : {}),
     };
 
     if (config.batteryEntityId) {
       parentType = parentType.with(PowerSourceServer(batteryConfig));
+    }
+
+    if (config.powerEntityId) {
+      parentType = parentType.with(HaElectricalPowerMeasurementServer);
+    }
+    if (config.energyEntityId) {
+      parentType = parentType.with(HaElectricalEnergyMeasurementServer);
     }
 
     if (config.areaName) {
@@ -332,6 +349,8 @@ export class ComposedAirPurifierEndpoint extends Endpoint {
     if (config.humidityEntityId) mappedIds.push(config.humidityEntityId);
     if (config.mapping?.filterLifeEntity)
       mappedIds.push(config.mapping.filterLifeEntity);
+    if (config.powerEntityId) mappedIds.push(config.powerEntityId);
+    if (config.energyEntityId) mappedIds.push(config.energyEntityId);
 
     const endpoint = new ComposedAirPurifierEndpoint(
       parentTypeWithState,
@@ -356,6 +375,8 @@ export class ComposedAirPurifierEndpoint extends Endpoint {
       config.humidityEntityId ? "+Hum" : "",
       config.batteryEntityId ? "+Bat" : "",
       hasFilterLife ? "+HEPA" : "",
+      config.powerEntityId ? "+Pwr" : "",
+      config.energyEntityId ? "+Nrg" : "",
     ]
       .filter(Boolean)
       .join("");

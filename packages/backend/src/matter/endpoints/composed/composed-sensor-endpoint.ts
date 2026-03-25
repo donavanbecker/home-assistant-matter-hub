@@ -25,6 +25,8 @@ import type { HomeAssistantStates } from "../../../services/home-assistant/home-
 import { convertPressureToHpa } from "../../../utils/converters/pressure.js";
 import { Temperature } from "../../../utils/converters/temperature.js";
 import { BasicInformationServer } from "../../behaviors/basic-information-server.js";
+import { HaElectricalEnergyMeasurementServer } from "../../behaviors/electrical-energy-measurement-server.js";
+import { HaElectricalPowerMeasurementServer } from "../../behaviors/electrical-power-measurement-server.js";
 import { HomeAssistantEntityBehavior } from "../../behaviors/home-assistant-entity-behavior.js";
 import {
   type HumidityMeasurementConfig,
@@ -144,6 +146,8 @@ export interface ComposedSensorConfig {
   humidityEntityId?: string;
   pressureEntityId?: string;
   batteryEntityId?: string;
+  powerEntityId?: string;
+  energyEntityId?: string;
   customName?: string;
   areaName?: string;
 }
@@ -195,10 +199,23 @@ export class ComposedSensorEndpoint extends Endpoint {
       ...(config.batteryEntityId
         ? { batteryEntity: config.batteryEntityId }
         : {}),
+      ...(config.powerEntityId
+        ? { powerEntity: config.powerEntityId }
+        : {}),
+      ...(config.energyEntityId
+        ? { energyEntity: config.energyEntityId }
+        : {}),
     };
 
     if (config.batteryEntityId) {
       parentType = parentType.with(PowerSourceServer(batteryConfig));
+    }
+
+    if (config.powerEntityId) {
+      parentType = parentType.with(HaElectricalPowerMeasurementServer);
+    }
+    if (config.energyEntityId) {
+      parentType = parentType.with(HaElectricalEnergyMeasurementServer);
     }
 
     if (config.areaName) {
@@ -273,6 +290,8 @@ export class ComposedSensorEndpoint extends Endpoint {
     const mappedIds: string[] = [];
     if (config.humidityEntityId) mappedIds.push(config.humidityEntityId);
     if (config.pressureEntityId) mappedIds.push(config.pressureEntityId);
+    if (config.powerEntityId) mappedIds.push(config.powerEntityId);
+    if (config.energyEntityId) mappedIds.push(config.energyEntityId);
 
     const endpoint = new ComposedSensorEndpoint(
       parentTypeWithState,
@@ -293,7 +312,8 @@ export class ComposedSensorEndpoint extends Endpoint {
 
     logger.info(
       `Created composed sensor ${primaryEntityId} with ${parts.length} sub-endpoint(s): ` +
-        `T${humSub ? "+H" : ""}${pressSub ? "+P" : ""}${config.batteryEntityId ? "+Bat" : ""}`,
+        `T${humSub ? "+H" : ""}${pressSub ? "+P" : ""}${config.batteryEntityId ? "+Bat" : ""}${config.powerEntityId ? "+Pwr" : ""}${config.energyEntityId ? "+Nrg" : ""}`,
+
     );
 
     return endpoint;
