@@ -117,6 +117,49 @@ The backend exposes a comprehensive REST API via Express for bridge management, 
 
 ---
 
+## Upgrading matter.js
+
+The `@matter/*` packages are pinned to a specific version in `packages/backend/package.json`. Upgrading requires careful validation because matter.js does not guarantee semver stability for internal APIs used by HAMH (SessionManager, CaseServer, DeviceAdvertiser).
+
+### Upgrade Checklist
+
+1. Review the matter.js changelog and migration guide for the target version.
+2. Search for breaking changes in APIs used by HAMH:
+   - `SessionManager` (session lifecycle, `subscriptionsChanged`, `sessions.added/deleted`)
+   - `MutableEndpoint.with()` (behavior composition)
+   - `ServerNode` / `CommissioningServer` (bridge lifecycle)
+   - `MdnsService` / `DeviceAdvertiser` (mDNS advertisement)
+   - Device type definitions in `@matter/main/devices`
+3. Update all three packages together: `@matter/general`, `@matter/main`, `@matter/nodejs`.
+4. Run the full validation sequence:
+   ```bash
+   pnpm run lint
+   pnpm run build
+   pnpm run test
+   ```
+5. Test pairing with at least one controller (Apple Home, Google Home, or Alexa).
+6. Test composed devices (temperature + humidity + pressure sensor grouping).
+7. Test server mode (vacuum endpoint).
+8. Test forceSync behavior (enable `autoForceSync`, verify changed states are pushed).
+9. Test session cleanup (verify stale sessions are closed when a new CASE session opens for the same peer).
+10. Build Docker image and verify it starts correctly:
+    ```bash
+    docker build -f apps/home-assistant-matter-hub/Dockerfile -t hamh-test .
+    ```
+
+### Known Internal API Dependencies
+
+| HAMH File | matter.js API | Purpose |
+|---|---|---|
+| `bridge.ts` | `SessionManager.sessions`, `.subscriptionsChanged` | Session diagnostics and stale session cleanup |
+| `bridge.ts` | `DeviceAdvertiser.restartAdvertisement()` | mDNS re-announce after session cleanup |
+| `bridge.ts` | `CommissioningServer.enterCommissionableMode()` | Multi-admin commissioning window |
+| `create-legacy-endpoint-type.ts` | `MutableEndpoint.with()` | Behavior composition for all device types |
+| `bridge-server-node.ts` | `ServerNode` subclass | Bridge server lifecycle |
+| `mdns.ts` | `MdnsService` | mDNS configuration |
+
+---
+
 ## Development & Handover Notes
 
 - **Start with backend**: Understand BridgeService, Bridge, BridgeEndpointManager, and HomeAssistantClient.
