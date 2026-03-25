@@ -155,12 +155,6 @@ importers:
         specifier: ^4.17.12
         version: 4.17.12
 
-  docs:
-    dependencies:
-      mystmd:
-        specifier: ^1.8.1
-        version: 1.8.1
-
   packages/backend:
     dependencies:
       '@home-assistant-matter-hub/common':
@@ -3552,10 +3546,6 @@ packages:
   multer@2.0.2:
     resolution: {integrity: sha512-u7f2xaZ/UG8oLXHvtF/oWTRvT44p9ecwBBqTwgJVq0+4BW1g8OW01TyMEGWBHbyMOYVHXslaut7qEQ1meATXgw==}
     engines: {node: '>= 10.16.0'}
-
-  mystmd@1.8.1:
-    resolution: {integrity: sha512-h0/RmGF++QVEtKW5Isoa4PJcYVSPa12MFxL1iIaFYw6tn/KVsI1SVDedupIHhvklcwaOSfg4xi7YWCXNmn/AnQ==}
-    hasBin: true
 
   mz@2.7.0:
     resolution: {integrity: sha512-z81GNO7nnYMEhrGh9LeymoE4+Yr0Wn5McHIZMK5cfQCl+NDX08sCZgUc9/6MHni9IWuFLm1Z3HTCXu2z9fN62Q==}
@@ -8367,8 +8357,6 @@ snapshots:
       object-assign: 4.1.1
       type-is: 1.6.18
       xtend: 4.0.2
-
-  mystmd@1.8.1: {}
 
   mz@2.7.0:
     dependencies:
