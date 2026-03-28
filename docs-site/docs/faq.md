@@ -211,6 +211,18 @@ Fixed in v2.0.27. Devices with `auto` + `cool` but no explicit `heat` mode (e.g.
 
 Fixed in v2.0.27. Devices with only `heat_cool` mode (no explicit `heat` or `cool`) now dynamically report `CoolingOnly` or `HeatingOnly` based on `hvac_action`, and the `systemMode` switches between Heat and Cool accordingly. See [#207](https://github.com/RiDDiX/home-assistant-matter-hub/issues/207).
 
+## After updating to HA 2026.4, my device names changed and voice commands stopped working
+
+Home Assistant 2026.4 changed how `friendly_name` is composed. Entity names now always include the device name as a prefix (e.g. "Motion Sensor Temperature" instead of just "Temperature"). This affects HAMH because Matter's `nodeLabel` is derived from `friendly_name`.
+
+Since Matter has no concept of aliases — `nodeLabel` is a single string (max 32 characters) — there is no way for HAMH to pass multiple names to a controller.
+
+**Workaround:** Use **Entity Mapping** in the HAMH UI to set a `customName` for affected entities. The `customName` always takes priority over `friendly_name`. Go to the bridge detail page → Entity Mappings → Add/Edit mapping → set your preferred name.
+
+HA's automatic migration adds old names as Assist voice aliases, but those only work for HA's built-in voice assistant — not for external controllers like Alexa, Google Home, or Apple Home. Each controller has its own device renaming UI that you can use as an alternative.
+
+See [#276](https://github.com/RiDDiX/home-assistant-matter-hub/issues/276) for discussion.
+
 ## What's the difference between Stable and Alpha?
 
 - **Stable** (v2.0.30): Production-ready, recommended for daily use

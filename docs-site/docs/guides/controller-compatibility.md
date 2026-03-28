@@ -37,8 +37,8 @@ Compatibility depends on controller firmware versions. This matrix reflects the 
 | `valve` | WaterValve | ✅ | ❓ | ❓ | ❓ |
 | `vacuum` | RoboticVacuumCleaner | ✅ | ❓ | ✅* | ❓ |
 | `water_heater` | Thermostat | ✅ | ✅ | ✅ | ❓ |
-| `alarm_control_panel` | ModeSelect | ❓ | ❓ | ❓ | ❓ |
-| `select` | ModeSelect | ❓ | ❓ | ❓ | ❓ |
+| `alarm_control_panel` | ModeSelect | ❓ | ❓ | ❌** | ❓ |
+| `select` | ModeSelect | ❓ | ❓ | ❌** | ❓ |
 | `event` | GenericSwitch | ✅ | ❓ | ❓ | ❓ |
 | `humidifier` | Fan | ✅ | ✅ | ✅ | ❓ |
 
@@ -50,6 +50,8 @@ Compatibility depends on controller firmware versions. This matrix reflects the 
 - ❌ = Not supported by the controller
 
 \* Alexa vacuum support requires the `vacuumOnOff` feature flag enabled.
+
+\*\* Alexa does not support the standalone ModeSelect device type (0x0027). The ModeSelect cluster is only recognized on specific device types like Lamp or Fan. See [Alexa Supported Device Categories](https://developer.amazon.com/en-US/docs/alexa/smarthome/supported-matter-device-categories.html) and [#273](https://github.com/RiDDiX/home-assistant-matter-hub/issues/273).
 
 ## Controller Profiles
 
