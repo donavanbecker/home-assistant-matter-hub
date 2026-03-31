@@ -4,13 +4,18 @@ import { ServiceArea } from "@matter/main/clusters";
 
 const logger = Logger.get("ServiceAreaServer");
 
+const ServiceAreaWithProgress = ServiceAreaBehavior.with(
+  ServiceArea.Feature.ProgressReporting,
+);
+
 /**
  * ServiceArea server implementation:
  * - No custom initialize() that calls super.initialize()
  * - Only override command handlers
  * - State is set via .set() at endpoint creation time
+ * - ProgressReporting feature enables controllers to display per-area status
  */
-export class ServiceAreaServerBase extends ServiceAreaBehavior {
+export class ServiceAreaServerBase extends ServiceAreaWithProgress {
   declare state: ServiceAreaServerBase.State;
 
   override selectAreas(
@@ -42,6 +47,12 @@ export class ServiceAreaServerBase extends ServiceAreaBehavior {
     // Store selected areas - actual cleaning starts when RvcRunMode.changeToMode(Cleaning) is called
     this.state.selectedAreas = uniqueAreas;
 
+    // Initialize progress for all selected areas as Pending
+    this.state.progress = uniqueAreas.map((areaId) => ({
+      areaId,
+      status: ServiceArea.OperationalStatus.Pending,
+    }));
+
     logger.info(
       `ServiceArea: Stored ${uniqueAreas.length} areas for cleaning: ${uniqueAreas.join(", ")}`,
     );
@@ -63,7 +74,7 @@ export class ServiceAreaServerBase extends ServiceAreaBehavior {
 }
 
 export namespace ServiceAreaServerBase {
-  export class State extends ServiceAreaBehavior.State {}
+  export class State extends ServiceAreaWithProgress.State {}
 }
 
 export interface ServiceAreaServerInitialState {
@@ -89,19 +100,24 @@ export function ServiceAreaServer(initialState: ServiceAreaServerInitialState) {
     supportedAreas: initialState.supportedAreas,
     selectedAreas: initialState.selectedAreas ?? [],
     currentArea: initialState.currentArea ?? null,
+    progress: [],
   });
 }
 
 // --- Maps-enabled variant ---
 
-const ServiceAreaWithMaps = ServiceAreaBehavior.with(ServiceArea.Feature.Maps);
+const ServiceAreaWithMapsAndProgress = ServiceAreaBehavior.with(
+  ServiceArea.Feature.Maps,
+  ServiceArea.Feature.ProgressReporting,
+);
 
 /**
- * ServiceArea server with Maps feature enabled.
- * Allows controllers to group and filter areas by map/floor.
+ * ServiceArea server with Maps + ProgressReporting features enabled.
+ * Allows controllers to group and filter areas by map/floor,
+ * and display per-area cleaning status.
  */
 // biome-ignore lint/correctness/noUnusedVariables: Used via .set() in factory function below
-class ServiceAreaServerWithMapsBase extends ServiceAreaWithMaps {
+class ServiceAreaServerWithMapsBase extends ServiceAreaWithMapsAndProgress {
   declare state: ServiceAreaServerWithMapsBase.State;
 
   override selectAreas(
@@ -130,6 +146,12 @@ class ServiceAreaServerWithMapsBase extends ServiceAreaWithMaps {
 
     this.state.selectedAreas = uniqueAreas;
 
+    // Initialize progress for all selected areas as Pending
+    this.state.progress = uniqueAreas.map((areaId) => ({
+      areaId,
+      status: ServiceArea.OperationalStatus.Pending,
+    }));
+
     logger.info(
       `ServiceArea: Stored ${uniqueAreas.length} areas for cleaning: ${uniqueAreas.join(", ")}`,
     );
@@ -150,7 +172,7 @@ class ServiceAreaServerWithMapsBase extends ServiceAreaWithMaps {
 }
 
 namespace ServiceAreaServerWithMapsBase {
-  export class State extends ServiceAreaWithMaps.State {}
+  export class State extends ServiceAreaWithMapsAndProgress.State {}
 }
 
 export interface ServiceAreaServerWithMapsInitialState
@@ -180,5 +202,6 @@ export function ServiceAreaServerWithMaps(
     supportedMaps: initialState.supportedMaps,
     selectedAreas: initialState.selectedAreas ?? [],
     currentArea: initialState.currentArea ?? null,
+    progress: [],
   });
 }

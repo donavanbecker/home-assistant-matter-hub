@@ -4,6 +4,7 @@ import {
   RvcRunModeServer as Base,
   ServiceAreaBehavior,
 } from "@matter/main/behaviors";
+import { ServiceArea } from "@matter/main/clusters";
 import { ModeBase } from "@matter/main/clusters/mode-base";
 import { RvcRunMode } from "@matter/main/clusters/rvc-run-mode";
 import { applyPatchState } from "../../utils/apply-patch-state.js";
@@ -92,7 +93,9 @@ class RvcRunModeServerBase extends Base {
   }
 
   /**
-   * Safely update ServiceArea.currentArea.
+   * Safely update ServiceArea.currentArea and progress.
+   * When areaId is set, marks it as Operating in progress.
+   * When areaId is null (Idle), marks all Operating/Pending as Completed.
    * No-op if ServiceArea is not available on this endpoint.
    */
   private trySetCurrentArea(areaId: number | null) {
@@ -102,8 +105,46 @@ class RvcRunModeServerBase extends Base {
         serviceArea.state.currentArea = areaId;
         logger.debug(`currentArea set to ${areaId}`);
       }
+      this.updateProgress(serviceArea, areaId);
     } catch {
       // ServiceArea not available on this endpoint
+    }
+  }
+
+  /**
+   * Update progress entries to reflect the current operating area.
+   * - null: mark all Operating/Pending entries as Completed (cleaning done)
+   * - areaId: mark that area as Operating
+   *
+   * Note: progress is available because our ServiceAreaServerBase enables
+   * ProgressReporting, but the base ServiceAreaBehavior type doesn't expose it.
+   */
+  private updateProgress(
+    serviceArea: InstanceType<typeof ServiceAreaBehavior>,
+    areaId: number | null,
+  ) {
+    const state = serviceArea.state as typeof serviceArea.state & {
+      progress?: ServiceArea.Progress[];
+    };
+    const progress = state.progress;
+    if (!progress || progress.length === 0) return;
+
+    if (areaId === null) {
+      // Cleaning finished — mark remaining Operating/Pending as Completed
+      state.progress = progress.map((p: ServiceArea.Progress) =>
+        p.status === ServiceArea.OperationalStatus.Operating ||
+        p.status === ServiceArea.OperationalStatus.Pending
+          ? { ...p, status: ServiceArea.OperationalStatus.Completed }
+          : p,
+      );
+    } else {
+      // Mark the target area as Operating
+      state.progress = progress.map((p: ServiceArea.Progress) =>
+        p.areaId === areaId &&
+        p.status === ServiceArea.OperationalStatus.Pending
+          ? { ...p, status: ServiceArea.OperationalStatus.Operating }
+          : p,
+      );
     }
   }
 
