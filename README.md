@@ -246,6 +246,9 @@ For more details, see the [Robot Vacuum Documentation](https://riddix.github.io/
 
 ### Home Assistant Add-on (Recommended)
 
+[![Open your Home Assistant instance and show the dashboard of an app.](https://my.home-assistant.io/badges/supervisor_addon.svg)](https://my.home-assistant.io/redirect/supervisor_addon/?addon=3fd9e6b0_hamh&repository_url=https%3A%2F%2Fgithub.com%2Friddix%2Fhome-assistant-addons)
+
+### Manual steps (testing versions, etc.)
 Add this repository to your Add-on Store:
 
 ```
