@@ -154,6 +154,11 @@ export class ServerModeBridge {
       await this.server.start();
       this.setStatus({ code: BridgeStatus.Running });
       this.startAutoForceSyncIfEnabled();
+      if (this.dataProvider.featureFlags?.autoForceSync) {
+        this.forceSync().catch((e) => {
+          this.log.warn("Startup force sync failed:", e);
+        });
+      }
       this.wireSessionDiagnostics();
       this.scheduleWarmStart();
       logMemoryUsage(this.log, "server mode bridge running");
