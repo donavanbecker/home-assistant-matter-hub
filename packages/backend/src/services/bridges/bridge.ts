@@ -243,7 +243,7 @@ export class Bridge {
           this.log.warn("Startup force sync failed:", e);
         });
       }
-      
+
       this.wireSessionDiagnostics();
       logMemoryUsage(this.log, "bridge running");
       diagnosticEventBus.emit("bridge_started", `Bridge started`, {

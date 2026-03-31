@@ -2,7 +2,7 @@
 
 # Home-Assistant-Matter-Hub
 
-!["Home-Assistant-Matter-Hub"](./docs/assets/hamh-logo-small.png)
+!["Home-Assistant-Matter-Hub"](./docs-site/static/img/hamh-logo-small.png)
 
 **Expose your Home Assistant devices to Matter controllers like Apple Home, Google Home, and Alexa**
 
