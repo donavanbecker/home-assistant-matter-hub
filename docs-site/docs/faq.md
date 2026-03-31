@@ -230,6 +230,20 @@ See [#276](https://github.com/RiDDiX/home-assistant-matter-hub/issues/276) for d
 
 See the [Alpha Features Guide](./guides/alpha-features.md) for details on alpha features.
 
+## I switched from Alpha to Stable (or vice versa) and lost all my devices / custom names
+
+The Alpha and Stable add-ons use **different add-on slugs** (`hamh-alpha` vs `hamh`), which means they have separate data directories. A Home Assistant system backup only restores data to the same add-on slug it came from — it does **not** transfer data between Alpha and Stable.
+
+To migrate your configuration (bridges, entity mappings, custom names, and Matter identity) between Alpha and Stable:
+
+1. **Before switching:** Open HAMH → Settings → Backup → **Download** a full backup (with identity included)
+2. **After switching:** Open HAMH → Settings → Backup → **Upload** the backup file and restore it
+3. **Restart** the add-on after restoring
+
+The built-in backup includes Matter identity data (keypairs, fabric credentials), so your controllers (Google Home, Apple Home, Alexa) will recognize the devices without re-commissioning. Without this step, all devices will appear as new and need to be set up again.
+
+See [#280](https://github.com/RiDDiX/home-assistant-matter-hub/issues/280) for details.
+
 ## How do I report an Alpha bug?
 
 When reporting Alpha issues, include:
