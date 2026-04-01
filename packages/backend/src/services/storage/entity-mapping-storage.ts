@@ -129,6 +129,7 @@ export class EntityMappingStorage extends Service {
         Object.keys(request.customFanSpeedTags).length > 0
           ? request.customFanSpeedTags
           : undefined,
+      currentRoomEntity: request.currentRoomEntity?.trim() || undefined,
       valetudoIdentifier: request.valetudoIdentifier?.trim() || undefined,
       coverSwapOpenClose: request.coverSwapOpenClose || undefined,
       composedEntities:
@@ -155,6 +156,7 @@ export class EntityMappingStorage extends Service {
       (!config.customServiceAreas || config.customServiceAreas.length === 0) &&
       (!config.customFanSpeedTags ||
         Object.keys(config.customFanSpeedTags).length === 0) &&
+      !config.currentRoomEntity &&
       !config.valetudoIdentifier &&
       !config.coverSwapOpenClose &&
       (!config.composedEntities || config.composedEntities.length === 0)

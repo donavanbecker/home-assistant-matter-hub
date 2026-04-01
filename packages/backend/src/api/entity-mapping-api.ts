@@ -47,6 +47,7 @@ export function entityMappingApi(
       mopIntensityEntity: body.mopIntensityEntity,
       customServiceAreas: body.customServiceAreas,
       customFanSpeedTags: body.customFanSpeedTags,
+      currentRoomEntity: body.currentRoomEntity,
       valetudoIdentifier: body.valetudoIdentifier,
       coverSwapOpenClose: body.coverSwapOpenClose,
       composedEntities: body.composedEntities,
