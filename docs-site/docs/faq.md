@@ -71,6 +71,7 @@ The automatic recovery feature will restart failed bridges. If a bridge keeps fa
 ## What sensors are supported?
 
 Currently supported sensor types:
+
 - Temperature (with auto humidity and pressure mapping)
 - Humidity
 - Pressure
@@ -120,7 +121,7 @@ Configure these in your Bridge Settings → Feature Flags. See [#107](https://gi
 
 HAMH has **Auto Battery Mapping** which automatically finds battery sensors on the same HA device and combines them with the primary sensor (temperature, climate, fan, vacuum). This feature is **disabled by default**. If batteries show separately:
 
-1. Check that the battery entity belongs to the same HA *device* as the primary entity
+1. Check that the battery entity belongs to the same HA _device_ as the primary entity
 2. Make sure `autoBatteryMapping` is enabled in your Bridge Settings → Feature Flags
 3. Alternatively, use **Entity Mapping** to manually set `batteryEntity` on the primary sensor
 
@@ -128,7 +129,7 @@ See [#99](https://github.com/RiDDiX/home-assistant-matter-hub/issues/99).
 
 ## My thermostat doesn't work correctly in auto mode
 
-Matter's "Auto" mode means the thermostat automatically switches between heating and cooling based on temperature. This maps to HA's `heat_cool` mode, *not* `auto`. Since v2.0.17:
+Matter's "Auto" mode means the thermostat automatically switches between heating and cooling based on temperature. This maps to HA's `heat_cool` mode, _not_ `auto`. Since v2.0.17:
 
 - **Heat-only** thermostats (e.g. TRVs) are exposed with only the Heating feature
 - **Cool-only** thermostats (e.g. ACs) are exposed with only the Cooling feature
@@ -237,16 +238,38 @@ The Alpha and Stable add-ons use **different add-on slugs** (`hamh-alpha` vs `ha
 To migrate your configuration (bridges, entity mappings, custom names, and Matter identity) between Alpha and Stable:
 
 1. **Before switching:** Open HAMH → Settings → Backup → **Download** a full backup (with identity included)
-2. **After switching:** Open HAMH → Settings → Backup → **Upload** the backup file and restore it
-3. **Restart** the add-on after restoring
+2. **Before starting the other version:** Clear its old data directory so the add-on starts fresh (see below)
+3. **After switching:** Open HAMH → Settings → Backup → **Upload** the backup file and restore it
+4. **Restart** the add-on after restoring
 
 The built-in backup includes Matter identity data (keypairs, fabric credentials), so your controllers (Google Home, Apple Home, Alexa) will recognize the devices without re-commissioning. Without this step, all devices will appear as new and need to be set up again.
+
+### Why clearing old data matters
+
+When you start the other add-on version, it immediately loads whatever bridge configuration already exists in its own data directory. If old bridges are present, they start with their old Matter identity **before** you can access the WebUI to restore your backup. This causes controllers to see "new" devices and lose custom names and room assignments.
+
+Clearing the data directory first ensures the add-on starts with no bridges, giving you a clean slate to restore into.
+
+### Clearing old data via SSH / CLI
+
+Connect to your Home Assistant host via SSH (e.g., the **Terminal & SSH** add-on) and remove the target add-on's data directory:
+
+```bash
+# When switching from Alpha → Stable, clear the Stable data:
+rm -rf /addon_configs/hamh/data
+
+# When switching from Stable → Alpha, clear the Alpha data:
+rm -rf /addon_configs/hamh-alpha/data
+```
+
+Then start the add-on, restore the backup via the WebUI, and restart.
 
 See [#280](https://github.com/RiDDiX/home-assistant-matter-hub/issues/280) for details.
 
 ## How do I report an Alpha bug?
 
 When reporting Alpha issues, include:
+
 - Alpha version number (visible in Health Dashboard)
 - Full logs from the add-on/container
 - Steps to reproduce
@@ -257,6 +280,7 @@ When reporting Alpha issues, include:
 Since v2.0.24, thermostats support **auto-resume** — when off and you set a temperature (even the same one), it automatically turns on. This works with all voice assistants.
 
 If not working:
+
 - Update to v2.0.30+
 - Only works for single-temp mode (not range/auto)
 - Thermostat must be in "Off" state
@@ -276,6 +300,7 @@ Fixed in v2.0.24. Endpoint disposal was improved in `BridgeEndpointManager` and 
 ## How do I use the Dashboard landing page?
 
 Since v2.0.24, the app opens with a **Dashboard** showing:
+
 - Bridge count, device count, fabric connections
 - Quick navigation to all pages
 - Bridge Wizard and Create Bridge buttons
@@ -286,6 +311,7 @@ Refreshes every 15 seconds.
 ## What is "Auto Composed Devices"?
 
 **Auto Composed Devices** (`autoComposedDevices` feature flag, since v2.0.20) combines related entities from the same HA device into one Matter endpoint:
+
 - Temperature + Humidity + Pressure + Battery = one device
 - Switches/Lights with power/energy monitoring show consumption in one device
 - Uses real Matter Composed Devices with sub-endpoints for proper controller display
