@@ -51,6 +51,11 @@ class RvcRunModeServerBase extends Base {
   private completedAreas = new Set<number>();
   /** Last known currentArea — used to detect room transitions */
   private lastCurrentArea: number | null = null;
+  /** Snapshot of selectedAreas taken when cleaning starts.
+   *  The start handler clears serviceArea.state.selectedAreas after
+   *  dispatching the HA action to prevent re-dispatch, but progress
+   *  tracking needs the original list for the entire cleaning session. */
+  private activeAreas: number[] = [];
 
   override async initialize() {
     // supportedModes and currentMode are set via .set() BEFORE initialize is called
@@ -78,23 +83,19 @@ class RvcRunModeServerBase extends Base {
 
     if (previousMode !== newMode) {
       if (newMode === RvcSupportedRunMode.Idle) {
-        // Reset currentArea when vacuum transitions to Idle (cleaning finished)
+        // Mark all areas as Completed before clearing session state
+        this.trySetCurrentArea(null);
         this.completedAreas.clear();
         this.lastCurrentArea = null;
-        this.trySetCurrentArea(null);
+        this.activeAreas = [];
       } else if (newMode === RvcSupportedRunMode.Cleaning) {
         // Restore currentArea when HA reports cleaning (e.g. after a brief
         // docked state between command dispatch and vacuum actually starting)
-        try {
-          const serviceArea = this.agent.get(ServiceAreaBehavior);
-          if (
-            serviceArea.state.selectedAreas?.length > 0 &&
-            serviceArea.state.currentArea === null
-          ) {
-            this.trySetCurrentArea(serviceArea.state.selectedAreas[0]);
-          }
-        } catch {
-          // ServiceArea not available
+        if (
+          this.activeAreas.length > 0 &&
+          this.lastCurrentArea === null
+        ) {
+          this.trySetCurrentArea(this.activeAreas[0]);
         }
       }
     }
@@ -121,9 +122,9 @@ class RvcRunModeServerBase extends Base {
       const roomState = stateProvider.getState(currentRoomEntityId);
       if (!roomState || !roomState.state) return;
 
+      if (this.activeAreas.length === 0) return;
+
       const serviceArea = this.agent.get(ServiceAreaBehavior);
-      const selectedAreas = serviceArea.state.selectedAreas;
-      if (!selectedAreas || selectedAreas.length === 0) return;
 
       // Match by segment_id attribute (numeric, preferred) or by room name
       const segmentId = (roomState.attributes as { segment_id?: number })
@@ -133,7 +134,7 @@ class RvcRunModeServerBase extends Base {
       let matchedAreaId: number | null = null;
       if (segmentId != null) {
         // segment_id maps directly to areaId for numeric room IDs
-        if (selectedAreas.includes(segmentId)) {
+        if (this.activeAreas.includes(segmentId)) {
           matchedAreaId = segmentId;
         }
       }
@@ -144,7 +145,7 @@ class RvcRunModeServerBase extends Base {
             a.areaInfo.locationInfo?.locationName?.toLowerCase() ===
             roomName.toLowerCase(),
         );
-        if (area && selectedAreas.includes(area.areaId)) {
+        if (area && this.activeAreas.includes(area.areaId)) {
           matchedAreaId = area.areaId;
         }
       }
@@ -193,30 +194,30 @@ class RvcRunModeServerBase extends Base {
    * - null: mark all areas as Completed (cleaning done)
    * - areaId: mark that area as Operating, others as Pending
    *
-   * Rebuilds progress from selectedAreas (plain number array) instead of
-   * reading managed state progress entries, which avoids infinite recursion
-   * in matter.js property getters during transaction pre-commit.
+   * Uses the activeAreas snapshot (plain number array) instead of
+   * managed state entries, which avoids infinite recursion in
+   * matter.js property getters during transaction pre-commit.
    */
   private updateProgress(
     serviceArea: InstanceType<typeof ServiceAreaBehavior>,
     areaId: number | null,
   ) {
+    if (this.activeAreas.length === 0) return;
+
     const state = serviceArea.state as typeof serviceArea.state & {
       progress?: ServiceArea.Progress[];
     };
-    const selectedAreas = serviceArea.state.selectedAreas;
-    if (!selectedAreas || selectedAreas.length === 0) return;
 
     if (areaId === null) {
-      // Cleaning finished — mark all selected areas as Completed
-      state.progress = selectedAreas.map((id: number) => ({
+      // Cleaning finished — mark all active areas as Completed
+      state.progress = this.activeAreas.map((id) => ({
         areaId: id,
         status: ServiceArea.OperationalStatus.Completed,
       }));
     } else {
       // Mark current area as Operating, completed areas as Completed,
       // remaining areas as Pending.
-      state.progress = selectedAreas.map((id: number) => ({
+      state.progress = this.activeAreas.map((id) => ({
         areaId: id,
         status:
           id === areaId
@@ -271,7 +272,9 @@ class RvcRunModeServerBase extends Base {
       try {
         const serviceArea = this.agent.get(ServiceAreaBehavior);
         if (serviceArea.state.selectedAreas?.length > 0) {
-          this.trySetCurrentArea(serviceArea.state.selectedAreas[0]);
+          // Snapshot selected areas before the start handler clears them
+          this.activeAreas = [...serviceArea.state.selectedAreas];
+          this.trySetCurrentArea(this.activeAreas[0]);
           homeAssistant.callAction(this.state.config.start(void 0, this.agent));
           this.state.currentMode = newMode;
           return {
@@ -284,7 +287,9 @@ class RvcRunModeServerBase extends Base {
       }
 
       if (this.state.config.cleanRoom) {
-        this.trySetCurrentArea(this.findAreaIdForMode(newMode));
+        const areaId = this.findAreaIdForMode(newMode);
+        this.activeAreas = areaId !== null ? [areaId] : [];
+        this.trySetCurrentArea(areaId);
         homeAssistant.callAction(
           this.state.config.cleanRoom(newMode, this.agent),
         );
@@ -302,7 +307,8 @@ class RvcRunModeServerBase extends Base {
         try {
           const serviceArea = this.agent.get(ServiceAreaBehavior);
           if (serviceArea.state.selectedAreas?.length > 0) {
-            this.trySetCurrentArea(serviceArea.state.selectedAreas[0]);
+            this.activeAreas = [...serviceArea.state.selectedAreas];
+            this.trySetCurrentArea(this.activeAreas[0]);
           }
         } catch {
           // ServiceArea not available
