@@ -54,7 +54,11 @@ const sidebars: SidebarsConfig = {
     {
       type: "category",
       label: "Troubleshooting",
-      items: ["guides/connectivity-issues", "guides/low-resource-devices", "faq"],
+      items: [
+        "guides/connectivity-issues",
+        "guides/low-resource-devices",
+        "faq",
+      ],
     },
     {
       type: "category",
