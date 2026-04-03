@@ -3,6 +3,7 @@ import type { HomeAssistantDomain } from "./home-assistant-domain.js";
 export type MatterDeviceType =
   | "air_purifier"
   | "air_quality_sensor"
+  | "dishwasher"
   | "basic_video_player"
   | "battery_storage"
   | "carbon_monoxide_sensor"
@@ -251,6 +252,7 @@ export const matterDeviceTypeLabels: Record<MatterDeviceType, string> = {
   carbon_monoxide_sensor: "Carbon Monoxide (CO) Sensor",
   color_temperature_light: "Color Temperature Light",
   contact_sensor: "Contact Sensor",
+  dishwasher: "Dishwasher",
   dimmable_light: "Dimmable Light",
   dimmable_plugin_unit: "Dimmable Plug-in Unit",
   door_lock: "Door Lock",
@@ -361,7 +363,14 @@ export const domainToDefaultMatterTypes: Partial<
     "tvoc_sensor",
   ],
   select: ["mode_select"],
-  switch: ["on_off_plugin_unit", "on_off_switch", "pump", "water_valve"],
+  siren: ["on_off_plugin_unit"],
+  switch: [
+    "dishwasher",
+    "on_off_plugin_unit",
+    "on_off_switch",
+    "pump",
+    "water_valve",
+  ],
   vacuum: ["robot_vacuum_cleaner"],
   valve: ["water_valve", "on_off_plugin_unit"],
   water_heater: ["water_heater", "thermostat"],

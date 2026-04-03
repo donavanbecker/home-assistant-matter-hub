@@ -216,6 +216,7 @@ const testEntities: Record<
     }),
   ],
   [HomeAssistantDomain.remote]: [createEntity("remote.r1", "on")],
+  [HomeAssistantDomain.siren]: [createEntity("siren.s1", "off")],
   [HomeAssistantDomain.select]: [
     createEntity("select.mode1", "option_a", {
       options: ["option_a", "option_b", "option_c"],

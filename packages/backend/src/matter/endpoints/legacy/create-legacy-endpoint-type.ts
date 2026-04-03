@@ -26,6 +26,7 @@ import { WaterLeakDetectorType } from "./binary-sensor/water-leak-detector.js";
 import { ButtonDevice } from "./button/index.js";
 import { ClimateDevice } from "./climate/index.js";
 import { CoverDevice } from "./cover/index.js";
+import { DishwasherEndpoint } from "./dishwasher/index.js";
 import { EventDevice } from "./event/index.js";
 import { FanDevice } from "./fan/index.js";
 import { HumidifierDevice } from "./humidifier/index.js";
@@ -59,6 +60,7 @@ import { RadonSensorType } from "./sensor/devices/radon-sensor.js";
 import { TemperatureSensorType } from "./sensor/devices/temperature-sensor.js";
 import { TvocSensorType } from "./sensor/devices/tvoc-sensor.js";
 import { SensorDevice } from "./sensor/index.js";
+import { SirenDevice } from "./siren/index.js";
 import { DimmablePlugInUnitType } from "./switch/dimmable-plugin-unit.js";
 import { SwitchDevice } from "./switch/index.js";
 import { VacuumDevice } from "./vacuum/index.js";
@@ -193,6 +195,7 @@ const deviceCtrs: Partial<
   select: SelectDevice,
   input_select: InputSelectDevice,
   scene: SceneDevice,
+  siren: SirenDevice,
   media_player: MediaPlayerDevice,
   humidifier: HumidifierDevice,
   vacuum: VacuumDevice,
@@ -224,6 +227,7 @@ const matterDeviceTypeFactories: Partial<
     }
     return SwitchDevice(ha);
   },
+  dishwasher: DishwasherEndpoint,
   dimmable_plugin_unit: (ha) =>
     DimmablePlugInUnitType.set({ homeAssistantEntity: ha }),
   on_off_switch: SwitchDevice,
