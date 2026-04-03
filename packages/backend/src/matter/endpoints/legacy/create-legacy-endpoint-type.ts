@@ -211,10 +211,8 @@ const matterDeviceTypeFactories: Partial<
     ) => EndpointType | undefined
   >
 > = {
-  on_off_light: (ha) =>
-    OnOffLightType.set({ homeAssistantEntity: ha }),
-  dimmable_light: (ha) =>
-    DimmableLightType.set({ homeAssistantEntity: ha }),
+  on_off_light: (ha) => OnOffLightType.set({ homeAssistantEntity: ha }),
+  dimmable_light: (ha) => DimmableLightType.set({ homeAssistantEntity: ha }),
   color_temperature_light: (ha) =>
     ColorTemperatureLightType.set({ homeAssistantEntity: ha }),
   extended_color_light: (ha) =>
@@ -238,19 +236,15 @@ const matterDeviceTypeFactories: Partial<
   humidifier_dehumidifier: HumidifierDevice,
   speaker: MediaPlayerDevice,
   basic_video_player: VideoPlayerDevice,
-  humidity_sensor: (ha) =>
-    HumiditySensorType.set({ homeAssistantEntity: ha }),
+  humidity_sensor: (ha) => HumiditySensorType.set({ homeAssistantEntity: ha }),
   temperature_sensor: (ha) =>
     TemperatureSensorType.set({ homeAssistantEntity: ha }),
-  pressure_sensor: (ha) =>
-    PressureSensorType.set({ homeAssistantEntity: ha }),
-  light_sensor: (ha) =>
-    IlluminanceSensorType.set({ homeAssistantEntity: ha }),
+  pressure_sensor: (ha) => PressureSensorType.set({ homeAssistantEntity: ha }),
+  light_sensor: (ha) => IlluminanceSensorType.set({ homeAssistantEntity: ha }),
   flow_sensor: (ha) => FlowSensorType.set({ homeAssistantEntity: ha }),
   air_quality_sensor: (ha) =>
     AirQualitySensorType.set({ homeAssistantEntity: ha }),
-  battery_storage: (ha) =>
-    BatterySensorType.set({ homeAssistantEntity: ha }),
+  battery_storage: (ha) => BatterySensorType.set({ homeAssistantEntity: ha }),
   tvoc_sensor: (ha) => TvocSensorType.set({ homeAssistantEntity: ha }),
   carbon_monoxide_sensor: (ha) =>
     CarbonMonoxideSensorType.set({ homeAssistantEntity: ha }),
@@ -263,10 +257,8 @@ const matterDeviceTypeFactories: Partial<
   pm1_sensor: (ha) => Pm1SensorType.set({ homeAssistantEntity: ha }),
   electrical_sensor: (ha) =>
     ElectricalSensorType.set({ homeAssistantEntity: ha }),
-  contact_sensor: (ha) =>
-    ContactSensorType.set({ homeAssistantEntity: ha }),
-  motion_sensor: (ha) =>
-    MotionSensorType.set({ homeAssistantEntity: ha }),
+  contact_sensor: (ha) => ContactSensorType.set({ homeAssistantEntity: ha }),
+  motion_sensor: (ha) => MotionSensorType.set({ homeAssistantEntity: ha }),
   occupancy_sensor: (ha) =>
     OccupancySensorType.set({ homeAssistantEntity: ha }),
   mode_select: SelectDevice,
@@ -275,8 +267,7 @@ const matterDeviceTypeFactories: Partial<
   rain_sensor: (ha) => RainSensorType.set({ homeAssistantEntity: ha }),
   water_heater: WaterHeaterDevice,
   generic_switch: EventDevice,
-  smoke_co_alarm: (ha) =>
-    SmokeAlarmType.set({ homeAssistantEntity: ha }),
+  smoke_co_alarm: (ha) => SmokeAlarmType.set({ homeAssistantEntity: ha }),
   water_freeze_detector: (ha) =>
     WaterFreezeDetectorType.set({ homeAssistantEntity: ha }),
   water_leak_detector: (ha) =>
