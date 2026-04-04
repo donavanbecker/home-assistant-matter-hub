@@ -203,13 +203,16 @@ function resolveCleanAreaIds(
 const vacuumRvcRunModeConfig = {
   getCurrentMode: (entity: { state: string }) => {
     const state = entity.state as VacuumState;
-    // All cleaning-related states should map to Cleaning mode
+    // All cleaning-related states should map to Cleaning mode.
+    // "paused" is included because in HA it means paused mid-clean;
+    // the Matter spec requires Cleaning mode when OpState is Paused.
     const cleaningStates: string[] = [
       VacuumState.cleaning,
       VacuumState.segment_cleaning,
       VacuumState.zone_cleaning,
       VacuumState.spot_cleaning,
       VacuumState.mop_cleaning,
+      VacuumState.paused,
     ];
     const isCleaning = cleaningStates.includes(state);
     logger.debug(

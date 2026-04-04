@@ -60,7 +60,7 @@ export const VacuumRvcOperationalStateServer = RvcOperationalStateServer({
       if (isCharging(entity)) {
         operationalState = RvcOperationalState.OperationalState.Charging;
       } else {
-        operationalState = RvcOperationalState.OperationalState.Paused;
+        operationalState = RvcOperationalState.OperationalState.Stopped;
       }
     } else if (state === VacuumState.error || state === "unavailable") {
       operationalState = RvcOperationalState.OperationalState.Error;
@@ -72,8 +72,8 @@ export const VacuumRvcOperationalStateServer = RvcOperationalStateServer({
         );
         operationalState = RvcOperationalState.OperationalState.Running;
       } else {
-        logger.info(`Unknown vacuum state "${state}", treating as Paused`);
-        operationalState = RvcOperationalState.OperationalState.Paused;
+        logger.info(`Unknown vacuum state "${state}", treating as Stopped`);
+        operationalState = RvcOperationalState.OperationalState.Stopped;
       }
     }
 
