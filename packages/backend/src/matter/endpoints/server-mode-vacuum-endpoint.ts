@@ -282,6 +282,11 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
 
     this.keepaliveTimer = setInterval(() => {
       if (this.lastState) {
+        // #287 diag[1/3]: confirm the keepalive timer is actually ticking
+        // and flushUpdate is being invoked. Remove once root cause is known.
+        logger.info(
+          `#287 diag[1]: keepalive tick for ${this.entityId} — scheduling flushUpdate`,
+        );
         this.pendingMappedChange = true;
         this.flushUpdate(this.lastState);
       }
