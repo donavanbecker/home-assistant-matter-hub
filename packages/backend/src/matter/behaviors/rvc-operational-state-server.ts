@@ -73,28 +73,6 @@ class RvcOperationalStateServerBase extends Base {
     await super.initialize();
     const homeAssistant = await this.agent.load(HomeAssistantEntityBehavior);
 
-    // #287 diag[3/3]: confirm matter.js Datasource actually registers a
-    // structural change for operationalError when the keepalive nonce
-    // toggles. If this never fires, the nonce is being deep-equaled
-    // away and no subscription report leaves the server. Remove once
-    // root cause is known.
-    try {
-      const events = this.events as unknown as {
-        operationalError$Changed?: { on: (cb: () => void) => void };
-      };
-      events.operationalError$Changed?.on(() => {
-        logger.info(
-          `#287 diag[3]: operationalError$Changed fired for ${homeAssistant.entityId}`,
-        );
-      });
-    } catch (e) {
-      logger.warn(
-        `#287 diag[3]: failed to attach operationalError$Changed listener: ${
-          e instanceof Error ? e.message : String(e)
-        }`,
-      );
-    }
-
     this.update(homeAssistant.entity);
     this.reactTo(homeAssistant.onChange, this.update);
   }
@@ -108,14 +86,6 @@ class RvcOperationalStateServerBase extends Base {
       this.agent,
     );
     const previousState = this.state.operationalState;
-
-    // #287 diag[2/3]: confirm the update() reactor is being invoked
-    // as a consequence of the keepalive tick (or any other source).
-    // Remove once root cause is known.
-    logger.info(
-      `#287 diag[2]: update() reactor invoked for ${entity.entity_id} — ` +
-        `prevState=${previousState} newState=${newState} nonceBefore=${this.keepaliveNonce}`,
-    );
 
     // Toggle nonce so operationalError is structurally different each call.
     this.keepaliveNonce = !this.keepaliveNonce;

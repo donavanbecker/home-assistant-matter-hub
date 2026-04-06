@@ -9,6 +9,7 @@ import {
   TransactionDestroyedError,
 } from "@matter/general";
 import type { EndpointType } from "@matter/main";
+import { RvcOperationalStateServer as RvcOpStateBehavior } from "@matter/main/behaviors/rvc-operational-state";
 import debounce from "debounce";
 import type { BridgeRegistry } from "../../services/bridges/bridge-registry.js";
 import type { HomeAssistantStates } from "../../services/home-assistant/home-assistant-registry.js";
@@ -263,10 +264,26 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
   private lastState?: HomeAssistantEntityState;
   private pendingMappedChange = false;
   private readonly flushUpdate: ReturnType<typeof debounce>;
-  /** Periodic keepalive timer that re-pushes the last known state so
-   *  Apple Home (iOS) doesn't show "Updating..." due to stale
-   *  subscription data when the vacuum is idle and no HA events fire. */
+  /** Periodic keepalive timer that writes directly to the
+   *  RvcOperationalState cluster in a fresh transaction so Apple Home
+   *  (iOS) doesn't show "Updating..." due to stale subscription data
+   *  when the vacuum is idle and no HA events fire.
+   *
+   *  Previous approaches that pushed state through
+   *  HomeAssistantEntityBehavior failed because the reactor writes
+   *  (RvcOperationalStateServer.update()) run inside the postCommit
+   *  phase of the HAEntityBehavior transaction — those writes are
+   *  buffered but never committed, so no attrsChanged event reaches
+   *  the ServerSubscription.
+   *
+   *  Writing directly via endpoint.act() creates an independent
+   *  transaction that goes through the full commit lifecycle. */
   private keepaliveTimer?: ReturnType<typeof setInterval>;
+  /** Alternating nonce so operationalError is structurally different
+   *  each keepalive tick. matter.js's Datasource uses isDeepEqual;
+   *  toggling errorStateDetails between absent and "" changes the
+   *  property count so the struct is never deep-equal. */
+  private keepaliveNonce = false;
 
   private constructor(
     type: EndpointType,
@@ -282,13 +299,7 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
 
     this.keepaliveTimer = setInterval(() => {
       if (this.lastState) {
-        // #287 diag[1/3]: confirm the keepalive timer is actually ticking
-        // and flushUpdate is being invoked. Remove once root cause is known.
-        logger.info(
-          `#287 diag[1]: keepalive tick for ${this.entityId} — scheduling flushUpdate`,
-        );
-        this.pendingMappedChange = true;
-        this.flushUpdate(this.lastState);
+        this.pushKeepalive();
       }
     }, 55_000);
   }
@@ -300,6 +311,43 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
     }
     this.flushUpdate.clear();
     await super.delete();
+  }
+
+  /**
+   * Write directly to the RvcOperationalState cluster in a fresh
+   * transaction.  The nonce toggles errorStateDetails between absent
+   * and "" so the struct is structurally different each call,
+   * guaranteeing matter.js emits attrsChanged → subscription report.
+   */
+  private async pushKeepalive() {
+    try {
+      await this.act("vacuum-keepalive", async (agent) => {
+        const opState = agent.get(RvcOpStateBehavior);
+        this.keepaliveNonce = !this.keepaliveNonce;
+        const errorStateId = opState.state.operationalError.errorStateId;
+        const operationalError: {
+          errorStateId: number;
+          errorStateDetails?: string;
+        } = { errorStateId };
+        if (this.keepaliveNonce) {
+          operationalError.errorStateDetails = "";
+        }
+        opState.state.operationalError = operationalError;
+      });
+    } catch (e: unknown) {
+      // Suppress expected errors during endpoint lifecycle transitions
+      if (
+        e instanceof TransactionDestroyedError ||
+        e instanceof DestroyedDependencyError
+      ) {
+        return;
+      }
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("Endpoint storage inaccessible")) {
+        return;
+      }
+      logger.debug(`Keepalive failed for ${this.entityId}: ${msg}`);
+    }
   }
 
   async updateStates(states: HomeAssistantStates): Promise<void> {
