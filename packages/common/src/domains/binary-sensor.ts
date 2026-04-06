@@ -20,6 +20,7 @@ export enum BinarySensorDeviceClass {
   Power = "power",
   Presence = "presence",
   Problem = "problem",
+  Rain = "rain",
   Running = "running",
   Safety = "safety",
   Smoke = "smoke",

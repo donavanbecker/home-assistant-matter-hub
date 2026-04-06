@@ -24,7 +24,7 @@ import {
   OnOffSensorType,
   OnOffSensorWithBatteryType,
 } from "./on-off-sensor.js";
-import type { RainSensorType } from "./rain-sensor.js";
+import { RainSensorType } from "./rain-sensor.js";
 import {
   CoAlarmType,
   CoAlarmWithBatteryType,
@@ -79,6 +79,8 @@ const deviceClasses: Partial<Record<BinarySensorDeviceClass, CombinedType>> = {
   [BinarySensorDeviceClass.Smoke]: SmokeAlarmType,
 
   [BinarySensorDeviceClass.Moisture]: WaterLeakDetectorType,
+
+  [BinarySensorDeviceClass.Rain]: RainSensorType,
 };
 
 // Mapping from normal type to battery type
