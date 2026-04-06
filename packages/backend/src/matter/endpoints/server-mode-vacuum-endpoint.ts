@@ -279,11 +279,11 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
    *  Writing directly via endpoint.act() creates an independent
    *  transaction that goes through the full commit lifecycle. */
   private keepaliveTimer?: ReturnType<typeof setInterval>;
-  /** Alternating nonce so operationalError is structurally different
-   *  each keepalive tick. matter.js's Datasource uses isDeepEqual;
-   *  toggling errorStateDetails between absent and "" changes the
-   *  property count so the struct is never deep-equal. */
-  private keepaliveNonce = false;
+  /** Monotonic counter that ensures operationalError is structurally
+   *  different on every keepalive tick. matter.js's Datasource uses
+   *  isDeepEqual; a unique errorStateLabel value guarantees the struct
+   *  is never deep-equal to its predecessor. */
+  private keepaliveCounter = 0;
 
   private constructor(
     type: EndpointType,
@@ -315,25 +315,27 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
 
   /**
    * Write directly to the RvcOperationalState cluster in a fresh
-   * transaction.  The nonce toggles errorStateDetails between absent
-   * and "" so the struct is structurally different each call,
+   * transaction.  Each call produces a unique errorStateLabel value
+   * so the struct is never deep-equal to its predecessor,
    * guaranteeing matter.js emits attrsChanged → subscription report.
    */
   private async pushKeepalive() {
     try {
+      this.keepaliveCounter++;
+      const counter = this.keepaliveCounter;
+      logger.info(`Keepalive #${counter} for ${this.entityId}`);
       await this.act("vacuum-keepalive", async (agent) => {
         const opState = agent.get(RvcOpStateBehavior);
-        this.keepaliveNonce = !this.keepaliveNonce;
         const errorStateId = opState.state.operationalError.errorStateId;
-        const operationalError: {
-          errorStateId: number;
-          errorStateDetails?: string;
-        } = { errorStateId };
-        if (this.keepaliveNonce) {
-          operationalError.errorStateDetails = "";
-        }
-        opState.state.operationalError = operationalError;
+        // Use a counter-based label so the struct is always unique.
+        // errorStateLabel is an optional string that controllers
+        // typically ignore when errorStateId is NoError (0).
+        opState.state.operationalError = {
+          errorStateId,
+          errorStateLabel: `k${counter}`,
+        };
       });
+      logger.info(`Keepalive #${counter} committed for ${this.entityId}`);
     } catch (e: unknown) {
       // Suppress expected errors during endpoint lifecycle transitions
       if (
@@ -346,7 +348,7 @@ export class ServerModeVacuumEndpoint extends EntityEndpoint {
       if (msg.includes("Endpoint storage inaccessible")) {
         return;
       }
-      logger.debug(`Keepalive failed for ${this.entityId}: ${msg}`);
+      logger.warn(`Keepalive failed for ${this.entityId}: ${msg}`);
     }
   }
 
