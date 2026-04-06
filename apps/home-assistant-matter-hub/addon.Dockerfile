@@ -32,4 +32,7 @@ COPY package.tgz /install/package.tgz
 RUN npm install -g /install/package.tgz
 RUN rm -rf /install
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD wget -qO /dev/null http://localhost:8482/api/health/live || exit 1
+
 CMD ["/docker-entrypoint.sh"]

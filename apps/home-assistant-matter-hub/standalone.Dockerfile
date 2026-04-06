@@ -15,6 +15,9 @@ COPY package.tgz /install/package.tgz
 RUN npm install -g /install/package.tgz
 RUN rm -rf /install
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD wget -qO /dev/null http://localhost:8482/api/health/live || exit 1
+
 # Dynamic heap sizing: 25% of effective memory, clamped to 256-1024MB.
 # Checks cgroup limits (Docker), then MemAvailable, then MemTotal.
 # Override with: docker run -e NODE_OPTIONS="--max-old-space-size=1024" ...
