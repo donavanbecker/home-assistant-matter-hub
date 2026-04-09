@@ -47,8 +47,7 @@ export class BasicInformationServer extends Base {
       reachable:
         entity.state?.state != null && entity.state.state !== "unavailable",
       serialNumber:
-        ellipse(32, mapping?.customSerialNumber) ??
-        hash(32, entity.entity_id),
+        ellipse(32, mapping?.customSerialNumber) ?? hash(32, entity.entity_id),
       // UniqueId helps controllers (especially Alexa) identify devices across
       // multiple fabric connections. Using MD5 hash of entity_id for stability.
       uniqueId: crypto
