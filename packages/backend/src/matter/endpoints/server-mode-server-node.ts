@@ -1,8 +1,13 @@
-import type { BridgeData } from "@home-assistant-matter-hub/common";
+import type {
+  BridgeData,
+  EntityMappingConfig,
+  HomeAssistantDeviceRegistry,
+} from "@home-assistant-matter-hub/common";
 import type { Environment } from "@matter/main";
 import { RoboticVacuumCleanerDevice } from "@matter/main/devices";
 import { type Endpoint, ServerNode } from "@matter/main/node";
 import { DeviceTypeId, VendorId } from "@matter/main/types";
+import { applyPatchState } from "../../utils/apply-patch-state.js";
 import { trimToLength } from "../../utils/trim-to-length.js";
 
 /**
@@ -68,6 +73,37 @@ export class ServerModeServerNode extends ServerNode {
    */
   clearDevice(): void {
     this.deviceEndpoint = undefined;
+  }
+
+  /**
+   * Update root-level BasicInformation with entity-specific data.
+   * In server mode, controllers (Apple Home, Alexa) read the root node's
+   * BasicInformation — not the device endpoint's BridgedDeviceBasicInformation.
+   * Without this, server-mode devices show bridge defaults (e.g. "riddix" / "MatterHub").
+   */
+  updateDeviceIdentity(
+    entityId: string,
+    device: HomeAssistantDeviceRegistry | undefined,
+    mapping: EntityMappingConfig | undefined,
+    friendlyName: string | undefined,
+  ): void {
+    applyPatchState(this.state.basicInformation, {
+      vendorName:
+        trimToLength(mapping?.customVendorName, 32, "...") ??
+        trimToLength(device?.manufacturer, 32, "..."),
+      productName:
+        trimToLength(mapping?.customProductName, 32, "...") ??
+        trimToLength(device?.model_id, 32, "...") ??
+        trimToLength(device?.model, 32, "..."),
+      productLabel: trimToLength(device?.model, 64, "..."),
+      nodeLabel:
+        trimToLength(mapping?.customName, 32, "...") ??
+        trimToLength(friendlyName, 32, "...") ??
+        trimToLength(entityId, 32, "..."),
+      serialNumber: trimToLength(mapping?.customSerialNumber, 32, "..."),
+      hardwareVersionString: trimToLength(device?.hw_version, 64, "..."),
+      softwareVersionString: trimToLength(device?.sw_version, 64, "..."),
+    });
   }
 
   async factoryReset(): Promise<void> {

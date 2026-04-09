@@ -209,6 +209,7 @@ export class ServerModeEndpointManager extends Service {
         await this.serverNode.addDevice(endpoint);
         this.deviceEndpoint = endpoint;
         this.mappingFingerprint = currentFp;
+        this.updateServerNodeIdentity(entityId, mapping);
         this.log.info(
           `Server mode: Added vacuum ${entityId} as standalone device`,
         );
@@ -235,6 +236,7 @@ export class ServerModeEndpointManager extends Service {
       await this.serverNode.addDevice(endpoint);
       this.deviceEndpoint = endpoint;
       this.mappingFingerprint = currentFp;
+      this.updateServerNodeIdentity(entityId, mapping);
       this.log.info(`Server mode: Added device ${entityId}`);
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
@@ -259,6 +261,21 @@ export class ServerModeEndpointManager extends Service {
         this.log.warn("State update failed for server mode endpoint:", e);
       }
     }
+  }
+
+  private updateServerNodeIdentity(
+    entityId: string,
+    mapping: EntityMappingConfig | undefined,
+  ): void {
+    const device = this.registry.deviceOf(entityId);
+    const state = this.registry.initialState(entityId);
+    const friendlyName = state?.attributes?.friendly_name as string | undefined;
+    this.serverNode.updateDeviceIdentity(
+      entityId,
+      device,
+      mapping,
+      friendlyName,
+    );
   }
 
   /**
