@@ -15,6 +15,7 @@ const FeaturedBase = Base.with(
 // biome-ignore lint/correctness/noUnusedVariables: Used via namespace below
 class GenericSwitchServerBase extends FeaturedBase {
   declare state: GenericSwitchServerBase.State;
+  private inLongPress = false;
 
   override async initialize() {
     await super.initialize();
@@ -40,8 +41,6 @@ class GenericSwitchServerBase extends FeaturedBase {
     const entityId = homeAssistant.entityId;
     logger.debug(`[${entityId}] Event fired: ${eventType}`);
 
-    // Map HA event types to Matter Switch actions
-    // For momentary switches, we simulate press -> release
     this.triggerPress(eventType);
   }
 
@@ -50,6 +49,7 @@ class GenericSwitchServerBase extends FeaturedBase {
 
     // Long press start (e.g. press_long, long_press)
     if (this.isLongPress(lower)) {
+      this.inLongPress = true;
       this.state.currentPosition = 1;
       this.events.initialPress?.emit({ newPosition: 1 }, this.context);
       this.events.longPress?.emit({ newPosition: 1 }, this.context);
@@ -59,8 +59,16 @@ class GenericSwitchServerBase extends FeaturedBase {
 
     // Long press release (e.g. press_long_release, long_release)
     if (this.isLongRelease(lower)) {
-      this.events.longRelease?.emit({ previousPosition: 1 }, this.context);
+      if (!this.inLongPress) {
+        // Synthesize the missing InitialPress + LongPress when the
+        // preceding press_long was lost (e.g. coalesced by debounce).
+        this.state.currentPosition = 1;
+        this.events.initialPress?.emit({ newPosition: 1 }, this.context);
+        this.events.longPress?.emit({ newPosition: 1 }, this.context);
+      }
+      this.inLongPress = false;
       this.state.currentPosition = 0;
+      this.events.longRelease?.emit({ previousPosition: 1 }, this.context);
       this.fireBridgeEvent(eventType, 1);
       return;
     }
@@ -73,25 +81,19 @@ class GenericSwitchServerBase extends FeaturedBase {
     // Standard momentary press (short press, single press, multi-press)
     const pressCount = this.getPressCount(lower);
 
+    // Emit all events synchronously within the reactor context.
+    // Using setTimeout + this.callback() causes expired-reference errors
+    // because the transaction context is no longer valid after event emission.
     this.state.currentPosition = 1;
     this.events.initialPress?.emit({ newPosition: 1 }, this.context);
-
-    // Spec requires shortRelease before multiPressComplete
-    setTimeout(
-      this.callback(() => {
-        this.events.shortRelease?.emit({ previousPosition: 1 }, this.context);
-        this.state.currentPosition = 0;
-
-        // MSM requires multiPressComplete for ALL presses, including single
-        this.events.multiPressComplete?.emit(
-          {
-            previousPosition: 0,
-            totalNumberOfPressesCounted: pressCount,
-          },
-          this.context,
-        );
-      }),
-      100,
+    this.state.currentPosition = 0;
+    this.events.shortRelease?.emit({ previousPosition: 1 }, this.context);
+    this.events.multiPressComplete?.emit(
+      {
+        previousPosition: 0,
+        totalNumberOfPressesCounted: pressCount,
+      },
+      this.context,
     );
 
     this.fireBridgeEvent(eventType, pressCount);

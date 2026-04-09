@@ -498,6 +498,7 @@ export class LegacyEndpoint extends EntityEndpoint {
   private lastState?: HomeAssistantEntityState;
   private pendingMappedChange = false;
   private readonly flushUpdate: ReturnType<typeof debounce>;
+  private eventUpdateChain: Promise<void> = Promise.resolve();
 
   override async delete() {
     // Clear any pending debounce timers to prevent callbacks firing after deletion
@@ -532,6 +533,17 @@ export class LegacyEndpoint extends EntityEndpoint {
       `State update received for ${this.entityId}: state=${state.state}`,
     );
     this.lastState = state;
+
+    // Event entities (buttons, doorbells) fire rapid sequential updates
+    // (e.g. press_long then press_long_release 4ms later). The 50ms debounce
+    // coalesces them, losing intermediate event_types. Process each update
+    // immediately and sequentially instead.
+    if (this.entityId.startsWith("event.")) {
+      this.eventUpdateChain = this.eventUpdateChain.then(() =>
+        this.flushPendingUpdate(state),
+      );
+      return;
+    }
     this.flushUpdate(state);
   }
 
