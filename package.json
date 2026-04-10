@@ -33,7 +33,13 @@
     "packages/*",
     "docs"
   ],
-  "pnpm": {},
+  "pnpm": {
+    "overrides": {
+      "path-to-regexp@<8.4.0": "^8.4.0",
+      "minimatch@<5.1.8": "5.1.8",
+      "minimatch@<9.0.7": "9.0.7"
+    }
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.4.3",
     "@dotenvx/dotenvx": "^1.52.0",
