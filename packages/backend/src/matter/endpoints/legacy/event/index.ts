@@ -2,15 +2,25 @@ import type { EventDeviceAttributes } from "@home-assistant-matter-hub/common";
 import type { EndpointType } from "@matter/main";
 import { GenericSwitchDevice } from "@matter/main/devices";
 import { BasicInformationServer } from "../../../behaviors/basic-information-server.js";
-import { HaGenericSwitchServer } from "../../../behaviors/generic-switch-server.js";
+import {
+  HaGenericSwitchServer,
+  HaGenericSwitchServerSimple,
+} from "../../../behaviors/generic-switch-server.js";
 import { HomeAssistantEntityBehavior } from "../../../behaviors/home-assistant-entity-behavior.js";
 import { IdentifyServer } from "../../../behaviors/identify-server.js";
 
-const EventEndpointType = GenericSwitchDevice.with(
+const EventEndpointTypeMulti = GenericSwitchDevice.with(
   BasicInformationServer,
   IdentifyServer,
   HomeAssistantEntityBehavior,
   HaGenericSwitchServer,
+);
+
+const EventEndpointTypeSimple = GenericSwitchDevice.with(
+  BasicInformationServer,
+  IdentifyServer,
+  HomeAssistantEntityBehavior,
+  HaGenericSwitchServerSimple,
 );
 
 const multiPressPatterns: [RegExp, number][] = [
@@ -35,8 +45,13 @@ export function EventDevice(
   const attrs = homeAssistantEntity.entity.state
     .attributes as EventDeviceAttributes;
   const multiPressMax = detectMultiPressMax(attrs.event_types ?? []);
-  return EventEndpointType.set({
+  if (multiPressMax >= 2) {
+    return EventEndpointTypeMulti.set({
+      homeAssistantEntity,
+      switch: { multiPressMax },
+    });
+  }
+  return EventEndpointTypeSimple.set({
     homeAssistantEntity,
-    switch: { multiPressMax },
   });
 }
