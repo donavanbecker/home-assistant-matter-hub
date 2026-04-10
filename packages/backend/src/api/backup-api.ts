@@ -530,6 +530,21 @@ async function extractBackupData(buffer: Buffer): Promise<ExtractedBackup> {
   return { backupData: data, zipDirectory: directory };
 }
 
+function resolveWithin(baseDir: string, relative: string): string | null {
+  if (relative.length === 0 || path.isAbsolute(relative)) {
+    return null;
+  }
+  const resolvedBase = path.resolve(baseDir);
+  const resolvedTarget = path.resolve(resolvedBase, relative);
+  if (
+    resolvedTarget !== resolvedBase &&
+    !resolvedTarget.startsWith(resolvedBase + path.sep)
+  ) {
+    return null;
+  }
+  return resolvedTarget;
+}
+
 async function restoreIdentityFiles(
   zipDirectory: unzipper.CentralDirectory,
   bridgeId: string,
@@ -550,7 +565,12 @@ async function restoreIdentityFiles(
 
   for (const file of identityFiles) {
     const relativePath = file.path.substring(identityPrefix.length);
-    const targetPath = path.join(targetDir, relativePath);
+    const targetPath = resolveWithin(targetDir, relativePath);
+    if (!targetPath) {
+      throw new Error(
+        `Refusing to restore identity file with unsafe path: ${file.path}`,
+      );
+    }
     const targetDirPath = path.dirname(targetPath);
 
     fs.mkdirSync(targetDirPath, { recursive: true });
@@ -584,7 +604,12 @@ async function restoreBridgeIcon(
 
   for (const file of iconFiles) {
     const fileName = file.path.substring(iconPrefix.length);
-    const targetPath = path.join(iconsDir, fileName);
+    const targetPath = resolveWithin(iconsDir, fileName);
+    if (!targetPath) {
+      throw new Error(
+        `Refusing to restore bridge icon with unsafe path: ${file.path}`,
+      );
+    }
 
     const content = await file.buffer();
     fs.writeFileSync(targetPath, content);
