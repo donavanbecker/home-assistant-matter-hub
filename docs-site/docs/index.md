@@ -53,9 +53,30 @@ Home, ...) are not placed in the same network segment. Please make sure to revie
 ## What's New
 
 <details>
-<summary><strong>📦 Stable (v2.0.36) - Current</strong></summary>
+<summary><strong>📦 Stable (v2.0.38) - Current</strong></summary>
 
-**New in v2.0.36:**
+**New in v2.0.38:**
+
+| Feature | Description |
+|---------|-------------|
+| **🏷️ Per-Entity Identity Overrides** | `customProductName`, `customVendorName`, `customSerialNumber` per entity mapping ([#277](https://github.com/RiDDiX/home-assistant-matter-hub/issues/277), [#290](https://github.com/RiDDiX/home-assistant-matter-hub/issues/290)) |
+| **🪟 Garage & Gate Open/Close** | Discrete Open/Close mode for garage and gate covers ([#55](https://github.com/RiDDiX/home-assistant-matter-hub/issues/55)) |
+| **🚿 Dishwasher Device Type** | Dishwasher override for switch entities |
+| **🚨 Siren Support** | Siren domain as OnOff Plug-in Unit |
+| **🏷️ productNameFromNodeLabel Flag** | Report node label as Matter productName for Aqara controllers |
+| **🤖 Vacuum Room Progress** | Dynamic room progress tracking via `currentRoomEntity` sensor |
+| **⚡ Startup Force Sync** | Immediate force sync on startup to beat stale Alexa queues ([#282](https://github.com/RiDDiX/home-assistant-matter-hub/pull/282)) |
+| **🌐 Network Diagnostic API** | mDNS/network diagnostic endpoint with dashboard card |
+| **🔌 Energy on Composed Devices** | Energy/power measurement clusters on composed endpoints |
+| **🩺 Multi-Admin Fabric Diagnostics** | Per-fabric session info in health API |
+| **🩺 Docker HEALTHCHECK** | Native healthcheck in standalone and addon images |
+| **🔒 Admin Password Hashing** | Admin password stored hashed, `timingSafeEqual` for lock PIN verification |
+| **🧵 Matter.js 0.16.11** | Updated Matter stack |
+| **🌍 Polish + Traditional Chinese** | New `pl` and `zh-tw` locales |
+
+**Fix highlights:** vacuum keepalive for Apple Home "Updating…" ([#287](https://github.com/RiDDiX/home-assistant-matter-hub/issues/287)), multi-phase clean progress ([#281](https://github.com/RiDDiX/home-assistant-matter-hub/issues/281)), GenericSwitch single/multi split for Apple Home buttons ([#289](https://github.com/RiDDiX/home-assistant-matter-hub/issues/289)), HA restart attribute guards ([#286](https://github.com/RiDDiX/home-assistant-matter-hub/issues/286)), fan speed restore on turn-on ([#275](https://github.com/RiDDiX/home-assistant-matter-hub/issues/275)), moisture sensor auto-map to HumiditySensor ([#273](https://github.com/RiDDiX/home-assistant-matter-hub/issues/273)), TV speaker override ([#293](https://github.com/RiDDiX/home-assistant-matter-hub/issues/293)), rain + radon sensor auto-mapping, composed sub-endpoint cleanup.
+
+**Previously in v2.0.36:**
 
 | Feature | Description |
 |---------|-------------|
@@ -71,21 +92,12 @@ Home, ...) are not placed in the same network segment. Please make sure to revie
 | **🔥 Cooling-Only Thermostat Fix** | Prevent HeatingOnly on cooling-only thermostat ([#264](https://github.com/RiDDiX/home-assistant-matter-hub/issues/264)) |
 | **↔️ Per-Entity Cover Swap** | Individual coverSwapOpenClose per cover ([#263](https://github.com/RiDDiX/home-assistant-matter-hub/issues/263)) |
 
-**Previously in v2.0.35:**
-
-| Feature | Description |
-|---------|-------------|
-| **🏠 HA 2026.3 Clean Area Support** | Native support for the new `vacuum.clean_area` action |
-| **🤖 Valetudo Identifier Mapping** | Custom `valetudoIdentifier` for MQTT topic case mismatches |
-| **🔌 Plugin System Hardening** | Validation, API version check, tgz upload/local install |
-| **📖 Docusaurus Docs** | New documentation site with improved search and navigation |
-
 </details>
 
 <details>
 <summary><strong>🧪 Alpha (v2.1.0-alpha.x)</strong></summary>
 
-**Alpha is currently in sync with Stable (v2.0.36).** All alpha features have been promoted to stable. New alpha features will appear here as development continues. See the [Alpha Features Guide](./guides/alpha-features.md) for installation instructions.
+**Alpha is currently level with Stable (v2.0.38).** All alpha features from the v2.1.0-alpha.600 line have been promoted into v2.0.38. New alpha work continues from `v2.1.0-alpha.601` onward and will appear here as development progresses. See the [Alpha Features Guide](./guides/alpha-features.md) for installation instructions.
 
 </details>
 

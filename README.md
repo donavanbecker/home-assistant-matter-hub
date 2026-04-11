@@ -37,7 +37,7 @@ of port forwarding etc.
 
 | Channel | Branch | Current Version | Description |
 |---------|--------|-----------------|-------------|
-| **Stable** | `main` | v2.0.36 | Production-ready, recommended for most users |
+| **Stable** | `main` | v2.0.38 | Production-ready, recommended for most users |
 | **Alpha** | `alpha` | v2.1.0-alpha.x | Pre-release with new features, for early adopters |
 | **Testing** | `testing` | v4.1.0-testing.x | ⚠️ **Highly unstable!** Experimental features, may break |
 
@@ -52,9 +52,30 @@ of port forwarding etc.
 ## 🎉 What's New
 
 <details>
-<summary><strong>📦 Stable Features (v2.0.36)</strong> - Click to expand</summary>
+<summary><strong>📦 Stable Features (v2.0.38)</strong> - Click to expand</summary>
 
-**New in v2.0.36:**
+**New in v2.0.38:**
+
+| Feature | Description |
+|---------|-------------|
+| **🏷️ Per-Entity Identity Overrides** | `customProductName`, `customVendorName`, `customSerialNumber` per entity mapping ([#277](https://github.com/RiDDiX/home-assistant-matter-hub/issues/277), [#290](https://github.com/RiDDiX/home-assistant-matter-hub/issues/290)) |
+| **🪟 Garage & Gate Open/Close** | Discrete Open/Close mode for garage and gate covers ([#55](https://github.com/RiDDiX/home-assistant-matter-hub/issues/55)) |
+| **🚿 Dishwasher Device Type** | Dishwasher override for switch entities |
+| **🚨 Siren Support** | Siren domain as OnOff Plug-in Unit |
+| **🏷️ productNameFromNodeLabel Flag** | Report node label as Matter productName for Aqara controllers |
+| **🤖 Vacuum Room Progress** | Dynamic room progress tracking via `currentRoomEntity` sensor |
+| **⚡ Startup Force Sync** | Immediate force sync on startup to beat stale Alexa queues ([#282](https://github.com/RiDDiX/home-assistant-matter-hub/pull/282)) |
+| **🌐 Network Diagnostic API** | mDNS/network diagnostic endpoint with dashboard card |
+| **🔌 Energy on Composed Devices** | Energy/power measurement clusters on composed endpoints |
+| **🩺 Multi-Admin Fabric Diagnostics** | Per-fabric session info in health API |
+| **🩺 Docker HEALTHCHECK** | Native healthcheck in standalone and addon images |
+| **🔒 Admin Password Hashing** | Admin password stored hashed, `timingSafeEqual` for lock PIN verification |
+| **🧵 Matter.js 0.16.11** | Updated Matter stack |
+| **🌍 Polish + Traditional Chinese** | New `pl` and `zh-tw` locales |
+
+**Fix highlights:** vacuum keepalive for Apple Home "Updating…" ([#287](https://github.com/RiDDiX/home-assistant-matter-hub/issues/287)), multi-phase clean progress ([#281](https://github.com/RiDDiX/home-assistant-matter-hub/issues/281)), GenericSwitch single/multi split for Apple Home buttons ([#289](https://github.com/RiDDiX/home-assistant-matter-hub/issues/289)), HA restart attribute guards ([#286](https://github.com/RiDDiX/home-assistant-matter-hub/issues/286)), fan speed restore on turn-on ([#275](https://github.com/RiDDiX/home-assistant-matter-hub/issues/275)), moisture sensor auto-map to HumiditySensor ([#273](https://github.com/RiDDiX/home-assistant-matter-hub/issues/273)), TV speaker override ([#293](https://github.com/RiDDiX/home-assistant-matter-hub/issues/293)), rain + radon sensor auto-mapping, composed sub-endpoint cleanup.
+
+**Previously in v2.0.36:**
 
 | Feature | Description |
 |---------|-------------|
@@ -70,21 +91,12 @@ of port forwarding etc.
 | **🔥 Cooling-Only Thermostat Fix** | Prevent HeatingOnly on cooling-only thermostat ([#264](https://github.com/RiDDiX/home-assistant-matter-hub/issues/264)) |
 | **↔️ Per-Entity Cover Swap** | Individual coverSwapOpenClose per cover ([#263](https://github.com/RiDDiX/home-assistant-matter-hub/issues/263)) |
 
-**Previously in v2.0.35:**
-
-| Feature | Description |
-|---------|-------------|
-| **🏠 HA 2026.3 Clean Area Support** | Native support for the new `vacuum.clean_area` action |
-| **🤖 Valetudo Identifier Mapping** | Custom `valetudoIdentifier` for MQTT topic case mismatches |
-| **🔌 Plugin System Hardening** | Validation, API version check, tgz upload/local install |
-| **📖 Docusaurus Docs** | New documentation site with improved search and navigation |
-
 </details>
 
 <details>
 <summary><strong>🧪 Alpha Features (v2.1.0-alpha.x)</strong> - Click to expand</summary>
 
-**Alpha is currently in sync with Stable (v2.0.36).** All alpha features have been promoted to stable. New alpha features will appear here as development continues.
+**Alpha is currently level with Stable (v2.0.38).** All alpha features from the v2.1.0-alpha.600 line have been promoted into v2.0.38. New alpha work continues from `v2.1.0-alpha.601` onward and will appear here as development progresses.
 
 </details>
 
@@ -109,6 +121,9 @@ of port forwarding etc.
 
 <details>
 <summary><strong>📜 Previous Stable Versions</strong> - Click to expand</summary>
+
+### v2.0.37
+Aqara productNameFromNodeLabel flag, Matter.js 0.16.11, Swedish locale update
 
 ### v2.0.35
 HA 2026.3 Clean Area Support, Valetudo Identifier Mapping, Plugin System Hardening, Registry Fingerprint Fix, Roomba Battery Fix, Contact Sensor Fix, Script Momentary Fix, Docusaurus Docs
@@ -412,6 +427,7 @@ This project thrives thanks to the amazing community! Special thanks to everyone
 | [@markgaze](https://github.com/markgaze) | 🤖 **Code Contributor** - Ecovacs Deebot room support ([#118](https://github.com/RiDDiX/home-assistant-matter-hub/pull/118)) |
 | [@omerfaruk-aran](https://github.com/omerfaruk-aran) | 🔧 **Network Debugging Expert** - Systematic mDNS/multicast root cause analysis for "No Response" issues ([#129](https://github.com/RiDDiX/home-assistant-matter-hub/issues/129)) |
 | [@gustavakerstrom](https://github.com/gustavakerstrom) | 🤖 **Code Contributor** - Template description display fix ([#215](https://github.com/RiDDiX/home-assistant-matter-hub/pull/215)) |
+| [@aetasoul](https://github.com/aetasoul) | 🤖 **Code Contributor** - Immediate force sync on startup to beat stale Alexa queues ([#282](https://github.com/RiDDiX/home-assistant-matter-hub/pull/282)) |
 
 <details>
 <summary><strong>📋 Issue Tracker - All Contributors</strong> (click to expand)</summary>
