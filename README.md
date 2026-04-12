@@ -54,6 +54,12 @@ of port forwarding etc.
 <details>
 <summary><strong>📦 Stable Features (v2.0.38)</strong> - Click to expand</summary>
 
+**HOTFIX (post v2.0.38):**
+- Fixed crash loop on startup caused by Node 22 native WebSocket dropping connections ([#297](https://github.com/RiDDiX/home-assistant-matter-hub/issues/297), [#299](https://github.com/RiDDiX/home-assistant-matter-hub/issues/299)) — affects both aarch64 (RPi) and amd64
+- Fixed service initialization errors being silently swallowed, causing the process to hang instead of exiting
+- Registry fetch now waits for WebSocket reconnect between retries and has increased retry tolerance
+- Fixed `select`, `input_select`, `siren` domains showing as unsupported in filter preview ([#298](https://github.com/RiDDiX/home-assistant-matter-hub/issues/298))
+
 **New in v2.0.38:**
 
 | Feature | Description |
