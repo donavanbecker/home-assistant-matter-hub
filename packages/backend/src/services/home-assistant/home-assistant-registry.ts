@@ -98,9 +98,9 @@ export class HomeAssistantRegistry extends Service {
 
   async reload(): Promise<boolean> {
     return await withRetry(() => this.fetchRegistries(), {
-      maxAttempts: 5,
+      maxAttempts: 10,
       baseDelayMs: 2000,
-      maxDelayMs: 15000,
+      maxDelayMs: 30000,
       onRetry: (attempt, error, delayMs) => {
         logger.warn(
           `Registry fetch failed (attempt ${attempt}), retrying in ${delayMs}ms:`,
@@ -112,6 +112,31 @@ export class HomeAssistantRegistry extends Service {
 
   private async fetchRegistries(): Promise<boolean> {
     const connection = this.client.connection;
+
+    // Wait for the WS connection to be live before sending commands.
+    // The HA WS library auto-reconnects on drop, but commands sent
+    // while disconnected fail immediately with ERR_CONNECTION_LOST.
+    if (!connection.connected) {
+      logger.debug("Connection not ready, waiting for reconnect...");
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+          connection.removeEventListener("ready", onReady);
+          resolve();
+        }, 30_000);
+        const onReady = () => {
+          clearTimeout(timeout);
+          connection.removeEventListener("ready", onReady);
+          resolve();
+        };
+        connection.addEventListener("ready", onReady);
+        if (connection.connected) {
+          clearTimeout(timeout);
+          connection.removeEventListener("ready", onReady);
+          resolve();
+        }
+      });
+    }
+
     const entityRegistry = await getRegistry(connection);
     const statesList = await getStates(connection);
     const deviceRegistry = await getDeviceRegistry(connection);

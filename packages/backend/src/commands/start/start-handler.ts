@@ -119,9 +119,7 @@ export async function startHandler(
   startOptions: ArgumentsCamelCase<StartOptions>,
   webUiDist?: string,
 ): Promise<void> {
-  Object.assign(globalThis, {
-    WebSocket: globalThis.WebSocket ?? ws.WebSocket,
-  });
+  Object.assign(globalThis, { WebSocket: ws.WebSocket });
 
   // Patch Matter.js TLV schemas before any clusters are instantiated
   patchLevelControlTlv();
