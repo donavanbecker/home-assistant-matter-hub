@@ -55,6 +55,9 @@ export class BridgeDataProvider extends Service implements BridgeData {
   get priority(): number | undefined {
     return this.data.priority;
   }
+  get serialNumberSuffix(): string | undefined {
+    return this.data.serialNumberSuffix;
+  }
 
   /************************************************
    * Functions
@@ -86,6 +89,7 @@ export class BridgeDataProvider extends Service implements BridgeData {
       countryCode: this.countryCode,
       icon: this.icon,
       priority: this.priority,
+      serialNumberSuffix: this.serialNumberSuffix,
       status: status.code,
       statusReason: status.reason,
       commissioning: commissioning

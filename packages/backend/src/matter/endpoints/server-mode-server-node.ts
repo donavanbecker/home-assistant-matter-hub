@@ -9,6 +9,7 @@ import { RoboticVacuumCleanerDevice } from "@matter/main/devices";
 import { type Endpoint, ServerNode } from "@matter/main/node";
 import { DeviceTypeId, VendorId } from "@matter/main/types";
 import { applyPatchState } from "../../utils/apply-patch-state.js";
+import { sanitizeMatterString } from "../../utils/sanitize-matter-string.js";
 import { trimToLength } from "../../utils/trim-to-length.js";
 
 /**
@@ -24,6 +25,7 @@ import { trimToLength } from "../../utils/trim-to-length.js";
 export class ServerModeServerNode extends ServerNode {
   private deviceEndpoint?: Endpoint;
   private readonly featureFlags?: BridgeFeatureFlags;
+  private readonly serialNumberSuffix?: string;
 
   constructor(env: Environment, bridgeData: BridgeData) {
     super({
@@ -54,6 +56,7 @@ export class ServerModeServerNode extends ServerNode {
       },
     });
     this.featureFlags = bridgeData.featureFlags;
+    this.serialNumberSuffix = bridgeData.serialNumberSuffix;
   }
 
   /**
@@ -96,8 +99,14 @@ export class ServerModeServerNode extends ServerNode {
       trimToLength(entityId, 32, "...");
     const productNameFromNodeLabel =
       this.featureFlags?.productNameFromNodeLabel === true
-        ? nodeLabel
+        ? (trimToLength(sanitizeMatterString(nodeLabel ?? ""), 32, "...") ??
+          undefined)
         : undefined;
+    const rawSerial = trimToLength(mapping?.customSerialNumber, 32, "...");
+    const serialNumber =
+      rawSerial && this.serialNumberSuffix
+        ? trimToLength(`${rawSerial}${this.serialNumberSuffix}`, 32, "...")
+        : rawSerial;
     applyPatchState(this.state.basicInformation, {
       vendorName:
         trimToLength(mapping?.customVendorName, 32, "...") ??
@@ -109,7 +118,7 @@ export class ServerModeServerNode extends ServerNode {
         trimToLength(device?.model, 32, "..."),
       productLabel: trimToLength(device?.model, 64, "..."),
       nodeLabel,
-      serialNumber: trimToLength(mapping?.customSerialNumber, 32, "..."),
+      serialNumber,
       hardwareVersionString: trimToLength(device?.hw_version, 64, "..."),
       softwareVersionString: trimToLength(device?.sw_version, 64, "..."),
     });

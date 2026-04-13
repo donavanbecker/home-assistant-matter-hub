@@ -301,6 +301,15 @@ export const bridgeConfigSchema: JSONSchema7 = {
       minimum: 1,
       maximum: 999,
     },
+    serialNumberSuffix: {
+      title: "Serial Number Suffix",
+      type: "string",
+      description:
+        "Append a suffix to every entity serial number on this bridge. " +
+        "Useful for forcing controllers like Aqara to treat devices as new " +
+        "and bypass cached device data. Leave empty for default behavior.",
+      maxLength: 16,
+    },
     filter: homeAssistantFilterSchema,
     featureFlags: featureFlagSchema,
   },

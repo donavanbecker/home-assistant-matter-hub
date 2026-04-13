@@ -4,6 +4,7 @@ import { VendorId } from "@matter/main";
 import { BridgedDeviceBasicInformationServer as Base } from "@matter/main/behaviors";
 import { BridgeDataProvider } from "../../services/bridges/bridge-data-provider.js";
 import { applyPatchState } from "../../utils/apply-patch-state.js";
+import { sanitizeMatterString } from "../../utils/sanitize-matter-string.js";
 import { trimToLength } from "../../utils/trim-to-length.js";
 import { HomeAssistantEntityBehavior } from "./home-assistant-entity-behavior.js";
 
@@ -28,7 +29,16 @@ export class BasicInformationServer extends Base {
       ellipse(32, entity.state?.attributes?.friendly_name) ??
       ellipse(32, entity.entity_id);
     const productNameFromNodeLabel =
-      featureFlags?.productNameFromNodeLabel === true ? nodeLabel : undefined;
+      featureFlags?.productNameFromNodeLabel === true
+        ? (ellipse(32, sanitizeMatterString(nodeLabel ?? "")) ?? undefined)
+        : undefined;
+    const serialNumberSuffix =
+      this.env.get(BridgeDataProvider).serialNumberSuffix;
+    const rawSerial =
+      ellipse(32, mapping?.customSerialNumber) ?? hash(32, entity.entity_id);
+    const serialNumber = serialNumberSuffix
+      ? ellipse(32, `${rawSerial}${serialNumberSuffix}`)
+      : rawSerial;
     applyPatchState(this.state, {
       vendorId: VendorId(basicInformation.vendorId),
       vendorName:
@@ -50,8 +60,7 @@ export class BasicInformationServer extends Base {
       nodeLabel,
       reachable:
         entity.state?.state != null && entity.state.state !== "unavailable",
-      serialNumber:
-        ellipse(32, mapping?.customSerialNumber) ?? hash(32, entity.entity_id),
+      serialNumber,
       // UniqueId helps controllers (especially Alexa) identify devices across
       // multiple fabric connections. Using MD5 hash of entity_id for stability.
       uniqueId: crypto

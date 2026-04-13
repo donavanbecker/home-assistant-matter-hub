@@ -108,6 +108,12 @@ export interface BridgeConfig {
   readonly icon?: BridgeIconType;
   /** Startup priority - lower values start first. Default: 100 */
   readonly priority?: number;
+  /**
+   * Append a suffix to every entity serial number on this bridge.
+   * Useful for forcing controllers like Aqara to treat devices as new
+   * and bypass their cached device data.
+   */
+  readonly serialNumberSuffix?: string;
 }
 
 export interface CreateBridgeRequest extends BridgeConfig {}
