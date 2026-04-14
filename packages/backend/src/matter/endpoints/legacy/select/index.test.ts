@@ -117,4 +117,36 @@ describe("SelectDevice / InputSelectDevice ModeSelect labels (#296)", () => {
     expect(InputSelectDevice({ entity } as never)).toBeUndefined();
     expect(SelectDevice({ entity } as never)).toBeUndefined();
   });
+
+  it("input_select calls input_select.select_option, select calls select.select_option", () => {
+    const inputEntity = createEntity("input_select.house_mode", "Home", {
+      friendly_name: "House Mode",
+      options: ["Home", "Away"],
+    });
+    const selectEntity = createEntity("select.thermostat_mode", "heat", {
+      friendly_name: "Thermostat Mode",
+      options: ["heat", "cool"],
+    });
+
+    const readAction = (endpointType: unknown): string => {
+      // biome-ignore lint/suspicious/noExplicitAny: inspecting matter.js internals
+      const behaviors = (endpointType as any).behaviors as Record<
+        string,
+        unknown
+      >;
+      // biome-ignore lint/suspicious/noExplicitAny: inspecting matter.js internals
+      const modeSelect = behaviors.modeSelect as any;
+      const config = modeSelect.defaults.config as {
+        selectOption: (option: string) => { action: string };
+      };
+      return config.selectOption("whatever").action;
+    };
+
+    expect(
+      readAction(InputSelectDevice({ entity: inputEntity } as never)),
+    ).toBe("input_select.select_option");
+    expect(readAction(SelectDevice({ entity: selectEntity } as never))).toBe(
+      "select.select_option",
+    );
+  });
 });

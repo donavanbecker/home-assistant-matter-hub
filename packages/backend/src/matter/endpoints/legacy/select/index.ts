@@ -15,14 +15,21 @@ function getSelectOptions(entity: HomeAssistantEntityInformation): string[] {
   return attrs.options ?? [];
 }
 
-const SelectModeServer = ModeSelectServer({
-  getOptions: getSelectOptions,
-  getCurrentOption: (entity) => entity.state.state ?? undefined,
-  selectOption: (option) => ({
-    action: "select.select_option",
-    data: { option },
-  }),
-});
+function buildSelectModeServer(action: string) {
+  return ModeSelectServer({
+    getOptions: getSelectOptions,
+    getCurrentOption: (entity) => entity.state.state ?? undefined,
+    selectOption: (option) => ({
+      action,
+      data: { option },
+    }),
+  });
+}
+
+const SelectModeServer = buildSelectModeServer("select.select_option");
+const InputSelectModeServer = buildSelectModeServer(
+  "input_select.select_option",
+);
 
 function buildSupportedModes(options: string[]) {
   return options.map((label, index) => ({
@@ -37,6 +44,13 @@ const SelectEndpointType = ModeSelectDevice.with(
   IdentifyServer,
   HomeAssistantEntityBehavior,
   SelectModeServer,
+);
+
+const InputSelectEndpointType = ModeSelectDevice.with(
+  BasicInformationServer,
+  IdentifyServer,
+  HomeAssistantEntityBehavior,
+  InputSelectModeServer,
 );
 
 export function SelectDevice(
@@ -86,7 +100,7 @@ export function InputSelectDevice(
     ? options.findIndex((o) => o.toLowerCase() === currentOption.toLowerCase())
     : 0;
 
-  return SelectEndpointType.set({
+  return InputSelectEndpointType.set({
     homeAssistantEntity,
     modeSelect: {
       description:
