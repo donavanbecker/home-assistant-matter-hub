@@ -48,6 +48,7 @@ export class Options {
   get logging(): LoggerServiceProps {
     return {
       level: this.startOptions.logLevel,
+      protocolLevel: this.startOptions.protocolLogLevel,
       disableColors: this.startOptions.disableLogColors ?? false,
       jsonOutput: this.startOptions.jsonLogs ?? false,
     };

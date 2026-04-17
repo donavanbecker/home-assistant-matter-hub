@@ -47,6 +47,7 @@ function logLevelToString(level: LogLevel): string {
 
 export interface LoggerServiceProps {
   readonly level: string;
+  readonly protocolLevel?: string;
   readonly disableColors: boolean;
   readonly jsonOutput?: boolean;
 }
@@ -67,6 +68,15 @@ export class LoggerService {
     Logger.level =
       this.customLogLevelMapping[this._level as CustomLogLevel] ??
       (this._level as MatterLogLevel);
+    // quiet matter.js packet-payload facilities unless explicitly asked for
+    const protocolLevel = logLevelFromString(options.protocolLevel ?? "info");
+    const resolvedProtocolLevel =
+      this.customLogLevelMapping[protocolLevel as CustomLogLevel] ??
+      (protocolLevel as MatterLogLevel);
+    Logger.facilityLevels = {
+      MessageChannel: resolvedProtocolLevel,
+      MessageExchange: resolvedProtocolLevel,
+    };
     Logger.format = options.disableColors ? LogFormat.PLAIN : LogFormat.ANSI;
   }
 

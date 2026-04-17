@@ -24,6 +24,13 @@ export function startOptionsBuilder(yargs: Argv): Argv<StartOptions> {
       choices: ["silly", "debug", "info", "notice", "warn", "error", "fatal"],
       default: "info",
     })
+    .option("protocol-log-level", {
+      type: "string",
+      choices: ["silly", "debug", "info", "notice", "warn", "error", "fatal"],
+      default: "info",
+      description:
+        "Log level for matter.js MessageChannel/MessageExchange facilities. These emit per-packet payloads at debug. Only lower it if you're debugging matter.js.",
+    })
     .option("disable-log-colors", {
       type: "boolean",
       default: false,
