@@ -13,4 +13,4 @@ export const ClimateOnOffServer = OnOffServer({
     return { action: "climate.turn_on" };
   },
   turnOff: () => ({ action: "climate.turn_off" }),
-}).with("Lighting");
+}).with("DeadFrontBehavior");
