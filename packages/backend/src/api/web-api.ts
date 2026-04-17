@@ -228,6 +228,9 @@ export class WebApi extends Service {
       realm: "Home Assistant Matter Hub",
     });
     return (req, res, next) => {
+      if (req.path === "/api/health/live" || req.path === "/api/health/ready") {
+        return next();
+      }
       if (envMiddleware) {
         return envMiddleware(req, res, next);
       }
