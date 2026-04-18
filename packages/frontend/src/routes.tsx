@@ -9,6 +9,8 @@ import { EditBridgePage } from "./pages/edit-bridge/EditBridgePage.tsx";
 import { HealthPage } from "./pages/health/HealthPage.tsx";
 import { LabelsPage } from "./pages/labels/LabelsPage.tsx";
 import { LockCredentialsPage } from "./pages/lock-credentials/LockCredentialsPage.tsx";
+import { NotFoundPage } from "./pages/NotFoundPage.tsx";
+import StandaloneDevicesPage from "./pages/standalone-devices/StandaloneDevicesPage.tsx";
 import { NetworkMapPage } from "./pages/network-map/NetworkMapPage.tsx";
 import { PluginsPage } from "./pages/plugins/PluginsPage.tsx";
 import { SettingsPage } from "./pages/settings/SettingsPage.tsx";
@@ -23,6 +25,7 @@ export const navigation = {
   editBridge: (bridgeId: string) => `/bridges/${bridgeId}/edit`,
   devices: "/devices",
   networkMap: "/network-map",
+  standaloneDevices: "/standalone-devices",
   health: "/health",
   labels: "/labels",
   lockCredentials: "/lock-credentials",
@@ -54,6 +57,7 @@ export const routes: RouteObject[] = [
       { path: navigation.devices, element: <DevicesPage /> },
       { path: navigation.networkMap, element: <NetworkMapPage /> },
       { path: navigation.health, element: <HealthPage /> },
+      { path: navigation.standaloneDevices, element: <StandaloneDevicesPage /> },
       { path: navigation.labels, element: <LabelsPage /> },
       { path: navigation.lockCredentials, element: <LockCredentialsPage /> },
       { path: navigation.plugins, element: <PluginsPage /> },

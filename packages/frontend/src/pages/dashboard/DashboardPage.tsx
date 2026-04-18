@@ -561,6 +561,61 @@ export const DashboardPage = () => {
               No bridges configured yet. Use the Bridge Wizard or create one
               manually.
             </Typography>
+            <Typography
+              variant="body1"
+              color="text.secondary"
+              sx={{ maxWidth: 520, mx: "auto", mb: 4 }}
+            >
+              {t("dashboard.welcomeDescription")}
+            </Typography>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              justifyContent="center"
+              sx={{ mb: 3 }}
+            >
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<AutoFixHighIcon />}
+                onClick={() => setWizardOpen(true)}
+              >
+                {t("dashboard.bridgeWizard")}
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<MapIcon />}
+                onClick={() => navigate(navigation.areaSetup)}
+              >
+                {t("dashboard.setupByArea")}
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<AddIcon />}
+                onClick={() => navigate(navigation.createBridge)}
+              >
+                {t("dashboard.manualSetup")}
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<DevicesIcon />}
+                onClick={() => navigate(navigation.standaloneDevices)}
+              >
+                Standalone Devices
+              </Button>
+            </Stack>
+            <Button
+              size="small"
+              endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+              href="https://t0bst4r.github.io/home-assistant-matter-hub/"
+              target="_blank"
+              rel="noopener"
+            >
+              {t("dashboard.documentation")}
+            </Button>
           </CardContent>
         </Card>
       )}
