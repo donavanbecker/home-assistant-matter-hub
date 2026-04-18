@@ -399,9 +399,9 @@ export function BackupRestore() {
                 flexDirection: "column",
               }}
             >
-              <Box display="flex" alignItems="center" gap={1} mb={1}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <BackupIcon color="primary" />
-                <Typography variant="subtitle1" fontWeight="bold">
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
                   {t("backup.configBackup")}
                 </Typography>
               </Box>
@@ -441,9 +441,9 @@ export function BackupRestore() {
                 flexDirection: "column",
               }}
             >
-              <Box display="flex" alignItems="center" gap={1} mb={1}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <SecurityIcon color="warning" />
-                <Typography variant="subtitle1" fontWeight="bold">
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
                   {t("backup.fullBackup")}
                 </Typography>
               </Box>
@@ -484,9 +484,9 @@ export function BackupRestore() {
                 flexDirection: "column",
               }}
             >
-              <Box display="flex" alignItems="center" gap={1} mb={1}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <RestoreIcon color="info" />
-                <Typography variant="subtitle1" fontWeight="bold">
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
                   {t("backup.restoreFromBackup")}
                 </Typography>
               </Box>
@@ -519,15 +519,10 @@ export function BackupRestore() {
 
         <Divider sx={{ my: 3 }} />
 
-        <Box
-          display="flex"
-          alignItems="center"
-          justifyContent="space-between"
-          mb={2}
-        >
-          <Box display="flex" alignItems="center" gap={1}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <BackupIcon color="primary" />
-            <Typography variant="subtitle1" fontWeight="bold">
+            <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
               {t("backup.storedBackups")}
             </Typography>
             {snapshots.length > 0 && (
@@ -557,7 +552,7 @@ export function BackupRestore() {
         </Box>
 
         {snapshotsLoading ? (
-          <Box display="flex" justifyContent="center" p={2}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
             <CircularProgress size={24} />
           </Box>
         ) : snapshots.length === 0 ? (
@@ -574,8 +569,8 @@ export function BackupRestore() {
               <ListItem
                 key={snap.filename}
                 secondaryAction={
-                  <Box display="flex" gap={0.5}>
-                    <Tooltip title={t("backup.downloadSnapshot")}>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <Tooltip title={t("backup.downloadSnapshot")}> 
                       <IconButton
                         size="small"
                         onClick={() => handleDownloadSnapshot(snap.filename)}
@@ -583,7 +578,7 @@ export function BackupRestore() {
                         <DownloadIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title={t("backup.restoreSnapshot")}>
+                    <Tooltip title={t("backup.restoreSnapshot")}> 
                       <IconButton
                         size="small"
                         color="warning"
@@ -592,7 +587,7 @@ export function BackupRestore() {
                         <RestoreIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title={t("common.delete")}>
+                    <Tooltip title={t("common.delete")}> 
                       <IconButton
                         size="small"
                         color="error"
@@ -612,7 +607,7 @@ export function BackupRestore() {
                 </ListItemIcon>
                 <ListItemText
                   primary={
-                    <Box display="flex" alignItems="center" gap={1}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Typography variant="body2">v{snap.version}</Typography>
                       <Chip
                         label={
@@ -636,9 +631,9 @@ export function BackupRestore() {
 
         <Divider sx={{ my: 3 }} />
 
-        <Box display="flex" alignItems="center" gap={1} mb={2}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <SettingsIcon color="action" />
-          <Typography variant="subtitle1" fontWeight="bold">
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
             {t("backup.settings")}
           </Typography>
         </Box>
@@ -677,9 +672,11 @@ export function BackupRestore() {
                   handleSettingsChange({ backupRetentionCount: val });
                 }
               }}
+              // @ts-expect-error MUI v9 type mismatch, runtime is correct
               inputProps={{ min: 1, max: 100 }}
               helperText={t("backup.retentionCountDesc")}
               sx={{ maxWidth: 200 }}
+              variant="outlined"
             />
           </Box>
         )}

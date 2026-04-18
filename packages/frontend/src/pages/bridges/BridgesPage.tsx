@@ -140,11 +140,13 @@ export const BridgesPage = () => {
         {bridges && (
           <>
             <Box
-              display="flex"
-              justifyContent="end"
-              flexWrap="wrap"
-              gap={1}
-              paddingTop={{ xs: 1, sm: 0 }}
+              sx={{
+                display: "flex",
+                justifyContent: "end",
+                flexWrap: "wrap",
+                gap: 1,
+                paddingTop: { xs: 1, sm: 0 },
+              }}
             >
               {bridges.length >= 1 && (
                 <>

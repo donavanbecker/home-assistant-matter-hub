@@ -52,6 +52,7 @@ import {
   getBridgeIcon,
   getBridgeIconColor,
 } from "../../components/bridge/bridgeIconUtils.ts";
+import { StandaloneDeviceWizard } from "../../components/standalone/StandaloneDeviceWizard.tsx";
 import { useBridges } from "../../hooks/data/bridges.ts";
 import { useDashboardWidgets } from "../../hooks/use-dashboard-widgets.ts";
 import { navigation } from "../../routes.tsx";
@@ -110,11 +111,11 @@ function StatCard({
   const content = (
     <CardContent sx={{ py: 2, "&:last-child": { pb: 2 } }}>
       <Box
-        display="flex"
         sx={{
+          display: "flex",
           flexDirection: { xs: "column", sm: "row" },
           alignItems: "center",
-          gap: { xs: 1, sm: 2 },
+          gap: { xs: 2, sm: 3 },
           textAlign: { xs: "center", sm: "left" },
         }}
       >
@@ -131,21 +132,17 @@ function StatCard({
         </Avatar>
         <Box sx={{ minWidth: 0 }}>
           <Typography
-            fontWeight={700}
-            lineHeight={1.1}
             noWrap
-            sx={{ fontSize: { xs: "1.5rem", sm: "2.125rem" } }}
+            sx={{ fontWeight: 700, lineHeight: 1.1, fontSize: { xs: "1.5rem", sm: "2.125rem" } }}
           >
             {value}
           </Typography>
-          <Typography variant="body2" color="text.secondary" noWrap>
-            {title}
+          <Typography
+            noWrap
+            sx={{ fontWeight: 700, lineHeight: 1.2, fontSize: { xs: "1.2rem", sm: "1.5rem" } }}
+          >
+            {subtitle}
           </Typography>
-          {subtitle && (
-            <Typography variant="caption" color="text.secondary" noWrap>
-              {subtitle}
-            </Typography>
-          )}
         </Box>
       </Box>
     </CardContent>
@@ -193,7 +190,7 @@ function BridgeMiniCard({
     <Card variant="outlined">
       <CardActionArea onClick={onClick}>
         <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
-          <Box display="flex" alignItems="center" gap={1.5}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <Chip
               label={`#${order}`}
               size="small"
@@ -235,11 +232,11 @@ function BridgeMiniCard({
                 </Avatar>
               )
             )}
-            <Box flex={1} minWidth={0}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="subtitle2" noWrap>
                 {bridge.name}
               </Typography>
-              <Stack direction="row" spacing={0.5} alignItems="center">
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
                 <Chip
                   label={bridge.status}
                   size="small"
@@ -286,7 +283,7 @@ function NavCard({
     <Card variant="outlined">
       <CardActionArea onClick={onClick}>
         <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
-          <Box display="flex" alignItems="center" gap={1.5}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Avatar
               sx={{
                 bgcolor: "action.selected",
@@ -320,6 +317,7 @@ export const DashboardPage = () => {
   const [successDismissed, setSuccessDismissed] = useState(
     () => localStorage.getItem("hamh-first-success-dismissed") === "true",
   );
+  const [standaloneWizardOpen, setStandaloneWizardOpen] = useState(false);
 
   const fetchHealth = useCallback(async () => {
     try {
@@ -359,7 +357,7 @@ export const DashboardPage = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" p={8}>
+      <Box sx={{ display: "flex", justifyContent: "center", p: 8 }}>
         <CircularProgress />
       </Box>
     );
@@ -371,9 +369,11 @@ export const DashboardPage = () => {
 
   return (
     <Box sx={{ p: 2 }}>
-      <Box display="flex" alignItems="center" gap={2} mb={3}>
+      <Box
+        sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}
+      >
         <HomeIcon color="primary" fontSize="large" />
-        <Typography variant="h5" fontWeight={600} component="h1">
+        <Typography variant="h5" sx={{ fontWeight: 600 }} component="h1">
           {t("dashboard.title")}
         </Typography>
         {hasBridges && (
@@ -421,7 +421,7 @@ export const DashboardPage = () => {
         >
           <CardContent sx={{ textAlign: "center", py: 5, px: 3 }}>
             <HubIcon sx={{ fontSize: 56, color: "primary.main", mb: 2 }} />
-            <Typography variant="h5" fontWeight={600} gutterBottom>
+            <Typography variant="h5" sx={{ fontWeight: 600 }} gutterBottom>
               {t("dashboard.welcome")}
             </Typography>
             <Typography
@@ -431,12 +431,7 @@ export const DashboardPage = () => {
             >
               {t("dashboard.welcomeDescription")}
             </Typography>
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={2}
-              justifyContent="center"
-              sx={{ mb: 3 }}
-            >
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ justifyContent: "center", mb: 3 }}>
               <Button
                 variant="contained"
                 size="large"
@@ -444,6 +439,14 @@ export const DashboardPage = () => {
                 onClick={() => setWizardOpen(true)}
               >
                 {t("dashboard.bridgeWizard")}
+              </Button>
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<AutoFixHighIcon />}
+                onClick={() => setStandaloneWizardOpen(true)}
+              >
+                {t("dashboard.standaloneDeviceWizard")}
               </Button>
               <Button
                 variant="outlined"
@@ -556,24 +559,11 @@ export const DashboardPage = () => {
 
             {widgetId === "bridges" && (
               <>
-                <Box
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  mb={2}
-                  flexWrap="wrap"
-                  gap={1}
-                >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
                   <Typography variant="h6">{t("nav.bridges")}</Typography>
                 </Box>
 
-                <Stack
-                  direction="row"
-                  spacing={1.5}
-                  sx={{ mb: 2 }}
-                  flexWrap="wrap"
-                  useFlexGap
-                >
+                <Stack direction="row" spacing={1.5} sx={{ mb: 2, flexWrap: "wrap" }} useFlexGap>
                   <Button
                     variant="contained"
                     startIcon={<AutoFixHighIcon />}
@@ -779,6 +769,13 @@ export const DashboardPage = () => {
         onComplete={() => {
           dispatch(loadBridges());
           fetchHealth();
+        }}
+      />
+      <StandaloneDeviceWizard
+        open={standaloneWizardOpen}
+        onClose={() => setStandaloneWizardOpen(false)}
+        onComplete={() => {
+          // Optionally refresh device list or show notification
         }}
       />
     </Box>

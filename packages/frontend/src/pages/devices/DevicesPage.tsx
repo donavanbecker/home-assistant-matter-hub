@@ -377,7 +377,7 @@ export const DevicesPage = () => {
             </IconButton>
           }
         >
-          <Typography variant="body2" fontWeight="bold" gutterBottom>
+          <Typography variant="body2" sx={{ fontWeight: "bold" }} gutterBottom>
             {t("devices.failedEntitiesTitle", {
               count: failedEntities.length,
               defaultValue: `${failedEntities.length} failed entities`,
@@ -394,7 +394,6 @@ export const DevicesPage = () => {
                   secondary={`${fe.bridgeName} — ${fe.reason}`}
                   primaryTypographyProps={{
                     variant: "body2",
-                    fontWeight: "bold",
                   }}
                   secondaryTypographyProps={{ variant: "caption" }}
                 />
@@ -426,11 +425,7 @@ export const DevicesPage = () => {
       {/* Filters */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Stack
-            spacing={2}
-            direction={{ xs: "column", md: "row" }}
-            alignItems={{ md: "center" }}
-          >
+          <Stack direction="row" spacing={1.5} sx={{ mb: 2, flexWrap: "wrap" }} useFlexGap>
             <TextField
               label={t("devices.searchPlaceholder")}
               value={searchTerm}
@@ -547,7 +542,7 @@ export const DevicesPage = () => {
           flexWrap: "wrap",
         }}
       >
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
           <Typography
             variant="body2"
             color="text.secondary"

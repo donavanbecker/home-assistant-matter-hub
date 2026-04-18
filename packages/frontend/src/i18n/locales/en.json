@@ -138,6 +138,7 @@
     "successMessage": "Your bridges are connected to {{count}} controller fabric(s). Devices should now appear in your controller app.",
     "noBridgesHint": "No bridges configured yet. Use the Bridge Wizard or create one manually.",
     "customizeDashboard": "Customize dashboard",
+    "standaloneDeviceWizard": "Standalone Device Wizard",
     "bridgeStatusRunning": "{{running}} running",
     "bridgeStatusFailed": "{{failed}} failed",
     "devicesFailed": "{{count}} failed",
@@ -617,5 +618,26 @@
     "importJson": "Import JSON",
     "importSuccess": "Imported {{count}} translation(s).",
     "importFailed": "Failed to import: invalid JSON format."
+  },
+  "standaloneDeviceWizard": {
+    "deviceTypeStep": "Device Type",
+    "deviceTypeRequired": "Please select a device type.",
+    "deviceType": "Device Type",
+    "deviceType": {
+      "light": "Light",
+      "lightDesc": "A smart light or bulb.",
+      "switch": "Switch/Plug",
+      "switchDesc": "A smart switch or plug.",
+      "sensor": "Sensor",
+      "sensorDesc": "A temperature, humidity, or other sensor.",
+      "climate": "Climate",
+      "climateDesc": "Thermostat, fan, or climate device.",
+      "lock": "Lock",
+      "lockDesc": "A smart lock or security device.",
+      "vacuum": "Vacuum",
+      "vacuumDesc": "A robot vacuum.",
+      "mediaPlayer": "Media Player",
+      "mediaPlayerDesc": "A speaker or media device."
+    }
   }
 }

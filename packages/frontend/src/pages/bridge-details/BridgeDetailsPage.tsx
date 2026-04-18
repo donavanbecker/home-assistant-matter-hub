@@ -73,13 +73,8 @@ const FailedEntitiesAlert = ({
                 <WarningIcon color="warning" fontSize="small" />
               </ListItemIcon>
               <ListItemText
-                primary={entity.entityId}
-                secondary={entity.reason}
-                primaryTypographyProps={{
-                  variant: "body2",
-                  fontWeight: "bold",
-                }}
-                secondaryTypographyProps={{ variant: "caption" }}
+                primary={<Typography variant="body2" sx={{ fontWeight: "bold" }}>{entity.entityId}</Typography>}
+                secondary={<Typography variant="caption">{entity.reason}</Typography>}
               />
             </ListItem>
           ))}
@@ -145,7 +140,7 @@ export const BridgeDetailsPage = () => {
         ]}
       />
 
-      <Box display="flex" justifyContent="space-between">
+      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
         <Typography variant="h4">
           {bridge.name} <BridgeStatusIcon status={bridge.status} />
         </Typography>
@@ -180,7 +175,7 @@ export const BridgeDetailsPage = () => {
 
       {devices && (
         <Stack spacing={2}>
-          <Box display="flex" justifyContent="flex-end" alignItems="center">
+          <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
             {timer != null && (
               <Tooltip title={t("bridge.refreshHint")}>
                 <Typography variant="body2" color="textSecondary">
