@@ -43,6 +43,29 @@ export function mappingProfileApi(
   mappingStorage: EntityMappingStorage,
 ): express.Router {
   const router = express.Router();
+    import rateLimit from "express-rate-limit";
+    import { expressjwt as jwt } from "express-jwt";
+
+    // JWT authentication middleware (replace secret in production)
+    router.use(
+      jwt({ secret: process.env.JWT_SECRET || "dev_secret", algorithms: ["HS256"] }).unless({
+        path: [
+          // Allow GETs without auth for demonstration; lock down in production
+          /^\/export\/[^/]+$/,
+          /^\/import\/preview\/[^/]+$/,
+        ],
+      })
+    );
+
+    // Rate limiting middleware (per IP)
+    router.use(
+      rateLimit({
+        windowMs: 60 * 1000, // 1 minute
+        max: 30, // 30 requests per minute per IP
+        standardHeaders: true,
+        legacyHeaders: false,
+      })
+    );
 
   router.get("/export/:bridgeId", (req, res) => {
     const { bridgeId } = req.params;

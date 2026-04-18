@@ -26,6 +26,9 @@ import { homeAssistantApi } from "./home-assistant-api.js";
 import { lockCredentialApi } from "./lock-credential-api.js";
 import { logsApi } from "./logs-api.js";
 import { mappingProfileApi } from "./mapping-profile-api.js";
+import { standaloneDeviceApi } from "./standalone-device-api.js";
+import { StandaloneDeviceManager } from "../services/standalone-devices/standalone-device-manager.js";
+import { StandaloneDeviceStorage } from "../services/storage/standalone-device-storage.js";
 import { matterApi } from "./matter-api.js";
 import { metricsApi } from "./metrics-api.js";
 import { networkDiagnosticApi } from "./network-diagnostic-api.js";
@@ -52,12 +55,13 @@ export interface WebApiProps {
 }
 
 export class WebApi extends Service {
+  private standaloneDeviceManager!: StandaloneDeviceManager;
+  private standaloneDeviceStorage!: StandaloneDeviceStorage;
   private readonly log: BetterLogger;
   private readonly logger: LoggerService;
   private readonly accessLogger: express.RequestHandler;
   private readonly startTime: number;
   private readonly wsApi: WebSocketApi;
-
   private app!: express.Application;
   private server?: http.Server;
 
@@ -90,6 +94,16 @@ export class WebApi extends Service {
   }
 
   protected override async initialize() {
+    // Get StandaloneDeviceStorage from environment (assume DI or manual load)
+    // If not available, throw error
+    // @ts-ignore
+    this.standaloneDeviceStorage = this["standaloneDeviceStorage"] || this["env"]?.get?.(StandaloneDeviceStorage);
+    if (!this.standaloneDeviceStorage) {
+      throw new Error("StandaloneDeviceStorage not available in WebApi environment");
+    }
+    this.standaloneDeviceManager = new StandaloneDeviceManager(this, this.standaloneDeviceStorage);
+    await this.standaloneDeviceManager.initialize();
+
     const api = express.Router();
     api
       .use(express.json())
@@ -112,6 +126,7 @@ export class WebApi extends Service {
       )
       .use("/entity-mappings", entityMappingApi(this.mappingStorage))
       .use("/mapping-profiles", mappingProfileApi(this.mappingStorage))
+      .use("/standalone-devices", standaloneDeviceApi(this.standaloneDeviceStorage))
       .use("/lock-credentials", lockCredentialApi(this.lockCredentialStorage))
       .use("/settings", settingsApi(this.settingsStorage, this.props.auth))
       .use(

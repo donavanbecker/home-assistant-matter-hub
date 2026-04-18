@@ -461,6 +461,14 @@ export const DashboardPage = () => {
               >
                 {t("dashboard.manualSetup")}
               </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<DevicesIcon />}
+                onClick={() => navigate(navigation.standaloneDevices)}
+              >
+                Standalone Devices
+              </Button>
             </Stack>
             <Button
               size="small"
