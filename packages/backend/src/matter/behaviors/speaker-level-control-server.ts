@@ -16,6 +16,14 @@ const optimisticLevelState = new Map<string, OptimisticLevelState>();
 const OPTIMISTIC_TIMEOUT_MS = 3000;
 const OPTIMISTIC_TOLERANCE = 5;
 
+function sweepOptimisticLevel(now: number) {
+  for (const [key, value] of optimisticLevelState) {
+    if (now - value.timestamp > OPTIMISTIC_TIMEOUT_MS) {
+      optimisticLevelState.delete(key);
+    }
+  }
+}
+
 export interface SpeakerLevelControlConfig {
   getValuePercent: ValueGetter<number | null>;
   moveToLevelPercent: ValueSetter<number>;
@@ -162,9 +170,11 @@ export class SpeakerLevelControlServerBase extends FeaturedBase {
       return;
     }
     this.state.currentLevel = level;
+    const now = Date.now();
+    sweepOptimisticLevel(now);
     optimisticLevelState.set(entityId, {
       expectedLevel: level,
-      timestamp: Date.now(),
+      timestamp: now,
     });
     homeAssistant.callAction(
       config.moveToLevelPercent(levelPercent, this.agent),

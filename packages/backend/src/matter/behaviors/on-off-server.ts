@@ -25,6 +25,16 @@ interface OptimisticOnOffState {
 const optimisticOnOffState = new Map<string, OptimisticOnOffState>();
 const OPTIMISTIC_TIMEOUT_MS = 3000;
 
+// Sweep stale entries on every set so removed entities don't linger in the
+// map for the lifetime of the process.
+function sweepOptimisticOnOff(now: number) {
+  for (const [key, value] of optimisticOnOffState) {
+    if (now - value.timestamp > OPTIMISTIC_TIMEOUT_MS) {
+      optimisticOnOffState.delete(key);
+    }
+  }
+}
+
 type OnOffCallback = (
   value: undefined,
   agent: Agent,
@@ -98,9 +108,11 @@ class OnOffServerBase extends Base {
     logger.info(`[${homeAssistant.entityId}] Turning ON -> ${action.action}`);
     // Notify LevelControlServer about turn-on for Alexa brightness workaround
     notifyLightTurnedOn(homeAssistant.entityId);
+    const now = Date.now();
+    sweepOptimisticOnOff(now);
     optimisticOnOffState.set(homeAssistant.entityId, {
       expectedOnOff: true,
-      timestamp: Date.now(),
+      timestamp: now,
     });
     homeAssistant.callAction(action);
     // Auto-reset for momentary actions (scenes, automations) so controllers
@@ -128,9 +140,11 @@ class OnOffServerBase extends Base {
       return;
     }
     logger.info(`[${homeAssistant.entityId}] Turning OFF -> ${action.action}`);
+    const now = Date.now();
+    sweepOptimisticOnOff(now);
     optimisticOnOffState.set(homeAssistant.entityId, {
       expectedOnOff: false,
-      timestamp: Date.now(),
+      timestamp: now,
     });
     homeAssistant.callAction(action);
   }
@@ -153,8 +167,10 @@ export function OnOffServer(config: OnOffConfig = {}) {
 }
 
 export function setOptimisticOnOff(entityId: string, expectedOnOff: boolean) {
+  const now = Date.now();
+  sweepOptimisticOnOff(now);
   optimisticOnOffState.set(entityId, {
     expectedOnOff,
-    timestamp: Date.now(),
+    timestamp: now,
   });
 }
