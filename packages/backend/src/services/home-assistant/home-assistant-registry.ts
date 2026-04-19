@@ -77,7 +77,15 @@ export class HomeAssistantRegistry extends Service {
   enableAutoRefresh(onRefresh: () => Promise<void> | void) {
     this.disableAutoRefresh();
 
+    let refreshing = false;
     this.autoRefresh = setInterval(async () => {
+      if (refreshing) {
+        // Previous tick is still mid-retry (HA slow / reconnecting).
+        // Skip this tick so reloads don't stack and overwrite each other.
+        logger.debug("Skipping registry refresh — previous tick still running");
+        return;
+      }
+      refreshing = true;
       try {
         const changed = await this.reload();
         if (changed) {
@@ -85,6 +93,8 @@ export class HomeAssistantRegistry extends Service {
         }
       } catch (e) {
         logger.warn("Failed to refresh registry, will retry next interval:", e);
+      } finally {
+        refreshing = false;
       }
     }, this.options.refreshInterval * 1000);
   }
