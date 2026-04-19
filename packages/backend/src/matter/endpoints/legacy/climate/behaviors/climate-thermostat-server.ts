@@ -56,7 +56,10 @@ const hvacActionToRunningMode: Record<
   [ClimateHvacAction.preheating]: Thermostat.ThermostatRunningMode.Heat,
   [ClimateHvacAction.defrosting]: Thermostat.ThermostatRunningMode.Heat,
   [ClimateHvacAction.heating]: Thermostat.ThermostatRunningMode.Heat,
-  [ClimateHvacAction.drying]: Thermostat.ThermostatRunningMode.Heat,
+  // Drying has no dedicated Matter RunningMode; reporting Heat made Apple
+  // Home display "Heating to …" during dehumidification. Off is neutral and
+  // getRunningState() downgrades it to FanOnly/Dry via systemMode.
+  [ClimateHvacAction.drying]: Thermostat.ThermostatRunningMode.Off,
   [ClimateHvacAction.cooling]: Thermostat.ThermostatRunningMode.Cool,
   [ClimateHvacAction.fan]: Thermostat.ThermostatRunningMode.Off,
   [ClimateHvacAction.idle]: Thermostat.ThermostatRunningMode.Off,

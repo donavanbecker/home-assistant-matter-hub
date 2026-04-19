@@ -747,6 +747,10 @@ export class ThermostatServerBase extends FullFeaturedBase {
           default:
             return allOff;
         }
+      default:
+        // Future matter.js RunningMode values (e.g. alternative heat/cool)
+        // fall through to "nothing running" rather than emitting undefined.
+        return allOff;
     }
   }
 
