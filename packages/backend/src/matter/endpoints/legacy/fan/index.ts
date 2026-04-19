@@ -3,6 +3,7 @@ import {
   FanDeviceFeature,
 } from "@home-assistant-matter-hub/common";
 import type { EndpointType } from "@matter/main";
+import { GroupsServer, ScenesManagementServer } from "@matter/main/behaviors";
 import type { FanControl } from "@matter/main/clusters";
 import {
   FanDevice as Device,
@@ -49,6 +50,8 @@ export function FanDevice(
           IdentifyServer,
           BasicInformationServer,
           HomeAssistantEntityBehavior,
+          GroupsServer,
+          ScenesManagementServer,
           FanOnOffServer,
           DefaultPowerSourceServer,
         )
@@ -56,6 +59,8 @@ export function FanDevice(
           IdentifyServer,
           BasicInformationServer,
           HomeAssistantEntityBehavior,
+          GroupsServer,
+          ScenesManagementServer,
           FanOnOffServer,
         );
     return onOffDevice.set({ homeAssistantEntity });
@@ -97,6 +102,7 @@ export function FanDevice(
         IdentifyServer,
         BasicInformationServer,
         HomeAssistantEntityBehavior,
+        GroupsServer,
         FanOnOffServer,
         FanFanControlServer.with(...features),
         DefaultPowerSourceServer,
@@ -105,6 +111,7 @@ export function FanDevice(
         IdentifyServer,
         BasicInformationServer,
         HomeAssistantEntityBehavior,
+        GroupsServer,
         FanOnOffServer,
         FanFanControlServer.with(...features),
       );

@@ -1,3 +1,4 @@
+import { GroupsServer, ScenesManagementServer } from "@matter/main/behaviors";
 import type { ColorControl } from "@matter/main/clusters";
 import { ExtendedColorLightDevice as Device } from "@matter/main/devices";
 import type { FeatureSelection } from "../../../../../utils/feature-selection.js";
@@ -27,6 +28,8 @@ export const ExtendedColorLightType = (
       IdentifyServer,
       BasicInformationServer,
       HomeAssistantEntityBehavior,
+      GroupsServer,
+      ScenesManagementServer,
       LightOnOffServer,
       LightLevelControlServer,
       LightColorControlServer.with(...features),
@@ -38,6 +41,8 @@ export const ExtendedColorLightType = (
     IdentifyServer,
     BasicInformationServer,
     HomeAssistantEntityBehavior,
+    GroupsServer,
+    ScenesManagementServer,
     LightOnOffServer,
     LightLevelControlServer,
     LightColorControlServer.with(...features),

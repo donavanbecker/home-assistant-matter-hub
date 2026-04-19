@@ -1,4 +1,5 @@
 import type { EndpointType } from "@matter/main";
+import { GroupsServer, ScenesManagementServer } from "@matter/main/behaviors";
 import { OnOffPlugInUnitDevice } from "@matter/main/devices";
 import { BasicInformationServer } from "../../../behaviors/basic-information-server.js";
 import { HaElectricalEnergyMeasurementServer } from "../../../behaviors/electrical-energy-measurement-server.js";
@@ -14,6 +15,8 @@ const SwitchEndpointType = OnOffPlugInUnitDevice.with(
   BasicInformationServer,
   IdentifyServer,
   HomeAssistantEntityBehavior,
+  GroupsServer,
+  ScenesManagementServer,
   SwitchOnOffServer,
 );
 
@@ -21,6 +24,8 @@ const SwitchWithBatteryEndpointType = OnOffPlugInUnitDevice.with(
   BasicInformationServer,
   IdentifyServer,
   HomeAssistantEntityBehavior,
+  GroupsServer,
+  ScenesManagementServer,
   SwitchOnOffServer,
   DefaultPowerSourceServer,
 );
