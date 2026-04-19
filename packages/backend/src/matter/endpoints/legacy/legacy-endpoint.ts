@@ -12,6 +12,7 @@ import {
 } from "@matter/general";
 import type { EndpointType } from "@matter/main";
 import debounce from "debounce";
+import { isEqual } from "lodash-es";
 import type { BridgeRegistry } from "../../../services/bridges/bridge-registry.js";
 import type { HomeAssistantStates } from "../../../services/home-assistant/home-assistant-registry.js";
 import { HomeAssistantEntityBehavior } from "../../behaviors/home-assistant-entity-behavior.js";
@@ -517,8 +518,7 @@ export class LegacyEndpoint extends EntityEndpoint {
     if (
       !mappedChanged &&
       state.state === this.lastState?.state &&
-      JSON.stringify(state.attributes) ===
-        JSON.stringify(this.lastState?.attributes)
+      isEqual(state.attributes, this.lastState?.attributes)
     ) {
       return;
     }
