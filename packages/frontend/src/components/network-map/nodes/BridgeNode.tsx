@@ -104,7 +104,11 @@ export const BridgeNode = ({ data }: NodeProps) => {
         </Typography>
       </Box>
 
-      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ display: "block" }}
+      >
         Port {port}
       </Typography>
 

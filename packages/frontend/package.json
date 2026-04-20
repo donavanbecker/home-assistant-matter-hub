@@ -9,7 +9,10 @@
     "serve": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "sync-i18n": "node scripts/sync-i18n.cjs",
+    "find-missing-i18n": "node scripts/missing-i18n.cjs",
+    "add-missing-i18n": "node scripts/missing-i18n.cjs --add"
   },
   "dependencies": {
     "@codemirror/lang-json": "^6.0.2",

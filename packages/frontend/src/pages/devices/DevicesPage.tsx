@@ -390,12 +390,12 @@ export const DevicesPage = () => {
                   <WarningIcon color="warning" fontSize="small" />
                 </ListItemIcon>
                 <ListItemText
-                  primary={fe.entityId}
-                  secondary={`${fe.bridgeName} — ${fe.reason}`}
-                  primaryTypographyProps={{
-                    variant: "body2",
-                  }}
-                  secondaryTypographyProps={{ variant: "caption" }}
+                  primary={<span style={{ fontSize: 14 }}>{fe.entityId}</span>}
+                  secondary={
+                    <span
+                      style={{ fontSize: 12, color: "#888" }}
+                    >{`${fe.bridgeName} — ${fe.reason}`}</span>
+                  }
                 />
               </ListItem>
             ))}
@@ -425,7 +425,12 @@ export const DevicesPage = () => {
       {/* Filters */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Stack direction="row" spacing={1.5} sx={{ mb: 2, flexWrap: "wrap" }} useFlexGap>
+          <Stack
+            direction="row"
+            spacing={1.5}
+            sx={{ mb: 2, flexWrap: "wrap" }}
+            useFlexGap
+          >
             <TextField
               label={t("devices.searchPlaceholder")}
               value={searchTerm}

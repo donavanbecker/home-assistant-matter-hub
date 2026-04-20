@@ -97,7 +97,8 @@ export class WebApi extends Service {
     // Get StandaloneDeviceStorage from environment (assume DI or manual load)
     // If not available, throw error
     // Try to get StandaloneDeviceStorage from environment if available
-    const envObj = (this as any).env;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const envObj = (this as unknown as { env: any }).env;
     this.standaloneDeviceStorage =
       this.standaloneDeviceStorage || envObj?.get?.(StandaloneDeviceStorage);
     if (!this.standaloneDeviceStorage) {

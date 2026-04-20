@@ -115,7 +115,7 @@ const PairingCard = ({ bridge }: { bridge: BridgeDataWithMetadata }) => {
     return (
       <Card sx={{ height: "100%" }}>
         <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
             <Avatar sx={{ bgcolor: "grey.500" }}>
               <QrCode2Icon />
             </Avatar>
@@ -137,7 +137,7 @@ const PairingCard = ({ bridge }: { bridge: BridgeDataWithMetadata }) => {
     <>
       <Card sx={{ height: "100%" }}>
         <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
             <Avatar sx={{ bgcolor: "primary.main" }}>
               <QrCode2Icon />
             </Avatar>
@@ -145,12 +145,23 @@ const PairingCard = ({ bridge }: { bridge: BridgeDataWithMetadata }) => {
           </Box>
 
           <Box
-            sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 2,
+            }}
           >
-            <Box sx={{ position: 'relative' }}>
+            <Box sx={{ position: "relative" }}>
               {bridge.commissioning.isCommissioned && (
                 <Box
-                  sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%) rotate(-45deg)', zIndex: 2 }}
+                  sx={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%) rotate(-45deg)",
+                    zIndex: 2,
+                  }}
                 >
                   <Chip
                     label={t("bridge.commissioned")}
@@ -159,9 +170,7 @@ const PairingCard = ({ bridge }: { bridge: BridgeDataWithMetadata }) => {
                   />
                 </Box>
               )}
-              <Box
-                sx={{ position: 'relative' }}
-              >
+              <Box sx={{ position: "relative" }}>
                 <QRCodeSVG
                   value={bridge.commissioning.qrPairingCode}
                   size={120}
@@ -169,15 +178,19 @@ const PairingCard = ({ bridge }: { bridge: BridgeDataWithMetadata }) => {
               </Box>
             </Box>
 
-            <Stack spacing={1} sx={{ width: '100%' }}>
+            <Stack spacing={1} sx={{ width: "100%" }}>
               <Box
-                sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
               >
                 <Typography variant="body2" color="text.secondary">
                   {t("bridge.manualCode")}:
                 </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
                     {bridge.commissioning.manualPairingCode}
                   </Typography>
                   <IconButton
@@ -226,7 +239,7 @@ const InfoCard = ({ bridge }: { bridge: BridgeDataWithMetadata }) => {
   return (
     <Card sx={{ height: "100%" }}>
       <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
           <Avatar sx={{ bgcolor: "info.main" }}>
             <InfoIcon />
           </Avatar>
@@ -234,11 +247,17 @@ const InfoCard = ({ bridge }: { bridge: BridgeDataWithMetadata }) => {
         </Box>
 
         <Stack spacing={1.5}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             <Typography>{bridge.id}</Typography>
           </Box>
           <Divider />
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between" }}>
             <Typography variant="body2" color="text.secondary">
               {t("common.port")}
             </Typography>
@@ -246,7 +265,7 @@ const InfoCard = ({ bridge }: { bridge: BridgeDataWithMetadata }) => {
               {bridge.port}
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between" }}>
             <Typography variant="body2" color="text.secondary">
               {t("common.devices")}
             </Typography>
@@ -260,19 +279,19 @@ const InfoCard = ({ bridge }: { bridge: BridgeDataWithMetadata }) => {
           </Box>
           {bridge.commissioning && (
             <>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                 <Typography variant="body2" color="text.secondary">
                   {t("bridge.passcode")}
                 </Typography>
-                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
                   {bridge.commissioning.passcode}
                 </Typography>
               </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                 <Typography variant="body2" color="text.secondary">
                   {t("bridge.discriminator")}
                 </Typography>
-                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
                   {bridge.commissioning.discriminator}
                 </Typography>
               </Box>
@@ -311,7 +330,7 @@ const FabricsCard = ({ bridge }: { bridge: BridgeDataWithMetadata }) => {
   return (
     <Card sx={{ height: "100%" }}>
       <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
           <Avatar
             sx={{ bgcolor: fabrics.length > 0 ? "success.main" : "grey.500" }}
           >
@@ -366,7 +385,7 @@ const FiltersCard = ({ bridge }: { bridge: BridgeDataWithMetadata }) => {
   return (
     <Card>
       <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
           <Avatar sx={{ bgcolor: "warning.main" }}>
             <FilterListIcon />
           </Avatar>
@@ -388,7 +407,12 @@ const FiltersCard = ({ bridge }: { bridge: BridgeDataWithMetadata }) => {
         </Box>
 
         {hasFilters ? (
-          <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            useFlexGap
+            sx={{ flexWrap: "wrap" }}
+          >
             {bridge.filter.include.map((filter) => (
               <Chip
                 key={`include-${filter.type}-${filter.value}`}
@@ -449,7 +473,7 @@ const PairingDialog = ({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <QrCode2Icon />
           {t("bridge.addController")}
         </Box>
@@ -459,7 +483,7 @@ const PairingDialog = ({
           {t("bridge.scanQrCode")}
         </Typography>
 
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", my: 3 }}>
           <Box
             sx={{
               background: "white",
@@ -473,7 +497,11 @@ const PairingDialog = ({
 
         <Stack spacing={1}>
           <Box
-            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
           >
             <Typography variant="body2">
               <strong>Manual Code:</strong>{" "}
@@ -491,7 +519,11 @@ const PairingDialog = ({
             </Tooltip>
           </Box>
           <Box
-            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
           >
             <Typography variant="body2">
               <strong>Passcode:</strong> {bridge.commissioning.passcode}
@@ -508,7 +540,11 @@ const PairingDialog = ({
             </Tooltip>
           </Box>
           <Box
-            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
           >
             <Typography variant="body2">
               <strong>Discriminator:</strong>{" "}
@@ -560,7 +596,11 @@ const FailedEntities = ({ bridge }: { bridge: BridgeDataWithMetadata }) => {
           <Box sx={{ mt: 1, maxHeight: 200, overflow: "auto" }}>
             {failedEntities.map((entity) => (
               <Box key={entity.entityId} sx={{ mb: 0.5 }}>
-                <Typography variant="body2" component="span" sx={{ fontWeight: "bold" }}>
+                <Typography
+                  variant="body2"
+                  component="span"
+                  sx={{ fontWeight: "bold" }}
+                >
                   {entity.entityId}
                 </Typography>
                 <Typography

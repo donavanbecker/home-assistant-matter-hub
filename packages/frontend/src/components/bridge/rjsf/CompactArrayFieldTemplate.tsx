@@ -82,12 +82,17 @@ export function CompactArrayFieldTemplate(props: ArrayFieldTemplateProps) {
   return (
     <Box>
       <Box
-        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 1,
+        }}
       >
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
           {title}
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Chip
             label={items.length}
             size="small"
@@ -126,7 +131,7 @@ export function CompactArrayFieldTemplate(props: ArrayFieldTemplateProps) {
         <Typography
           variant="body2"
           color="text.secondary"
-          sx={{ textAlign: 'center', py: 2 }}
+          sx={{ textAlign: "center", py: 2 }}
         >
           No matching rules
         </Typography>
@@ -152,8 +157,8 @@ export function CompactArrayFieldTemplate(props: ArrayFieldTemplateProps) {
             >
               <Box
                 sx={{
-                  display: 'flex',
-                  alignItems: 'center',
+                  display: "flex",
+                  alignItems: "center",
                   px: 1.5,
                   py: 0.75,
                   cursor: "pointer",
@@ -169,7 +174,14 @@ export function CompactArrayFieldTemplate(props: ArrayFieldTemplateProps) {
                 )}
                 {hasContent ? (
                   <Box
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 0.5, flex: 1, minWidth: 0 }}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      ml: 0.5,
+                      flex: 1,
+                      minWidth: 0,
+                    }}
                   >
                     <Chip
                       label={type}
@@ -193,7 +205,7 @@ export function CompactArrayFieldTemplate(props: ArrayFieldTemplateProps) {
                   <Typography
                     variant="body2"
                     color="text.secondary"
-                    sx={{ ml: 0.5, fontStyle: 'italic' }}
+                    sx={{ ml: 0.5, fontStyle: "italic" }}
                   >
                     New rule (click to configure)
                   </Typography>

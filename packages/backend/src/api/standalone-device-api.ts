@@ -76,16 +76,17 @@ export function standaloneDeviceApi(storage: StandaloneDeviceStorage) {
           );
           // Create a temporary StandaloneDeviceManager instance (env and storage are not used for getDeviceClass)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const tempManager = new StandaloneDeviceManager(
-            undefined as unknown as any,
-            undefined as unknown as any,
+            undefined as unknown as import("@matter/main").Environment,
+            undefined as unknown as import("../services/storage/standalone-device-storage.js").StandaloneDeviceStorage,
           );
           const DeviceClass = tempManager.getDeviceClass(data.deviceType);
           const IdentifyServer = (await import("@matter/main/behaviors"))
             .IdentifyServer;
           const Endpoint = (await import("@matter/main")).Endpoint;
           const deviceTypeObj = DeviceClass.with(IdentifyServer);
-          const mainEndpoint = new Endpoint(deviceTypeObj, { id: data.id });
+          const _mainEndpoint = new Endpoint(deviceTypeObj, { id: data.id });
           const validation = validateEndpointType(deviceTypeObj, data.id);
           if (validation && validation.missingMandatory.length > 0) {
             reply.code(400).send({
@@ -94,7 +95,7 @@ export function standaloneDeviceApi(storage: StandaloneDeviceStorage) {
             });
             return;
           }
-        } catch (e) {
+        } catch (_e) {
           // If validation fails for any reason, allow creation (fail open)
         }
         await storage.add(data);

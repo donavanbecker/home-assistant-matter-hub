@@ -95,18 +95,18 @@ const EndpointTreeItemLabel = (props: EndpointTreeItemProps) => {
   }, [props.endpoint.state]);
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <EndpointIcon endpoint={props.endpoint} />
-          <Box
-            component="span"
-            sx={{
-              ml: 1,
-              whiteSpace: 'nowrap',
-              textOverflow: 'ellipsis',
-              overflow: 'hidden',
-              ...(isUnavailable ? { opacity: 0.6 } : {}),
-            }}
-          >
+    <Box sx={{ display: "flex", alignItems: "center" }}>
+      <EndpointIcon endpoint={props.endpoint} />
+      <Box
+        component="span"
+        sx={{
+          ml: 1,
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+          ...(isUnavailable ? { opacity: 0.6 } : {}),
+        }}
+      >
         <EndpointName endpoint={props.endpoint} />
       </Box>
       {isUnavailable && (

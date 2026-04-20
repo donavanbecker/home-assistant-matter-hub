@@ -42,7 +42,7 @@ function configToProfileEntry(
 
 export function mappingProfileApi(
   mappingStorage: EntityMappingStorage,
-  jwtSecret: string = "dev_secret",
+  _jwtSecret: string = "dev_secret",
 ): express.Router {
   const router = express.Router();
   // Rate limiting middleware (per IP)

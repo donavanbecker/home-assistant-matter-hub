@@ -53,7 +53,7 @@ export class LegacyEndpoint extends EntityEndpoint {
       state,
     };
     // Centralized cluster mapping logic
-    const clusterMapping = mapEntityToClusters(entityInfo, mapping);
+    const _clusterMapping = mapEntityToClusters(entityInfo, mapping);
     // Optionally, log or use clusterMapping.clusters, clusterMapping.composed, etc.
     // This can be used to drive endpoint type selection, validation, and diagnostics.
 

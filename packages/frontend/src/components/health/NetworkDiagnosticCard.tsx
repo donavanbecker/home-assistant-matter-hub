@@ -82,7 +82,12 @@ export function NetworkDiagnosticCard() {
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Box
-        sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 1,
+        }}
       >
         <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
           {t("health.networkDiagnostics")}

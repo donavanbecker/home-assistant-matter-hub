@@ -12,7 +12,7 @@ import type { EntityMappingStorage } from "../services/storage/entity-mapping-st
  */
 export function entityMappingApi(
   mappingStorage: EntityMappingStorage,
-  jwtSecret: string = "dev_secret",
+  _jwtSecret: string = "dev_secret",
 ): express.Router {
   const router = express.Router();
 
@@ -32,7 +32,7 @@ export function entityMappingApi(
       const { bridgeId } = req.params;
       const mappings = await mappingStorage.getMappingsForBridge(bridgeId);
       res.status(200).json({ bridgeId, mappings });
-    } catch (err) {
+    } catch (_err) {
       res.status(500).json({ error: "Failed to fetch entity mappings" });
     }
   });
@@ -47,7 +47,7 @@ export function entityMappingApi(
       } else {
         res.status(404).json({ error: "Mapping not found" });
       }
-    } catch (err) {
+    } catch (_err) {
       res.status(500).json({ error: "Failed to fetch entity mapping" });
     }
   });
@@ -64,7 +64,7 @@ export function entityMappingApi(
       };
       const config = await mappingStorage.setMapping(request);
       res.status(200).json(config);
-    } catch (err) {
+    } catch (_err) {
       res.status(400).json({ error: "Failed to save entity mapping" });
     }
   });
@@ -75,7 +75,7 @@ export function entityMappingApi(
       const { bridgeId, entityId } = req.params;
       await mappingStorage.deleteMapping(bridgeId, entityId);
       res.status(204).send();
-    } catch (err) {
+    } catch (_err) {
       res.status(500).json({ error: "Failed to delete entity mapping" });
     }
   });
@@ -86,13 +86,13 @@ export function entityMappingApi(
       const { bridgeId } = req.params;
       await mappingStorage.deleteBridgeMappings(bridgeId);
       res.status(204).send();
-    } catch (err) {
+    } catch (_err) {
       res.status(500).json({ error: "Failed to delete bridge mappings" });
     }
   });
 
   // Public profile endpoint (no auth)
-  router.get("/entity-mapping/public-profile", async (req, res) => {
+  router.get("/entity-mapping/public-profile", async (_req, res) => {
     // Implement as needed, or return 501 if not supported
     res.status(501).json({ error: "Not implemented" });
   });

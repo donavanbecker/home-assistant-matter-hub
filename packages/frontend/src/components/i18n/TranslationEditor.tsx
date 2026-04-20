@@ -385,7 +385,14 @@ export function TranslationEditor() {
   return (
     <Box sx={{ p: 2 }}>
       <Box
-        sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 1 }}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 2,
+          flexWrap: "wrap",
+          gap: 1,
+        }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <TranslateIcon />
@@ -434,7 +441,13 @@ export function TranslationEditor() {
 
       <Collapse in={showAddLang}>
         <Box
-          sx={{ display: "flex", gap: 1, mb: 2, alignItems: "flex-start", flexWrap: "wrap" }}
+          sx={{
+            display: "flex",
+            gap: 1,
+            mb: 2,
+            alignItems: "flex-start",
+            flexWrap: "wrap",
+          }}
         >
           <TextField
             size="small"
@@ -470,10 +483,23 @@ export function TranslationEditor() {
         {t("translationEditor.info")}
       </Alert>
 
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+          mb: 2,
+          flexWrap: "wrap",
+        }}
+      >
         <Box sx={{ flexGrow: 1, minWidth: 200 }}>
           <Box
-            sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              mb: 0.5,
+            }}
           >
             <Typography variant="body2" color="text.secondary">
               {t("translationEditor.progress", {

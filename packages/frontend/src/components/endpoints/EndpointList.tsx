@@ -215,15 +215,15 @@ export const EndpointList = (props: EndpointListProps) => {
     <Box>
       <Box
         sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
           mb: 2,
           gap: 2,
-          flexWrap: 'wrap',
+          flexWrap: "wrap",
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography variant="h6" component="span">
             {t("endpoints.title")} ({endpoints.length})
           </Typography>
@@ -239,7 +239,9 @@ export const EndpointList = (props: EndpointListProps) => {
           </Tooltip>
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
+        <Box
+          sx={{ display: "flex", alignItems: "center", gap: 1, flexGrow: 1 }}
+        >
           <TextField
             size="small"
             placeholder={t("endpoints.searchPlaceholder")}
@@ -275,7 +277,7 @@ export const EndpointList = (props: EndpointListProps) => {
 
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel id="sort-label">
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <SortIcon fontSize="small" /> {t("endpoints.sortBy")}
               </Box>
             </InputLabel>

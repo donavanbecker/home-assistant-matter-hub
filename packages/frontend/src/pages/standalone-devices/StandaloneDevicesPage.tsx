@@ -280,7 +280,7 @@ function DeviceCreationForm({
               )}
             </div>
             <div style={{ marginTop: 4 }}>
-              {entities.map((id) => (
+              {entities.map((id: string) => (
                 <span
                   key={id}
                   style={{
@@ -305,7 +305,7 @@ function DeviceCreationForm({
                       : "Click to remove"
                   }
                   onClick={() =>
-                    setEntities(entities.filter((eid) => eid !== id))
+                    setEntities(entities.filter((eid: string) => eid !== id))
                   }
                 >
                   {id} ×

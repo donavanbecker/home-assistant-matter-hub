@@ -275,9 +275,9 @@ export function EntityMappingSection({ bridgeId }: EntityMappingSectionProps) {
       <CardContent>
         <Box
           sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
             mb: 2,
           }}
         >
@@ -362,7 +362,10 @@ export function EntityMappingSection({ bridgeId }: EntityMappingSectionProps) {
                 {mappingsList.map((config) => (
                   <TableRow key={config.entityId}>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontFamily: "monospace" }}
+                      >
                         {config.entityId}
                       </Typography>
                     </TableCell>
@@ -481,7 +484,10 @@ export function EntityMappingSection({ bridgeId }: EntityMappingSectionProps) {
                         />
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontFamily: "monospace" }}
+                        >
                           {config.entityId}
                         </Typography>
                       </TableCell>
@@ -562,7 +568,10 @@ export function EntityMappingSection({ bridgeId }: EntityMappingSectionProps) {
                             />
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontFamily: "monospace" }}
+                            >
                               {match.matchedEntityId}
                             </Typography>
                           </TableCell>

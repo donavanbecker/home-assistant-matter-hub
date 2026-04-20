@@ -43,11 +43,14 @@ export function BridgeTemplateSelector({
         settings. You can customize everything afterwards.
       </Typography>
 
-      <Grid container spacing={1.5} sx={{ alignItems: 'flex-start' }}>
+      <Grid container spacing={1.5} sx={{ alignItems: "flex-start" }}>
         {bridgeTemplates.map((template) => {
           const isSelected = selectedTemplate === template.id;
           return (
-            <Grid key={template.id} sx={{ gridColumn: { xs: 'span 12', sm: 'span 6', md: 'span 4' } }}>
+            <Grid
+              key={template.id}
+              sx={{ gridColumn: { xs: "span 12", sm: "span 6", md: "span 4" } }}
+            >
               <Card
                 variant="outlined"
                 sx={{
@@ -69,7 +72,14 @@ export function BridgeTemplateSelector({
                   }}
                 >
                   <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        mb: 0.5,
+                      }}
+                    >
                       <Typography sx={{ fontSize: 20 }}>
                         {templateIcons[template.icon] ?? templateIcons.default}
                       </Typography>
