@@ -24,6 +24,14 @@ import { EntityIsolationService } from "./entity-isolation-service.js";
 
 const MAX_ENTITY_ID_LENGTH = 150;
 
+// matter.js Observable is dynamically typed per endpoint.
+// biome-ignore lint/suspicious/noExplicitAny: matter.js Observable has no static type
+type PluginObservable = any;
+interface PluginListenerRef {
+  observable: PluginObservable;
+  listener: (value: unknown) => void;
+}
+
 export class BridgeEndpointManager extends Service {
   readonly root: Endpoint;
   private entityIds: string[] = [];
@@ -32,6 +40,7 @@ export class BridgeEndpointManager extends Service {
   private readonly mappingFingerprints = new Map<string, string>();
   private readonly pluginEndpoints = new Map<string, Endpoint>();
   private readonly pluginStateUpdating = new Set<string>();
+  private readonly pluginListeners = new Map<string, PluginListenerRef[]>();
 
   get failedEntities(): FailedEntity[] {
     // Combine static failed entities with dynamically isolated entities
@@ -107,6 +116,17 @@ export class BridgeEndpointManager extends Service {
       pluginName: string,
       deviceId: string,
     ) => {
+      const listeners = this.pluginListeners.get(deviceId);
+      if (listeners) {
+        for (const { observable, listener } of listeners) {
+          try {
+            observable.off(listener);
+          } catch {
+            // Observable may already be disposed — ignore.
+          }
+        }
+        this.pluginListeners.delete(deviceId);
+      }
       const endpoint = this.pluginEndpoints.get(deviceId);
       if (endpoint) {
         try {
@@ -158,6 +178,7 @@ export class BridgeEndpointManager extends Service {
     if (!device.onAttributeWrite) return;
     // biome-ignore lint/suspicious/noExplicitAny: matter.js events are dynamically typed per endpoint
     const allEvents = endpoint.events as any;
+    const listeners: PluginListenerRef[] = [];
     for (const behaviorId of Object.keys(endpoint.type.behaviors)) {
       if (behaviorId === "pluginDevice") continue;
       const behaviorEvents = allEvents[behaviorId];
@@ -167,7 +188,7 @@ export class BridgeEndpointManager extends Service {
         const observable = behaviorEvents[eventName];
         if (!observable || typeof observable.on !== "function") continue;
         const attrName = eventName.slice(0, -"$Changed".length);
-        observable.on((newValue: unknown) => {
+        const listener = (newValue: unknown) => {
           if (this.pluginStateUpdating.has(device.id)) return;
           device
             .onAttributeWrite?.(behaviorId, attrName, newValue)
@@ -177,8 +198,13 @@ export class BridgeEndpointManager extends Service {
                 e,
               );
             });
-        });
+        };
+        observable.on(listener);
+        listeners.push({ observable, listener });
       }
+    }
+    if (listeners.length > 0) {
+      this.pluginListeners.set(device.id, listeners);
     }
   }
 
@@ -577,7 +603,30 @@ export class BridgeEndpointManager extends Service {
     }
   }
 
-  async updateStates(states: HomeAssistantStates) {
+  private updateInFlight: Promise<void> | undefined;
+  private pendingStates: HomeAssistantStates | undefined;
+
+  async updateStates(states: HomeAssistantStates): Promise<void> {
+    // Collapse bursts (HA restart, scene activation) by serializing runs.
+    // If a run is already active, stash the latest batch; once the current
+    // run finishes it picks up the freshest stash. Older pending batches
+    // are dropped — they're already superseded by the newer one.
+    if (this.updateInFlight) {
+      this.pendingStates = states;
+      return this.updateInFlight;
+    }
+    this.updateInFlight = this.runUpdateStates(states).finally(() => {
+      this.updateInFlight = undefined;
+      const queued = this.pendingStates;
+      this.pendingStates = undefined;
+      if (queued) {
+        void this.updateStates(queued);
+      }
+    });
+    return this.updateInFlight;
+  }
+
+  private async runUpdateStates(states: HomeAssistantStates): Promise<void> {
     const startMs = performance.now();
 
     // Merge subscription states into registry so EntityStateProvider

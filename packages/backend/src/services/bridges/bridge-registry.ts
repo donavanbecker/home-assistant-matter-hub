@@ -14,6 +14,7 @@ import {
 import { Logger } from "@matter/general";
 import { callService } from "home-assistant-js-websocket";
 import { keys, pickBy, values } from "lodash-es";
+import { sendHaMessage } from "../../utils/send-ha-message.js";
 import type { HomeAssistantClient } from "../home-assistant/home-assistant-client.js";
 import type {
   HomeAssistantDevices,
@@ -144,10 +145,10 @@ export class BridgeRegistry {
   /**
    * Check if auto composed devices mode is enabled.
    * When enabled, temperature sensors with auto-mapped humidity/pressure/battery
-   * create real Matter Composed Devices (BridgedNodeEndpoint with sub-endpoints)
-   * instead of adding extra clusters to a flat TemperatureSensor endpoint.
-   * This ensures Apple Home, Google Home, and Alexa properly display
-   * humidity and pressure readings using their correct device types.
+   * build real Matter Composed Devices (BridgedNodeEndpoint with sub-endpoints)
+   * rather than stacking extra clusters onto a flat TemperatureSensor —
+   * Apple Home, Google Home, and Alexa render each sub-endpoint using its
+   * own device type.
    */
   isAutoComposedDevicesEnabled(): boolean {
     return this.dataProvider.featureFlags?.autoComposedDevices === true;
@@ -513,9 +514,9 @@ export class BridgeRegistry {
     if (!(supportedFeatures & VacuumDeviceFeature.CLEAN_AREA)) return [];
 
     try {
-      const entry = await this.client.connection.sendMessagePromise<{
+      const entry = await sendHaMessage<{
         options?: Record<string, Record<string, unknown>>;
-      }>({
+      }>(this.client.connection, {
         type: "config/entity_registry/get",
         entity_id: entityId,
       });
@@ -535,13 +536,12 @@ export class BridgeRegistry {
       // entries whose segment IDs no longer exist on the device.
       let validSegmentIds: Set<string> | undefined;
       try {
-        const segmentsResponse =
-          await this.client.connection.sendMessagePromise<
-            { id: string; name: string; group?: string | null }[]
-          >({
-            type: "vacuum/get_segments",
-            entity_id: entityId,
-          });
+        const segmentsResponse = await sendHaMessage<
+          { id: string; name: string; group?: string | null }[]
+        >(this.client.connection, {
+          type: "vacuum/get_segments",
+          entity_id: entityId,
+        });
         if (Array.isArray(segmentsResponse)) {
           validSegmentIds = new Set(segmentsResponse.map((s) => s.id));
           BridgeRegistry.cleanAreaLogger.debug(
@@ -781,8 +781,8 @@ export class BridgeRegistry {
         .some((id) => d.id === id),
     );
 
-    // Pre-calculate auto-assignments BEFORE endpoints are created
-    // This ensures entities are marked as "used" regardless of processing order
+    // Pre-calculate auto-assignments before endpoint creation so entities
+    // are marked "used" regardless of the order they're processed later.
     this.preCalculateAutoAssignments();
   }
 

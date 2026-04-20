@@ -151,11 +151,11 @@ export interface ComposedAirPurifierConfig {
 // --- Main class ---
 
 /**
- * A composed air purifier endpoint using BridgedNodeEndpoint as the parent
- * with separate sub-endpoints for the air purifier and each sensor type.
- * This ensures each device type only has its spec-defined clusters:
- * Apple Home ignores or breaks on non-standard clusters (e.g. adding
- * TemperatureMeasurement to AirPurifierDevice breaks FanControl UI).
+ * Composed air purifier endpoint built on BridgedNodeEndpoint with one
+ * sub-endpoint for the purifier and one per sensor type, so every device
+ * type only carries its spec-defined clusters. Apple Home ignores or
+ * breaks on non-standard clusters — attaching TemperatureMeasurement
+ * directly to AirPurifierDevice breaks the FanControl UI.
  *
  * Structure (per Matter spec §9.4.4):
  *   BridgedNodeEndpoint (parent - basic info + optional battery)

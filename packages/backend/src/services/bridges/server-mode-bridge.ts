@@ -162,7 +162,7 @@ export class ServerModeBridge {
       this.wireSessionDiagnostics();
       this.scheduleWarmStart();
       logMemoryUsage(this.log, "server mode bridge running");
-      this.log.info("Server mode bridge started successfully");
+      this.log.info("Server mode bridge started");
       diagnosticEventBus.emit("bridge_started", "Server mode bridge started", {
         bridgeId: this.id,
         bridgeName: this.dataProvider.name,

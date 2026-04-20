@@ -25,6 +25,7 @@ export enum ClusterId {
 
   airQuality = "airQuality",
   booleanState = "booleanState",
+  booleanStateConfiguration = "booleanStateConfiguration",
   carbonDioxideConcentrationMeasurement = "carbonDioxideConcentrationMeasurement",
   carbonMonoxideConcentrationMeasurement = "carbonMonoxideConcentrationMeasurement",
   colorControl = "colorControl",

@@ -5,6 +5,7 @@ import type { LoggerService } from "../../core/app/logger.js";
 import { Service } from "../../core/ioc/service.js";
 import { DebounceContext } from "../../utils/debounce-context.js";
 import { CircuitBreaker, withRetry } from "../../utils/retry.js";
+import { sendHaMessage } from "../../utils/send-ha-message.js";
 import { diagnosticEventBus } from "../diagnostics/diagnostic-event-bus.js";
 import type { HomeAssistantClient } from "./home-assistant-client.js";
 
@@ -208,17 +209,14 @@ export class HomeAssistantActions extends Service {
   }
 
   fireEvent(eventType: string, eventData?: Record<string, unknown>): void {
-    const connection = this.client.connection;
-    connection
-      .sendMessagePromise({
-        type: "fire_event",
-        event_type: eventType,
-        event_data: eventData,
-      })
-      .catch((error) => {
-        const errorMsg = this.formatError(error);
-        this.log.warn(`Failed to fire event '${eventType}': ${errorMsg}`);
-      });
+    sendHaMessage(this.client.connection, {
+      type: "fire_event",
+      event_type: eventType,
+      event_data: eventData,
+    }).catch((error) => {
+      const errorMsg = this.formatError(error);
+      this.log.warn(`Failed to fire event '${eventType}': ${errorMsg}`);
+    });
   }
 
   override async dispose(): Promise<void> {

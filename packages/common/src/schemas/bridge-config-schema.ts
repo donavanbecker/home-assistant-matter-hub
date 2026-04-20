@@ -201,9 +201,8 @@ const featureFlagSchema: JSONSchema7 = {
     autoComposedDevices: {
       title: "Auto Composed Devices",
       description:
-        "Master toggle: automatically combine related entities from the same Home Assistant device " +
-        "into single Matter endpoints. Enables battery, humidity, pressure, power, and energy auto-mapping at once. " +
-        "This provides a cleaner device experience in Matter controllers (e.g., a Shelly Plug appears as one device with power monitoring).",
+        "Master toggle: combine related entities from the same Home Assistant device into a single Matter endpoint. " +
+        "Turns on battery, humidity, pressure, power, and energy auto-mapping at once — a Shelly Plug shows up as one device with power monitoring instead of several siblings.",
       type: "boolean",
       default: false,
     },
@@ -250,6 +249,18 @@ const featureFlagSchema: JSONSchema7 = {
         "WARNING: OnOff is NOT part of the Matter RVC device type specification. " +
         "Enabling this may break Apple Home (shows 'Updating') and Google Home.",
       type: "boolean",
+    },
+
+    alexaPreserveBrightnessOnTurnOn: {
+      title: "Alexa: Preserve Brightness on Turn-On",
+      description:
+        "Workaround for Alexa resetting light brightness to 100% after subscription renewal. " +
+        "When enabled, the bridge ignores brightness commands that set lights to 100% within " +
+        "200ms of a turn-on command for the same light. " +
+        "WARNING: breaks Apple Home's 'set room to 100%' Siri commands, which use the same " +
+        "on() + moveToLevel(254) pattern. Only enable on Alexa-only bridges.",
+      type: "boolean",
+      default: false,
     },
   },
 };

@@ -250,10 +250,21 @@ export class ColorControlServerBase extends FeaturedBase {
       });
     }
 
-    // Set colorMode and hueSaturation attributes
+    // Only publish colorMode alongside the cluster values that actually
+    // changed this cycle. When hue/sat is skipped but CT isn't (or vice
+    // versa), writing colorMode without its companion values produced a
+    // mismatched snapshot that controllers read back inconsistently.
+    const writingHueSat = this.features.hueSaturation && !skipHueSat;
+    const writingColorTemp =
+      !skipColorTemp &&
+      newColorMode === ColorControl.ColorMode.ColorTemperatureMireds;
+    const shouldPublishColorMode =
+      (writingHueSat &&
+        newColorMode !== ColorControl.ColorMode.ColorTemperatureMireds) ||
+      writingColorTemp;
     applyPatchState(this.state, {
-      ...(skipColorTemp && skipHueSat ? {} : { colorMode: newColorMode }),
-      ...(this.features.hueSaturation && !skipHueSat
+      ...(shouldPublishColorMode ? { colorMode: newColorMode } : {}),
+      ...(writingHueSat
         ? {
             currentHue: hue,
             currentSaturation: saturation,
@@ -277,6 +288,12 @@ export class ColorControlServerBase extends FeaturedBase {
       this.agent,
     );
     const targetKelvin = ColorConverter.temperatureMiredsToKelvin(targetMireds);
+    if (targetKelvin == null) {
+      // Matter allows colorTemperatureMireds = 0 in some contexts, but HA's
+      // light.turn_on expects a finite kelvin/mireds value. Drop the command
+      // rather than pass Infinity through.
+      return;
+    }
 
     if (currentKelvin === targetKelvin) {
       return;

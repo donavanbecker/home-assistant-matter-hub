@@ -47,6 +47,11 @@ export class Bridge {
   private deadSessionTimer: ReturnType<typeof setTimeout> | null = null;
   private staleSessionTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
+  // Serialize concurrent lifecycle calls so auto-recovery and a manual
+  // restartBridge can't race past each other's Starting/Stopping states.
+  private startInFlight?: Promise<void>;
+  private stopInFlight?: Promise<void>;
+
   // Tracks the last synced state JSON per entity to avoid pushing unchanged states.
   // Key: entity_id, Value: JSON.stringify of entity.state
   private lastSyncedStates = new Map<string, string>();
@@ -228,6 +233,16 @@ export class Bridge {
     if (this.status.code === BridgeStatus.Running) {
       return;
     }
+    if (this.startInFlight) {
+      return this.startInFlight;
+    }
+    this.startInFlight = this.runStart().finally(() => {
+      this.startInFlight = undefined;
+    });
+    return this.startInFlight;
+  }
+
+  private async runStart() {
     this.lastSyncedStates.clear();
     try {
       this.setStatus({
@@ -272,6 +287,16 @@ export class Bridge {
     code: BridgeStatus = BridgeStatus.Stopped,
     reason = "Manually stopped",
   ) {
+    if (this.stopInFlight) {
+      return this.stopInFlight;
+    }
+    this.stopInFlight = this.runStop(code, reason).finally(() => {
+      this.stopInFlight = undefined;
+    });
+    return this.stopInFlight;
+  }
+
+  private async runStop(code: BridgeStatus, reason: string) {
     this.unwireSessionDiagnostics();
     this.stopAutoForceSync();
     await this.endpointManager.stopPlugins();

@@ -4,11 +4,12 @@ import type {
   HomeAssistantEntityRegistry,
 } from "@home-assistant-matter-hub/common";
 import type { Connection } from "home-assistant-js-websocket";
+import { sendHaMessage } from "../../../utils/send-ha-message.js";
 
 export async function getRegistry(
   connection: Connection,
 ): Promise<HomeAssistantEntityRegistry[]> {
-  return await connection.sendMessagePromise<HomeAssistantEntityRegistry[]>({
+  return sendHaMessage<HomeAssistantEntityRegistry[]>(connection, {
     type: "config/entity_registry/list",
   });
 }
@@ -16,7 +17,7 @@ export async function getRegistry(
 export async function getDeviceRegistry(
   connection: Connection,
 ): Promise<HomeAssistantDeviceRegistry[]> {
-  return connection.sendMessagePromise<HomeAssistantDeviceRegistry[]>({
+  return sendHaMessage<HomeAssistantDeviceRegistry[]>(connection, {
     type: "config/device_registry/list",
   });
 }
@@ -31,7 +32,7 @@ export interface HomeAssistantLabel {
 export async function getLabelRegistry(
   connection: Connection,
 ): Promise<HomeAssistantLabel[]> {
-  return connection.sendMessagePromise<HomeAssistantLabel[]>({
+  return sendHaMessage<HomeAssistantLabel[]>(connection, {
     type: "config/label_registry/list",
   });
 }
@@ -39,7 +40,7 @@ export async function getLabelRegistry(
 export async function getAreaRegistry(
   connection: Connection,
 ): Promise<HomeAssistantAreaRegistry[]> {
-  return connection.sendMessagePromise<HomeAssistantAreaRegistry[]>({
+  return sendHaMessage<HomeAssistantAreaRegistry[]>(connection, {
     type: "config/area_registry/list",
   });
 }

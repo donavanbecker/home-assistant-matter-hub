@@ -92,8 +92,8 @@ class RvcRunModeServerBase extends Base {
   declare state: RvcRunModeServerBase.State;
 
   override async initialize() {
-    // supportedModes and currentMode are set via .set() BEFORE initialize is called
-    // This ensures Matter.js has the modes at pairing time
+    // supportedModes and currentMode are set via .set() before initialize,
+    // so matter.js has the modes ready at pairing time.
     await super.initialize();
     const homeAssistant = await this.agent.load(HomeAssistantEntityBehavior);
     this.update(homeAssistant.entity);
@@ -502,7 +502,7 @@ class RvcRunModeServerBase extends Base {
     this.state.currentMode = newMode;
     return {
       status: ModeBase.ModeChangeStatus.Success,
-      statusText: "Successfully switched mode",
+      statusText: "Mode switched",
     };
   }
 }

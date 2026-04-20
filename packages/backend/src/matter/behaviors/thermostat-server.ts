@@ -263,8 +263,8 @@ export class ThermostatServerBase extends FullFeaturedBase {
   declare state: ThermostatServerBase.State;
 
   // State class only declares the config property type.
-  // ALL defaults are set via .set() in the ThermostatServer function below.
-  // This ensures Matter.js's internal cluster data store receives the values.
+  // ALL defaults are set via .set() in the ThermostatServer function below
+  // so matter.js's internal cluster data store picks them up before init.
   static override State = class State extends FullFeaturedBase.State {
     config!: ThermostatServerConfig;
   };
@@ -727,10 +727,10 @@ export class ThermostatServerBase extends FullFeaturedBase {
     const dry = { ...allOff, heat: true, fan: true };
     const fanOnly = { ...allOff, fan: true };
 
-    // Use runningMode (derived from hvac_action) as the PRIMARY signal for active
-    // heating/cooling. This allows controllers like Apple Home to distinguish
-    // "Heating to 26" (active) from "Heat to 26" (mode selected but idle).
-    // For FanOnly/Dry modes (no RunningMode equivalent), fall back to systemMode.
+    // runningMode (derived from hvac_action) is the primary signal for
+    // active heating/cooling — Apple Home reads it to distinguish
+    // "Heating to 26" (active) from "Heat to 26" (mode selected, idle).
+    // FanOnly/Dry have no RunningMode equivalent, so we fall back to systemMode.
     switch (runningMode) {
       case RunningMode.Heat:
         return heat;
@@ -747,6 +747,10 @@ export class ThermostatServerBase extends FullFeaturedBase {
           default:
             return allOff;
         }
+      default:
+        // Future matter.js RunningMode values (e.g. alternative heat/cool)
+        // fall through to "nothing running" rather than emitting undefined.
+        return allOff;
     }
   }
 

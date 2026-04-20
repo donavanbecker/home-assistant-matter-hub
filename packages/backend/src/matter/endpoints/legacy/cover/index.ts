@@ -42,8 +42,8 @@ const CoverDeviceType = (
       features.add("AbsolutePosition");
     }
   } else {
-    // Fallback: Add features even if support_open is not set
-    // This ensures the WindowCovering device is always valid
+    // Fallback: add features even if support_open is not set so the
+    // WindowCovering device comes up with a valid descriptor.
     logger.warn(
       `[${entityId}] Cover has no support_open feature (supported_features=${supportedFeatures}), adding Lift anyway`,
     );

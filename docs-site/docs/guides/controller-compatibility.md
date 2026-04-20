@@ -1,6 +1,6 @@
 # Controller Compatibility Matrix
 
-This page documents which Matter device types work with which controllers, based on community testing and official documentation.
+This page documents which Matter device types work with which controllers, based on community testing and the vendors' published Matter device-type lists.
 
 :::info
 Compatibility depends on controller firmware versions. This matrix reflects the latest known state. If you find discrepancies, please open an issue.
@@ -8,39 +8,42 @@ Compatibility depends on controller firmware versions. This matrix reflects the 
 
 ## Device Type Support
 
+Rows flagged with a footnote number link to the vendor source that establishes the value. Rows without a number are established by community testing or by earlier releases of HAMH.
+
 | HA Domain | Matter Device Type | Apple Home | Google Home | Alexa | SmartThings |
 |---|---|:---:|:---:|:---:|:---:|
-| `light` | OnOffLight | ✅ | ✅ | ✅ | ✅ |
-| `light` | DimmableLight | ✅ | ✅ | ✅ | ✅ |
-| `light` | ColorTemperatureLight | ✅ | ✅ | ✅ | ✅ |
-| `light` | ExtendedColorLight | ✅ | ✅ | ✅ | ✅ |
-| `switch` | OnOffPlugInUnit | ✅ | ✅ | ✅ | ✅ |
-| `switch` | DimmablePlugInUnit | ✅ | ✅ | ✅ | ✅ |
-| `lock` | DoorLock | ✅ | ✅ | ✅ | ✅ |
-| `cover` | WindowCovering | ✅ | ✅ | ✅ | ✅ |
-| `climate` | Thermostat | ✅ | ✅ | ✅ | ✅ |
-| `fan` | Fan | ✅ | ✅ | ✅ | ⚠️ |
-| `sensor` | TemperatureSensor | ✅ | ✅ | ✅ | ✅ |
-| `sensor` | HumiditySensor | ✅ | ✅ | ✅ | ✅ |
-| `sensor` | PressureSensor | ✅ | ❓ | ❓ | ✅ |
-| `sensor` | IlluminanceSensor | ✅ | ❓ | ❓ | ✅ |
-| `sensor` | FlowSensor | ❓ | ❓ | ❓ | ❓ |
-| `sensor` | AirQualitySensor | ✅ | ❓ | ❓ | ❓ |
+| `light` | OnOffLight | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
+| `light` | DimmableLight | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
+| `light` | ColorTemperatureLight | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
+| `light` | ExtendedColorLight | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
+| `switch` | OnOffPlugInUnit | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
+| `switch` | DimmablePlugInUnit | ✅ | ✅ | ✅ [²](#sources) | ✅ |
+| `lock` | DoorLock | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
+| `cover` | WindowCovering | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
+| `climate` | Thermostat | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
+| `fan` | Fan | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ⚠️ |
+| `sensor` | TemperatureSensor | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
+| `sensor` | HumiditySensor | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
+| `sensor` | PressureSensor | ✅ | ✅ [¹](#sources) | ❌ [²](#sources) | ✅ |
+| `sensor` | IlluminanceSensor | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
+| `sensor` | FlowSensor | ❓ | ✅ [¹](#sources) | ❌ [²](#sources) | ❓ |
+| `sensor` | AirQualitySensor | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ❓ |
 | `sensor` | ElectricalSensor | ❓ | ❓ | ❓ | ❓ |
-| `binary_sensor` | ContactSensor | ✅ | ✅ | ✅ | ✅ |
-| `binary_sensor` | OccupancySensor | ✅ | ✅ | ✅ | ✅ |
-| `binary_sensor` | SmokeCoAlarm | ✅ | ✅ | ✅ | ✅ |
-| `binary_sensor` | WaterLeakDetector | ✅ | ✅ | ✅ | ✅ |
+| `binary_sensor` | ContactSensor | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
+| `binary_sensor` | OccupancySensor | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
+| `binary_sensor` | SmokeCoAlarm | ✅ | ✅ | ✅ [²](#sources) | ✅ |
+| `binary_sensor` | WaterLeakDetector | ✅ | ✅ | ✅ [²](#sources) | ✅ |
 | `binary_sensor` | WaterFreezeDetector | ❓ | ❓ | ❓ | ❓ |
-| `media_player` | Speaker | ❓ | ❓ | ❓ | ❓ |
+| `media_player` | Speaker | ❓ | ✅ [¹](#sources) | ❌ [²](#sources) | ❓ |
 | `media_player` | BasicVideoPlayer | ❓ | ❓ | ❓ | ❓ |
-| `valve` | WaterValve | ✅ | ❓ | ❓ | ❓ |
-| `vacuum` | RoboticVacuumCleaner | ✅ | ❓ | ✅* | ❓ |
+| `valve` | WaterValve | ✅ | ❌ [¹](#sources) | ❌ [²](#sources) | ❓ |
+| `vacuum` | RoboticVacuumCleaner | ✅ [³](#sources) | ✅ [¹](#sources) | ✅* [²](#sources) | ❓ |
 | `water_heater` | Thermostat | ✅ | ✅ | ✅ | ❓ |
 | `alarm_control_panel` | ModeSelect | ❓ | ❓ | ❌** | ❓ |
 | `select` | ModeSelect | ❓ | ❓ | ❌** | ❓ |
-| `event` | GenericSwitch | ✅ | ❓ | ❓ | ❓ |
-| `humidifier` | Fan | ✅ | ✅ | ✅ | ❓ |
+| `event` | GenericSwitch | ✅ | ❓ | ✅ [²](#sources) | ❓ |
+| `humidifier` | Fan | ✅ | ✅ [¹](#sources) | ✅ [²](#sources) | ❓ |
+| `dishwasher` (override) | Dishwasher | ❌ [³](#sources) | ✅ [¹](#sources) | ✅ [²](#sources) | ✅ |
 
 ### Legend
 
@@ -52,6 +55,16 @@ Compatibility depends on controller firmware versions. This matrix reflects the 
 \* Alexa vacuum support requires the `vacuumOnOff` feature flag enabled.
 
 \*\* Alexa does not support the standalone ModeSelect device type (0x0027). The ModeSelect cluster is only recognized on specific device types like Lamp or Fan. See [Alexa Supported Device Categories](https://developer.amazon.com/en-US/docs/alexa/smarthome/supported-matter-device-categories.html) and [#273](https://github.com/RiDDiX/home-assistant-matter-hub/issues/273).
+
+### Sources
+
+Footnote references for the ✅ / ❌ cells above:
+
+1. Google Home — [Supported devices](https://developers.home.google.com/matter/supported-devices) (doc dated 2024-12-20). Rows marked ❌ for Google are device types not listed on that page. The Google doc is roughly 16 months old; a cell not listed may just mean "not yet documented".
+2. Amazon Alexa — [Supported Matter Device Categories and Clusters](https://developer.amazon.com/en-US/docs/alexa/smarthome/supported-matter-device-categories.html) (doc dated 2026-04-08). Rows marked ❌ for Alexa are device types absent from that page.
+3. Apple Home — [Use Matter accessories with the Home app](https://support.apple.com/en-us/102135) (doc dated 2025-12-12) plus iOS 18.4 release coverage for robot vacuum support. Apple's public doc does not list dishwashers as a supported category.
+
+Apple, Google, Alexa, and SmartThings each move at a different cadence. A ❌ here means the vendor has not published support on their current device-type page — not that the device is known to fail. When a vendor adds the category we flip the cell and cite the update.
 
 ## Controller Profiles
 

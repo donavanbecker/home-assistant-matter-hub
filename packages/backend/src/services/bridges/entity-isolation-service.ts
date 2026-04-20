@@ -5,9 +5,9 @@ import { diagnosticEventBus } from "../diagnostics/diagnostic-event-bus.js";
 const logger = Logger.get("EntityIsolation");
 
 /**
- * Service to track and isolate entities that cause runtime errors.
- * This allows the bridge to continue functioning even when individual
- * entities have issues (e.g., Invalid intervalMs from subscription timing).
+ * Tracks and isolates entities that throw at runtime so the bridge keeps
+ * running when individual entities hit issues (e.g. Invalid intervalMs
+ * from subscription timing).
  */
 class EntityIsolationServiceImpl {
   private isolatedEntities: Map<string, FailedEntity> = new Map();

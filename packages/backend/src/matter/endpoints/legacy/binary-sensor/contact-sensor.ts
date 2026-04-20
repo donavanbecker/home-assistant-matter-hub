@@ -1,3 +1,4 @@
+import { BooleanStateConfigurationServer } from "@matter/main/behaviors";
 import { ContactSensorDevice } from "@matter/main/devices";
 import { EntityStateProvider } from "../../../../services/bridges/entity-state-provider.js";
 import { BasicInformationServer } from "../../../behaviors/basic-information-server.js";
@@ -11,6 +12,7 @@ export const ContactSensorType = ContactSensorDevice.with(
   IdentifyServer,
   HomeAssistantEntityBehavior,
   BooleanStateServer({ inverted: true }),
+  BooleanStateConfigurationServer,
 );
 
 export const ContactSensorWithBatteryType = ContactSensorDevice.with(
@@ -18,6 +20,7 @@ export const ContactSensorWithBatteryType = ContactSensorDevice.with(
   IdentifyServer,
   HomeAssistantEntityBehavior,
   BooleanStateServer({ inverted: true }),
+  BooleanStateConfigurationServer,
   PowerSourceServer({
     getBatteryPercent: (entity, agent) => {
       // First check for battery entity from mapping (auto-assigned or manual)

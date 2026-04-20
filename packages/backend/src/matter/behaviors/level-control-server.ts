@@ -2,6 +2,7 @@ import type { HomeAssistantEntityInformation } from "@home-assistant-matter-hub/
 import { Logger } from "@matter/general";
 import { LevelControlServer as Base } from "@matter/main/behaviors";
 import type { LevelControl } from "@matter/main/clusters/level-control";
+import { BridgeDataProvider } from "../../services/bridges/bridge-data-provider.js";
 import { applyPatchState } from "../../utils/apply-patch-state.js";
 import type { FeatureSelection } from "../../utils/feature-selection.js";
 import { HomeAssistantEntityBehavior } from "./home-assistant-entity-behavior.js";
@@ -9,6 +10,7 @@ import type { ValueGetter, ValueSetter } from "./utils/cluster-config.js";
 
 // Track when lights were turned on to detect Alexa's brightness reset pattern
 const lastTurnOnTimestamps = new Map<string, number>();
+const LAST_TURN_ON_TTL_MS = 60_000;
 
 // Track optimistic level writes to prevent stale HA state from overwriting them.
 // After a controller command, the HA state update with the OLD brightness can
@@ -24,12 +26,31 @@ const optimisticLevelState = new Map<string, OptimisticLevelState>();
 const OPTIMISTIC_TIMEOUT_MS = 3000;
 const OPTIMISTIC_TOLERANCE = 5;
 
+// Sweep stale entries so removed entities don't linger forever in either
+// map. Cheap enough to call on every set/get of the involved entity.
+function sweepOptimisticLevel(now: number) {
+  for (const [key, value] of optimisticLevelState) {
+    if (now - value.timestamp > OPTIMISTIC_TIMEOUT_MS) {
+      optimisticLevelState.delete(key);
+    }
+  }
+}
+function sweepLastTurnOn(now: number) {
+  for (const [key, ts] of lastTurnOnTimestamps) {
+    if (now - ts > LAST_TURN_ON_TTL_MS) {
+      lastTurnOnTimestamps.delete(key);
+    }
+  }
+}
+
 /**
  * Called by OnOffServer when a light is turned on via Matter command.
  * Used to detect Alexa's brightness reset pattern.
  */
 export function notifyLightTurnedOn(entityId: string): void {
-  lastTurnOnTimestamps.set(entityId, Date.now());
+  const now = Date.now();
+  sweepLastTurnOn(now);
+  lastTurnOnTimestamps.set(entityId, now);
 }
 
 const logger = Logger.get("LevelControlServer");
@@ -63,12 +84,10 @@ export class LevelControlServerBase extends FeaturedBase {
     // Apple Home lights jump to 100% on every turn-on (#225).
     this.state.onLevel = null;
 
-    logger.debug(`initialize: calling super.initialize()`);
     try {
       await super.initialize();
-      logger.debug(`initialize: super.initialize() completed successfully`);
     } catch (error) {
-      logger.error(`initialize: super.initialize() FAILED:`, error);
+      logger.error("super.initialize() failed:", error);
       throw error;
     }
     const homeAssistant = await this.agent.load(HomeAssistantEntityBehavior);
@@ -164,20 +183,22 @@ export class LevelControlServerBase extends FeaturedBase {
     const levelRange = this.maxLevel - this.minLevel;
     const levelPercent = (level - this.minLevel) / levelRange;
 
-    // Alexa workaround: After subscription renewal, Alexa sends on() followed by
-    // moveToLevel(254) within ~50ms, resetting brightness to 100%. Ignore max
-    // brightness commands that come shortly after turn-on. This is always active
-    // because the 200ms window is too short for intentional human interaction.
-    const lastTurnOn = lastTurnOnTimestamps.get(entityId);
-    const timeSinceTurnOn = lastTurnOn ? Date.now() - lastTurnOn : Infinity;
-    const isMaxBrightness = level >= this.maxLevel;
-
-    if (isMaxBrightness && timeSinceTurnOn < 200) {
-      logger.debug(
-        `[${entityId}] Ignoring moveToLevel(${level}) - Alexa brightness reset detected ` +
-          `(${timeSinceTurnOn}ms after turn-on)`,
-      );
-      return;
+    // Alexa workaround (#142, opt-in): after subscription renewal Alexa sends
+    // on() followed by moveToLevel(254) within ~50ms, resetting brightness to
+    // 100%. Apple Home's room-level "set to 100%" Siri command uses the same
+    // on() + moveToLevel(254) pattern (#306), so this has to stay behind a
+    // feature flag — dropping the command by default breaks Apple Home.
+    const { featureFlags } = this.env.get(BridgeDataProvider);
+    if (featureFlags?.alexaPreserveBrightnessOnTurnOn === true) {
+      const lastTurnOn = lastTurnOnTimestamps.get(entityId);
+      const timeSinceTurnOn = lastTurnOn ? Date.now() - lastTurnOn : Infinity;
+      if (level >= this.maxLevel && timeSinceTurnOn < 200) {
+        logger.debug(
+          `[${entityId}] Ignoring moveToLevel(${level}) - Alexa brightness reset detected ` +
+            `(${timeSinceTurnOn}ms after turn-on)`,
+        );
+        return;
+      }
     }
 
     const current = config.getValuePercent(
@@ -200,9 +221,11 @@ export class LevelControlServerBase extends FeaturedBase {
     // in the command response. Without this, Apple Home reads the stale
     // currentLevel before the HA state update arrives and reverts the UI.
     this.state.currentLevel = level;
+    const now = Date.now();
+    sweepOptimisticLevel(now);
     optimisticLevelState.set(entityId, {
       expectedLevel: level,
-      timestamp: Date.now(),
+      timestamp: now,
     });
     homeAssistant.callAction(action);
   }

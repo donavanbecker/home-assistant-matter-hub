@@ -78,8 +78,9 @@ process.on("unhandledRejection", (reason) => {
 // Re-register error handlers after Matter.js initialization to override its handlers
 // Matter.js registers its own handlers that call process.exit(1), so we need to be last
 function registerFinalErrorHandlers() {
-  // Remove all listeners and re-add ours as the only ones
-  // This ensures our suppression logic takes precedence
+  // Drop every existing listener and re-attach ours so the suppression
+  // logic sits at the end of the chain — matter.js hooks its own handlers
+  // that would otherwise call process.exit(1) before we get a look in.
   process.removeAllListeners("uncaughtException");
   process.removeAllListeners("unhandledRejection");
 
@@ -142,9 +143,9 @@ export async function startHandler(
   const registry$ = appEnvironment.load(HomeAssistantRegistry);
   const backupService$ = appEnvironment.load(BackupService);
 
-  // Wire up WebSocket broadcasts for bridge status changes.
-  // This ensures the frontend receives live updates as each bridge
-  // transitions through Starting → Running during startup.
+  // Wire up WebSocket broadcasts for bridge status changes so the frontend
+  // sees each Stopped → Starting → Running transition as it happens during
+  // startup rather than after the whole set finishes.
   const [bridgeService, webApi, backupService] = await Promise.all([
     bridgeService$,
     webApi$,
@@ -171,9 +172,12 @@ export async function startHandler(
       console.warn("Auto-backup during shutdown failed:", e);
     }
     try {
+      // Dispose the whole IoC container so WebApi (releases the HTTP port),
+      // HomeAssistantClient (closes the WS), and every storage service tear
+      // down in reverse creation order before the process exits.
       await Promise.race([
-        bridgeService.dispose(),
-        new Promise((resolve) => setTimeout(resolve, 10_000)),
+        appEnvironment.dispose(),
+        new Promise((resolve) => setTimeout(resolve, 15_000)),
       ]);
     } catch (e) {
       console.warn("Error during graceful shutdown:", e);

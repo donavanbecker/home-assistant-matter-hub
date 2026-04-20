@@ -136,14 +136,14 @@ export function ClimateDevice(
     attributes.hvac_modes.includes(mode),
   );
   // Treat auto-only thermostats (no heat/cool/heat_cool) as heating devices
-  // This allows simple thermostats that only have "auto" mode to work
+  // so simple "auto"-only thermostats still map onto a Matter mode.
   const isAutoOnly =
     !hasExplicitHeating &&
     !supportsCooling &&
     autoOnlyMode.some((mode) => attributes.hvac_modes.includes(mode));
-  // Treat ventilation-only devices (fan_only/dry, no heat/cool/auto) as heating
-  // devices. This allows CMVs like Ambientika (#130) to be exposed as Matter
-  // thermostats. The actual mode control works via SystemMode.FanOnly/Dry.
+  // Treat ventilation-only devices (fan_only/dry, no heat/cool/auto) as
+  // heating devices so CMVs like Ambientika (#130) still surface as Matter
+  // thermostats. The actual mode control runs through SystemMode.FanOnly/Dry.
   const isVentilationOnly =
     !hasExplicitHeating &&
     !supportsCooling &&
@@ -207,8 +207,8 @@ export function ClimateDevice(
     (attributes.hvac_modes.includes(ClimateHvacMode.heat) ||
       attributes.hvac_modes.includes(ClimateHvacMode.cool));
 
-  // Pass thermostat state at the endpoint type level using the behavior ID.
-  // This ensures Matter.js's internal validation sees the values.
+  // Pass thermostat state at the endpoint type level using the behavior ID,
+  // so matter.js's internal validation sees the values before initialize.
   // Only include attributes for the features the device actually supports.
   return ClimateDeviceType(
     supportsOnOff,

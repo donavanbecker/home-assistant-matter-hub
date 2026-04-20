@@ -155,11 +155,10 @@ export interface ComposedSensorConfig {
 // --- Main class ---
 
 /**
- * A composed sensor endpoint that uses BridgedNodeEndpoint as the parent
- * with separate sub-endpoints for each sensor type. This ensures that
- * each sensor has the correct Matter device type, which is required for
- * Apple Home, Google Home, and Amazon Alexa to properly display humidity
- * and pressure readings.
+ * Composed sensor endpoint built on BridgedNodeEndpoint with one
+ * sub-endpoint per sensor type. Each sub-endpoint carries its own Matter
+ * device type — required for Apple Home, Google Home, and Alexa to
+ * render humidity and pressure readings with the right icons and units.
  *
  * Structure:
  *   BridgedNodeEndpoint (parent - basic info + optional battery)

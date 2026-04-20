@@ -10,6 +10,30 @@ import type { BetterLogger, LoggerService } from "../../core/app/logger.js";
 import { Service } from "../../core/ioc/service.js";
 import { withRetry } from "../../utils/retry.js";
 
+// Treat DNS / routing / TLS hiccups the same as ERR_CANNOT_CONNECT: log and
+// retry instead of crashing startup. The HA WS library only emits
+// ERR_CANNOT_CONNECT for its own connect-phase failures; Node raises its own
+// error codes (ENOTFOUND, ECONNRESET, etc.) on the underlying socket.
+const TRANSIENT_CONNECT_ERROR_CODES = new Set<string>([
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "EPIPE",
+]);
+function isTransientConnectError(reason: unknown): boolean {
+  if (reason === ERR_CANNOT_CONNECT) return true;
+  const code = (reason as NodeJS.ErrnoException | undefined)?.code;
+  if (code && TRANSIENT_CONNECT_ERROR_CODES.has(code)) return true;
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  return (
+    msg.includes("socket hang up") || msg.includes("tls") || msg.includes("TLS")
+  );
+}
+
 export interface HomeAssistantClientProps {
   readonly url: string;
   readonly accessToken: string;
@@ -57,16 +81,6 @@ export class HomeAssistantClient extends Service {
         await this.waitForHomeAssistantToBeUpAndRunning(connection);
         return connection;
       } catch (reason: unknown) {
-        if (reason === ERR_CANNOT_CONNECT) {
-          this.log.warnCtx("Unable to connect to Home Assistant, retrying...", {
-            url: props.url,
-            attempt,
-            maxAttempts: maxConnectAttempts,
-            retryDelayMs: 5000,
-          });
-          await new Promise((resolve) => setTimeout(resolve, 5000));
-          continue;
-        }
         if (reason === ERR_INVALID_AUTH) {
           this.log.errorCtx(
             "Authentication failed",
@@ -76,6 +90,17 @@ export class HomeAssistantClient extends Service {
           throw new Error(
             "Authentication failed while connecting to home assistant",
           );
+        }
+        if (isTransientConnectError(reason)) {
+          this.log.warnCtx("Unable to connect to Home Assistant, retrying...", {
+            url: props.url,
+            attempt,
+            maxAttempts: maxConnectAttempts,
+            retryDelayMs: 5000,
+            reason: reason instanceof Error ? reason.message : String(reason),
+          });
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+          continue;
         }
         throw new Error(`Unable to connect to home assistant: ${reason}`);
       }

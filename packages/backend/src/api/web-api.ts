@@ -271,12 +271,19 @@ export class WebApi extends Service {
     if (this.server) {
       return;
     }
-    this.server = await new Promise((resolve) => {
+    this.server = await new Promise((resolve, reject) => {
       const server = this.app.listen(this.props.port, () => {
         this.log.info(
           `HTTP server (API ${this.props.webUiDist ? "& Web App" : "only"}) listening on port ${this.props.port}`,
         );
         resolve(server);
+      });
+      server.on("error", (err: NodeJS.ErrnoException) => {
+        reject(
+          err.code === "EADDRINUSE"
+            ? new Error(`Port ${this.props.port} already in use`)
+            : err,
+        );
       });
     });
     this.wsApi.attach(this.server, this.props.basePath);

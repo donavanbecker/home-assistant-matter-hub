@@ -171,10 +171,15 @@ export abstract class ColorConverter {
 
   /**
    * Convert Color Tempareture from Mireds to Kelvin
-   * @param temperatureMireds Temperature in Mireds
-   * @return Temperature in Kelvin
+   * @param temperatureMireds Temperature in Mireds (must be finite and > 0)
+   * @return Temperature in Kelvin, or null if the input is 0 / negative / non-finite
    */
-  public static temperatureMiredsToKelvin(temperatureMireds: number): number {
+  public static temperatureMiredsToKelvin(
+    temperatureMireds: number,
+  ): number | null {
+    if (!Number.isFinite(temperatureMireds) || temperatureMireds <= 0) {
+      return null;
+    }
     return 1_000_000 / temperatureMireds;
   }
 

@@ -12,6 +12,7 @@ import {
 } from "@matter/general";
 import type { EndpointType } from "@matter/main";
 import debounce from "debounce";
+import { isEqual } from "lodash-es";
 import type { BridgeRegistry } from "../../../services/bridges/bridge-registry.js";
 import type { HomeAssistantStates } from "../../../services/home-assistant/home-assistant-registry.js";
 import { HomeAssistantEntityBehavior } from "../../behaviors/home-assistant-entity-behavior.js";
@@ -372,10 +373,9 @@ export class LegacyEndpoint extends EntityEndpoint {
     }
 
     // When autoComposedDevices is enabled and this is a temperature sensor
-    // with auto-mapped humidity/pressure, create a real Matter Composed Device
-    // instead of a flat endpoint with extra clusters.
-    // This ensures Apple Home, Google Home, and Alexa properly display
-    // humidity and pressure using their correct device types.
+    // with auto-mapped humidity/pressure, build a real Matter Composed Device
+    // instead of a flat endpoint with extra clusters — Apple Home, Google
+    // Home, and Alexa then render each sub-endpoint with its own device type.
     if (registry.isAutoComposedDevicesEnabled()) {
       const attrs = state.attributes as SensorDeviceAttributes;
       if (
@@ -528,8 +528,7 @@ export class LegacyEndpoint extends EntityEndpoint {
     if (
       !mappedChanged &&
       state.state === this.lastState?.state &&
-      JSON.stringify(state.attributes) ===
-        JSON.stringify(this.lastState?.attributes)
+      isEqual(state.attributes, this.lastState?.attributes)
     ) {
       return;
     }

@@ -1,3 +1,4 @@
+import { BooleanStateConfigurationServer } from "@matter/main/behaviors";
 import { RainSensorDevice } from "@matter/main/devices";
 import { BasicInformationServer } from "../../../behaviors/basic-information-server.js";
 import { BooleanStateServer } from "../../../behaviors/boolean-state-server.js";
@@ -9,4 +10,5 @@ export const RainSensorType = RainSensorDevice.with(
   IdentifyServer,
   HomeAssistantEntityBehavior,
   BooleanStateServer(),
+  BooleanStateConfigurationServer,
 );

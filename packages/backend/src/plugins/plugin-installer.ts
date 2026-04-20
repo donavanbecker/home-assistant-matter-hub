@@ -91,9 +91,7 @@ export class PluginInstaller {
 
           // Try to read the installed version
           const version = this.getInstalledVersion(packageName);
-          logger.info(
-            `Successfully installed ${packageName}@${version || "unknown"}`,
-          );
+          logger.info(`Installed ${packageName}@${version || "unknown"}`);
           resolve({
             success: true,
             packageName,
@@ -136,7 +134,7 @@ export class PluginInstaller {
             });
             return;
           }
-          logger.info(`Successfully uninstalled ${packageName}`);
+          logger.info(`Uninstalled ${packageName}`);
           resolve({ success: true, packageName });
         },
       );

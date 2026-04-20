@@ -1,3 +1,4 @@
+import { GroupsServer, ScenesManagementServer } from "@matter/main/behaviors";
 import { DimmablePlugInUnitDevice } from "@matter/main/devices";
 import { BasicInformationServer } from "../../../behaviors/basic-information-server.js";
 import { HomeAssistantEntityBehavior } from "../../../behaviors/home-assistant-entity-behavior.js";
@@ -9,6 +10,8 @@ export const DimmablePlugInUnitType = DimmablePlugInUnitDevice.with(
   IdentifyServer,
   BasicInformationServer,
   HomeAssistantEntityBehavior,
+  GroupsServer,
+  ScenesManagementServer,
   LightOnOffServer,
   LightLevelControlServer,
 );

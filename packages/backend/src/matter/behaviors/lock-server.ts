@@ -81,8 +81,8 @@ function buildGetUserResponse(
 }
 
 /**
- * Base DoorLock server - used when no PIN is configured for the entity.
- * This provides basic lock/unlock functionality without PIN requirements.
+ * Base DoorLock server — used when no PIN is configured for the entity.
+ * Plain lock/unlock, no credential workflow.
  */
 // biome-ignore lint/correctness/noUnusedVariables: Biome thinks this is unused, but it's used by the function below
 class LockServerBase extends Base {
@@ -136,12 +136,10 @@ namespace LockServerBase {
 
 /**
  * Extended DoorLock server with PinCredential feature.
- * This enables requirePinForRemoteOperation which tells Matter controllers
- * (like Google Home) that a PIN is required for remote unlock operations.
+ * Sets requirePinForRemoteOperation so Matter controllers (Google Home
+ * in particular) prompt for the PIN in-app before unlock.
  *
- * Google Home will then prompt for PIN in the app before allowing unlock.
- * Note: Voice unlock is still disabled by Google for Matter locks (this is
- * a Google policy, not a Matter limitation).
+ * Voice unlock stays disabled by Google policy — not a Matter limitation.
  */
 const PinCredentialBase = Base.with(
   "User",
@@ -395,12 +393,9 @@ export function LockServer(config: LockServerConfig) {
 }
 
 /**
- * Creates a LockServer with PIN credential support.
- * This enables requirePinForRemoteOperation which tells Matter controllers
- * that a PIN is required for remote unlock operations.
- *
- * Note: This enables PIN entry in apps like Google Home, but voice unlock
- * remains disabled by Google's policy for Matter locks.
+ * LockServer with PIN credential support. Sets requirePinForRemoteOperation
+ * so Matter controllers prompt for the PIN before remote unlock. Voice
+ * unlock stays disabled by Google policy for Matter locks.
  */
 export function LockServerWithPin(config: LockServerConfig) {
   return LockServerWithPinBase.set({ config });
@@ -505,8 +500,8 @@ class LockServerWithPinAndUnboltBase extends PinCredentialUnboltBase {
 
   override unlockDoor(request: DoorLock.UnlockDoorRequest) {
     const homeAssistant = this.agent.get(HomeAssistantEntityBehavior);
-    // Use unlatch action if available (lock.open = unlock + unlatch on most locks)
-    // This ensures Apple Home's unlock also unlatches, matching Google Home behavior
+    // Use unlatch action if available (lock.open = unlock + unlatch on most
+    // locks) — Apple Home's unlock then also unlatches, matching Google Home.
     const unlatchConfig = this.state.config.unlatch;
     const action = unlatchConfig
       ? unlatchConfig(void 0, this.agent)

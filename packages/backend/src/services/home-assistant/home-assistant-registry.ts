@@ -77,7 +77,15 @@ export class HomeAssistantRegistry extends Service {
   enableAutoRefresh(onRefresh: () => Promise<void> | void) {
     this.disableAutoRefresh();
 
+    let refreshing = false;
     this.autoRefresh = setInterval(async () => {
+      if (refreshing) {
+        // Previous tick is still mid-retry (HA slow / reconnecting).
+        // Skip this tick so reloads don't stack and overwrite each other.
+        logger.debug("Skipping registry refresh — previous tick still running");
+        return;
+      }
+      refreshing = true;
       try {
         const changed = await this.reload();
         if (changed) {
@@ -85,6 +93,8 @@ export class HomeAssistantRegistry extends Service {
         }
       } catch (e) {
         logger.warn("Failed to refresh registry, will retry next interval:", e);
+      } finally {
+        refreshing = false;
       }
     }, this.options.refreshInterval * 1000);
   }
@@ -137,23 +147,19 @@ export class HomeAssistantRegistry extends Service {
       });
     }
 
-    const entityRegistry = await getRegistry(connection);
-    const statesList = await getStates(connection);
-    const deviceRegistry = await getDeviceRegistry(connection);
-
-    let labels: HomeAssistantLabel[] = [];
-    try {
-      labels = await getLabelRegistry(connection);
-    } catch {
-      // Label registry might not be available in older HA versions
-    }
-
-    let areas: Array<{ area_id: string; name: string }> = [];
-    try {
-      areas = await getAreaRegistry(connection);
-    } catch {
-      // Area registry might not be available in older HA versions
-    }
+    // Fire the five HA queries in parallel. Label and area registries aren't
+    // guaranteed on older HA versions — catch and fall back to empty arrays
+    // without failing the whole reload.
+    const [entityRegistry, statesList, deviceRegistry, labels, areas] =
+      await Promise.all([
+        getRegistry(connection),
+        getStates(connection),
+        getDeviceRegistry(connection),
+        getLabelRegistry(connection).catch(() => [] as HomeAssistantLabel[]),
+        getAreaRegistry(connection).catch(
+          () => [] as Array<{ area_id: string; name: string }>,
+        ),
+      ]);
 
     // Fingerprint structural registry data to detect changes.
     // State *values* change constantly (handled by WebSocket subscription);
