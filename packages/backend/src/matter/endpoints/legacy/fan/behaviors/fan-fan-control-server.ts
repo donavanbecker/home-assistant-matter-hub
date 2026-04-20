@@ -58,7 +58,10 @@ const fanControlConfig: FanControlServerConfig = {
   },
 
   turnOff: () => ({ action: "fan.turn_off" }),
-  turnOn: (percentage) => ({ action: "fan.turn_on", data: { percentage } }),
+  turnOn: (percentage) => ({
+    action: "fan.set_percentage",
+    data: { percentage },
+  }),
   setAutoMode: () => ({ action: "fan.turn_on", data: { preset_mode: "Auto" } }),
   setAirflowDirection: (direction) => ({
     action: "fan.set_direction",
