@@ -34,6 +34,12 @@ export interface WindowCoveringConfig {
   getCurrentTiltPosition: ValueGetter<number | null>;
   getMovementStatus: ValueGetter<MovementStatus>;
 
+  // Override the feature-derived Type / EndProductType. Used to tell
+  // controllers the covering is a curtain/shutter/awning instead of the
+  // default Rollershade (#304).
+  getCoverType?: ValueGetter<WindowCovering.WindowCoveringType | undefined>;
+  getEndProductType?: ValueGetter<WindowCovering.EndProductType | undefined>;
+
   stopCover: ValueSetter<void>;
   openCoverLift: ValueSetter<void>;
   closeCoverLift: ValueSetter<void>;
@@ -212,21 +218,26 @@ export class WindowCoveringServerBase extends FeaturedBase {
       `Cover update for ${entity.entity_id}: state=${state.state}, lift=${currentLift}%, tilt=${currentTilt}%, movement=${MovementStatus[movementStatus]}`,
     );
 
+    const overrideType = config.getCoverType?.(state, this.agent);
+    const overrideEndProduct = config.getEndProductType?.(state, this.agent);
+
     const appliedPatch = applyPatchState<WindowCoveringServerBase.State>(
       this.state,
       {
         type:
-          this.features.lift && this.features.tilt
+          overrideType ??
+          (this.features.lift && this.features.tilt
             ? WindowCovering.WindowCoveringType.TiltBlindLift
             : this.features.tilt
               ? WindowCovering.WindowCoveringType.TiltBlindTiltOnly
-              : WindowCovering.WindowCoveringType.Rollershade,
+              : WindowCovering.WindowCoveringType.Rollershade),
         endProductType:
-          this.features.lift && this.features.tilt
+          overrideEndProduct ??
+          (this.features.lift && this.features.tilt
             ? WindowCovering.EndProductType.SheerShade
             : this.features.tilt
               ? WindowCovering.EndProductType.TiltOnlyInteriorBlind
-              : WindowCovering.EndProductType.RollerShade,
+              : WindowCovering.EndProductType.RollerShade),
         operationalStatus: {
           global: movementStatus,
           ...(this.features.lift ? { lift: movementStatus } : {}),
